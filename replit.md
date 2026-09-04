@@ -1,6 +1,6 @@
-# [Project name]
+# Corvlio Field Dashboard
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An installable field dashboard for Corvlio clients to spot new AI receptionist leads, respond quickly, and track follow-up from a phone.
 
 ## Run & Operate
 
@@ -22,15 +22,20 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/corvlio-field-dashboard` — the React/Vite PWA, including the mobile feed, lead detail, stats, settings, Clerk auth routes, manifest, and service worker.
+- `artifacts/api-server` — the shared Express service and Clerk Frontend API proxy.
+- `public/manifest.webmanifest` and `public/sw.js` — install metadata and offline app-shell support.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first build uses realistic seeded leads with local persistence so the core field workflow is usable before the optional Google Sheets sync is connected.
+- Clerk is the authentication provider for the single business-owner account; the public root route stays useful for signed-out visitors, while field routes require a signed-in session.
+- Native `tel:` and `sms:` links are used for one-tap contact actions; browser push is intentionally labeled as a future connection until a push provider is selected.
+- The PWA is the first delivery target, with a standalone manifest and a conservative service worker that never caches API or auth requests.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Corvlio Field Desk gives owner-operators a quick glance at today's newest leads, urgency, issue, address, and contact status. It includes one-tap call/text actions, completed-call history, response-time stats, settings, and branded owner sign-in.
 
 ## User preferences
 

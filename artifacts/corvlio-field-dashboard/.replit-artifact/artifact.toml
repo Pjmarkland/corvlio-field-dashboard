@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Corvlio Field Dashboard"
+description = "A mobile-first field dashboard for Corvlio clients to spot new AI receptionist leads, call or text customers quickly, track contact status, review response metrics, and manage business settings from a job site."
+version = "1.0.0"
+id = "artifacts/corvlio-field-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22182
+
+[services.development]
+run = "pnpm --filter @workspace/corvlio-field-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/corvlio-field-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/corvlio-field-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22182"
+BASE_PATH = "/"

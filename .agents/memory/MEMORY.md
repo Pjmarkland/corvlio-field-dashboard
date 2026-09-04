@@ -1,0 +1,1 @@
+- [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
