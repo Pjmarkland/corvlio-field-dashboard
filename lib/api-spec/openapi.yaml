@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: leads
+    description: Lead operations
 paths:
   /healthz:
     get:
@@ -24,7 +26,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /leads:
+    get:
+      operationId: getLeads
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: List Google Sheet leads
+      description: Returns normalized lead rows for the signed-in business owner.
+      responses:
+        "200":
+          description: Lead rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lead"
+        "401":
+          description: Authentication required
+        "502":
+          description: Google Sheets could not be read
 components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +61,35 @@ components:
           type: string
       required:
         - status
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        issue:
+          type: string
+        address:
+          type: string
+        urgency:
+          type: string
+          enum: [urgent, normal, low]
+        status:
+          type: string
+          enum: [pending, contacted]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - phone
+        - issue
+        - address
+        - urgency
+        - status
+        - createdAt
 

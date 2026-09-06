@@ -23,19 +23,20 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 ## Where things live
 
 - `artifacts/corvlio-field-dashboard` — the React/Vite PWA, including the mobile feed, lead detail, stats, settings, Clerk auth routes, manifest, and service worker.
-- `artifacts/api-server` — the shared Express service and Clerk Frontend API proxy.
+- `artifacts/api-server` — the shared Express service, Clerk Frontend API proxy, and protected Google Sheets lead reader.
 - `public/manifest.webmanifest` and `public/sw.js` — install metadata and offline app-shell support.
 
 ## Architecture decisions
 
-- The first build uses realistic seeded leads with local persistence so the core field workflow is usable before the optional Google Sheets sync is connected.
+- Lead data comes from one fixed Google Sheet through a protected API endpoint. The server refreshes short-lived Google OAuth access tokens from server-only credentials and normalizes the sheet rows before returning them.
+- The current Google Sheets integration is intentionally single-owner and read-only. Per-business sheet selection and status write-back are future work.
 - Clerk is the authentication provider for the single business-owner account; the public root route stays useful for signed-out visitors, while field routes require a signed-in session.
 - Native `tel:` and `sms:` links are used for one-tap contact actions; browser push is intentionally labeled as a future connection until a push provider is selected.
 - The PWA is the first delivery target, with a standalone manifest and a conservative service worker that never caches API or auth requests.
 
 ## Product
 
-Corvlio Field Desk gives owner-operators a quick glance at today's newest leads, urgency, issue, address, and contact status. It includes one-tap call/text actions, completed-call history, response-time stats, settings, and branded owner sign-in.
+Corvlio Field Desk gives owner-operators a quick glance at today's newest Google Sheet leads, urgency, issue, address, and contact status. It includes one-tap call/text actions, completed-call history, live lead totals, settings, and branded owner sign-in.
 
 ## User preferences
 
