@@ -1,1 +1,2 @@
 - [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
+- [PWA data-source migrations](pwa-data-source-migrations.md) — invalidate installed app shells and legacy client data when replacing a persisted data source.

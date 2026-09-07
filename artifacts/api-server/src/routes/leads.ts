@@ -6,6 +6,12 @@ import { readGoogleSheetLeads } from "../lib/googleSheets";
 const router: IRouter = Router();
 
 router.get("/leads", async (req, res): Promise<void> => {
+  res.set({
+    "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+    Pragma: "no-cache",
+  });
+  res.vary("Cookie");
+
   const { userId } = getAuth(req);
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
