@@ -36,13 +36,11 @@ paths:
       description: Returns normalized lead rows for the signed-in business owner.
       responses:
         "200":
-          description: Lead rows
+          description: Business lead workspace
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Lead"
+                $ref: "#/components/schemas/LeadWorkspace"
         "401":
           description: Authentication required
         "502":
@@ -92,4 +90,19 @@ components:
         - urgency
         - status
         - createdAt
+    LeadWorkspace:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        businessName:
+          type: [string, "null"]
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
+      required:
+        - configured
+        - businessName
+        - leads
 

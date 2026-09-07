@@ -1,6 +1,3 @@
-import { GetLeadsResponse } from "@workspace/api-zod";
-
-const SPREADSHEET_ID = "1ypzx5z1l31RZ9r_msGT8JQG0S4guAmQWSOa5xZTWgtc";
 const REQUIRED_HEADERS = [
   "Timestamp",
   "Caller Name",
@@ -57,8 +54,12 @@ async function getAccessToken(): Promise<string> {
 
 function normalizeUrgency(value: string): "urgent" | "normal" | "low" {
   const normalized = value.trim().toLowerCase();
-  if (["urgent", "high", "emergency"].includes(normalized)) return "urgent";
-  if (["low", "flexible"].includes(normalized)) return "low";
+  if (["urgent", "high", "emergency", "same-day", "same day"].some((label) => normalized.includes(label))) {
+    return "urgent";
+  }
+  if (["low", "flexible", "can wait", "whenever"].some((label) => normalized.includes(label))) {
+    return "low";
+  }
   return "normal";
 }
 
@@ -110,19 +111,19 @@ function parseSheetTimestamp(value: unknown, timeZone: string, rowNumber: number
   return instant.toISOString();
 }
 
-export async function readGoogleSheetLeads() {
+export async function readGoogleSheetLeads(spreadsheetId: string) {
   const accessToken = await getAccessToken();
   const valuesUrl = new URL(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:Z`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/A:Z`,
   );
   valuesUrl.searchParams.set("majorDimension", "ROWS");
   valuesUrl.searchParams.set("valueRenderOption", "FORMATTED_VALUE");
   const timestampsUrl = new URL(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:A`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/A:A`,
   );
   timestampsUrl.searchParams.set("majorDimension", "ROWS");
   timestampsUrl.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
-  const metadataUrl = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`);
+  const metadataUrl = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`);
   metadataUrl.searchParams.set("fields", "properties.timeZone");
 
   const headers = { authorization: `Bearer ${accessToken}` };
@@ -175,5 +176,5 @@ export async function readGoogleSheetLeads() {
     }))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
-  return GetLeadsResponse.parse(leads);
+  return leads;
 }

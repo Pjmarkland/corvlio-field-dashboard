@@ -10,3 +10,4 @@ export * from './healthStatus';
 export * from './lead';
 export * from './leadStatus';
 export * from './leadUrgency';
+export * from './leadWorkspace';

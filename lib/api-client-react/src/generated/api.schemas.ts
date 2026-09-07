@@ -37,3 +37,10 @@ export interface Lead {
   createdAt: string;
 }
 
+export interface LeadWorkspace {
+  configured: boolean;
+  /** @nullable */
+  businessName: string | null;
+  leads: Lead[];
+}
+

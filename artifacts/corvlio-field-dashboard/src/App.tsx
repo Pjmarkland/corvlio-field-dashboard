@@ -154,7 +154,7 @@ function statusLabel(status: LeadStatus) {
   return status === 'contacted' ? 'Contacted' : 'Needs response';
 }
 
-function AppShell({ children, leads }: { children: ReactNode; leads: Lead[] }) {
+function AppShell({ children, leads, businessName }: { children: ReactNode; leads: Lead[]; businessName?: string | null }) {
   const [location] = useLocation();
   const pendingCount = leads.filter((lead) => lead.status === 'pending').length;
   const nav = [
@@ -207,8 +207,8 @@ function AppShell({ children, leads }: { children: ReactNode; leads: Lead[] }) {
             </div>
             <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex"><span className="h-2 w-2 rounded-full bg-[#49a979]" /> On the road · synced</div>
             <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block"><p className="text-xs font-semibold">Northline crew</p><p className="font-mono text-[10px] text-muted-foreground">Owner operator</p></div>
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground" data-testid="avatar-account">NC</div>
+              <div className="hidden text-right sm:block"><p className="max-w-48 truncate text-xs font-semibold">{businessName ?? 'Unconfigured account'}</p><p className="font-mono text-[10px] text-muted-foreground">Owner operator</p></div>
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground" data-testid="avatar-account">{businessName ? initials(businessName) : '—'}</div>
             </div>
           </div>
         </header>
@@ -306,9 +306,9 @@ function NotFound() {
   return <div className="grid min-h-[60vh] place-items-center text-center"><div><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted"><X size={26} /></div><h1 className="text-2xl font-800">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">That field note wandered off.</p><Link href="/dashboard" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground" data-testid="link-not-found-home">Back to today</Link></div></div>;
 }
 
-function Router({ leads, onContact, onStatus }: { leads: Lead[]; onContact: (id: string) => void; onStatus: (id: string, status: LeadStatus) => void }) {
+function Router({ leads, businessName, onContact, onStatus }: { leads: Lead[]; businessName: string; onContact: (id: string) => void; onStatus: (id: string, status: LeadStatus) => void }) {
   const [location] = useLocation();
-  return <AppShell leads={leads}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <HomePage leads={leads} onContact={onContact} />} /><Route path="/completed" component={() => <CompletedPage leads={leads} />} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onContact={onContact} onStatus={onStatus} />} /><Route path="/stats" component={() => <StatsPage leads={leads} />} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+  return <AppShell leads={leads} businessName={businessName}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <HomePage leads={leads} onContact={onContact} />} /><Route path="/completed" component={() => <CompletedPage leads={leads} />} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onContact={onContact} onStatus={onStatus} />} /><Route path="/stats" component={() => <StatsPage leads={leads} />} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
 }
 
 function PublicHome() {
@@ -370,10 +370,10 @@ function LeadDataRouter() {
   const { data, isLoading, isError, refetch } = useGetLeads();
   const [statusOverrides, setStatusOverrides] = useState<Record<string, LeadStatus>>({});
   const leads = useMemo(
-    () => (data ?? [])
+    () => (data?.leads ?? [])
       .map((lead) => ({ ...lead, status: statusOverrides[lead.id] ?? lead.status }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-    [data, statusOverrides],
+    [data?.leads, statusOverrides],
   );
   const onStatus = (id: string, status: LeadStatus) =>
     setStatusOverrides((current) => ({ ...current, [id]: status }));
@@ -385,7 +385,11 @@ function LeadDataRouter() {
     return <AppShell leads={[]}><div className="grid min-h-[55vh] place-items-center text-center"><div className="max-w-sm"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><X size={26} /></div><h1 className="text-2xl font-800">Couldn’t load leads</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Corvlio couldn’t reach the connected Google Sheet. Your mock data has not been substituted.</p><button type="button" onClick={() => void refetch()} className="mt-5 min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">Try again</button></div></div></AppShell>;
   }
 
-  return <Router leads={leads as Lead[]} onContact={(id) => onStatus(id, 'contacted')} onStatus={onStatus} />;
+  if (!data?.configured) {
+    return <AppShell leads={[]} businessName={null}><div className="grid min-h-[55vh] place-items-center text-center"><div className="max-w-md"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Users size={28} /></div><p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary">Account setup</p><h1 className="text-3xl font-800 tracking-[-0.045em]">No business configured</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">This owner account is signed in, but it hasn’t been linked to a Corvlio business yet. Contact Corvlio support to connect the correct lead sheet.</p><a href="mailto:hello@corvlio.com?subject=Connect%20my%20Corvlio%20business" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="link-configure-business">Contact Corvlio <ArrowUpRight size={16} /></a></div></div></AppShell>;
+  }
+
+  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} onContact={(id) => onStatus(id, 'contacted')} onStatus={onStatus} />;
 }
 
 function AuthenticatedRouter() {

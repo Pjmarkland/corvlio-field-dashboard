@@ -21,7 +21,10 @@ export const HealthCheckResponse = zod.object({
  * Returns normalized lead rows for the signed-in business owner.
  * @summary List Google Sheet leads
  */
-export const GetLeadsResponseItem = zod.object({
+export const GetLeadsResponse = zod.object({
+  "configured": zod.boolean(),
+  "businessName": zod.string().nullable(),
+  "leads": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),
@@ -30,7 +33,7 @@ export const GetLeadsResponseItem = zod.object({
   "urgency": zod.enum(['urgent', 'normal', 'low']),
   "status": zod.enum(['pending', 'contacted']),
   "createdAt": zod.coerce.date()
+}))
 })
-export const GetLeadsResponse = zod.array(GetLeadsResponseItem)
 
 

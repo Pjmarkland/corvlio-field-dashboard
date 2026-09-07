@@ -17,7 +17,7 @@ import type {
 
 import type {
   HealthStatus,
-  Lead
+  LeadWorkspace
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -137,9 +137,9 @@ export const getGetLeadsUrl = () => {
  * Returns normalized lead rows for the signed-in business owner.
  * @summary List Google Sheet leads
  */
-export const getLeads = async ( options?: Parameters<typeof customFetch>[1]): Promise<Lead[]> => {
+export const getLeads = async ( options?: Parameters<typeof customFetch>[1]): Promise<LeadWorkspace> => {
 
-  return customFetch<Lead[]>(getGetLeadsUrl(),
+  return customFetch<LeadWorkspace>(getGetLeadsUrl(),
   {
     ...options,
     method: 'GET'

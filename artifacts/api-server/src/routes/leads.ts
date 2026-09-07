@@ -1,6 +1,7 @@
 import { getAuth } from "@clerk/express";
 import { GetLeadsResponse } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
+import { findBusinessForClerkUser } from "../lib/businessRegistry";
 import { readGoogleSheetLeads } from "../lib/googleSheets";
 
 const router: IRouter = Router();
@@ -19,8 +20,22 @@ router.get("/leads", async (req, res): Promise<void> => {
   }
 
   try {
-    const leads = await readGoogleSheetLeads();
-    res.json(GetLeadsResponse.parse(leads));
+    const business = findBusinessForClerkUser(userId);
+    if (!business) {
+      res.json(GetLeadsResponse.parse({
+        configured: false,
+        businessName: null,
+        leads: [],
+      }));
+      return;
+    }
+
+    const leads = await readGoogleSheetLeads(business.googleSheetId);
+    res.json(GetLeadsResponse.parse({
+      configured: true,
+      businessName: business.name,
+      leads,
+    }));
   } catch (error) {
     req.log.error(
       { error: error instanceof Error ? error.message : "Unknown Google Sheets error" },
