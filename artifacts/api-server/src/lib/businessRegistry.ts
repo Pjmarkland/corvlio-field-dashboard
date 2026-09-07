@@ -16,7 +16,7 @@ const BUSINESSES: readonly Business[] = [
     id: "business-b",
     name: "HVAC Test Business",
     googleSheetId: "1AYt1Q1uFTvOByPjwK_uqGVOn3qay2CVo9IqNZ1V7p5o",
-    clerkUserIds: [],
+    clerkUserIds: ["user_3J1HZFvYKoBOrJV3WEzroXFgjuE"],
   },
 ];
 
