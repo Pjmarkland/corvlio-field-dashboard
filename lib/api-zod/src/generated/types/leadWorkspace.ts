@@ -11,5 +11,7 @@ export interface LeadWorkspace {
   configured: boolean;
   /** @nullable */
   businessName: string | null;
+  /** @nullable */
+  timeZone: string | null;
   leads: Lead[];
 }

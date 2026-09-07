@@ -1,12 +1,18 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { useGetLeads } from '@workspace/api-client-react';
+import {
+  getGetLeadsQueryKey,
+  useGetLeads,
+  useUpdateLeadStatus,
+  type LeadWorkspace,
+} from '@workspace/api-client-react';
 import { ClerkProvider, Show, SignIn, SignUp, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -43,7 +49,9 @@ type Lead = {
   urgency: Urgency;
   status: LeadStatus;
   createdAt: string;
+  contactedAt: string | null;
 };
+type StatusHandler = (id: string, status: LeadStatus) => void;
 
 const queryClient = new QueryClient();
 const SETTINGS_KEY = 'corvlio-settings-v1';
@@ -154,6 +162,44 @@ function statusLabel(status: LeadStatus) {
   return status === 'contacted' ? 'Contacted' : 'Needs response';
 }
 
+function dateOrdinalInTimeZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Math.floor(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)) / 86_400_000);
+}
+
+function leadMetrics(leads: Lead[], timeZone: string) {
+  const todayOrdinal = dateOrdinalInTimeZone(new Date(), timeZone);
+  const todayDay = new Date(todayOrdinal * 86_400_000).getUTCDay();
+  const weekStartOrdinal = todayOrdinal - ((todayDay + 6) % 7);
+  const thisWeek = leads.filter((lead) => {
+    const ordinal = dateOrdinalInTimeZone(new Date(lead.createdAt), timeZone);
+    return ordinal >= weekStartOrdinal && ordinal <= todayOrdinal;
+  }).length;
+  const replyDurations = leads.flatMap((lead) => {
+    if (!lead.contactedAt) return [];
+    const duration = Date.parse(lead.contactedAt) - Date.parse(lead.createdAt);
+    return Number.isFinite(duration) && duration >= 0 ? [duration] : [];
+  });
+  const avgReplyMinutes = replyDurations.length
+    ? Math.round(replyDurations.reduce((total, duration) => total + duration, 0) / replyDurations.length / 60_000)
+    : null;
+  return { thisWeek, avgReplyMinutes };
+}
+
+function formatReplyTime(minutes: number | null) {
+  if (minutes == null) return '—';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
 function AppShell({ children, leads, businessName }: { children: ReactNode; leads: Lead[]; businessName?: string | null }) {
   const [location] = useLocation();
   const pendingCount = leads.filter((lead) => lead.status === 'pending').length;
@@ -229,7 +275,7 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
   return <div className="mb-7 flex items-end justify-between gap-4 animate-rise-in"><div><div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{eyebrow}</div><h1 className="text-[32px] font-800 leading-[.98] tracking-[-0.055em] sm:text-[40px]">{title}</h1>{description ? <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p> : null}</div>{action}</div>;
 }
 
-function LeadCard({ lead, onContact }: { lead: Lead; onContact: (id: string) => void }) {
+function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHandler; saving: boolean }) {
   return <article className="group rounded-2xl border border-border bg-card p-4 shadow-[0_1px_0_hsl(35_19%_84%)] transition-transform hover:-translate-y-0.5 sm:p-5" data-testid={`card-lead-${lead.id}`}>
     <div className="flex items-start gap-3">
       <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] text-xs font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`} data-testid={`avatar-lead-${lead.id}`}>{initials(lead.name)}</div>
@@ -241,32 +287,34 @@ function LeadCard({ lead, onContact }: { lead: Lead; onContact: (id: string) => 
     </div>
     <div className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><MapPin size={13} className="text-primary" /><span className="truncate">{lead.address}</span></div>
     <div className="mt-4 grid grid-cols-2 gap-2">
-      <a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => onContact(lead.id)} data-testid={`button-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition-transform active:scale-[.98]"><Phone size={16} />Call</a>
-      <a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => onContact(lead.id)} data-testid={`button-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-muted active:scale-[.98]"><MessageSquare size={16} />Text</a>
+      <a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition-transform active:scale-[.98]"><Phone size={16} />Call</a>
+      <a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-muted active:scale-[.98]"><MessageSquare size={16} />Text</a>
     </div>
-    <div className="mt-3 flex items-center justify-between"><span className={`flex items-center gap-1.5 text-[11px] font-semibold ${lead.status === 'contacted' ? 'text-[#398660]' : 'text-muted-foreground'}`}><span className={`h-1.5 w-1.5 rounded-full ${lead.status === 'contacted' ? 'bg-[#49a979]' : 'bg-[#c4bcae]'}`} />{statusLabel(lead.status)}</span><Link href={`/leads/${lead.id}`} className="flex items-center gap-1 text-[11px] font-semibold text-primary opacity-80 group-hover:opacity-100" data-testid={`link-view-${lead.id}`}>Details <ArrowUpRight size={13} /></Link></div>
+    <div className="mt-3 flex items-center justify-between gap-3"><span className={`flex items-center gap-1.5 text-[11px] font-semibold ${lead.status === 'contacted' ? 'text-[#398660]' : 'text-muted-foreground'}`}><span className={`h-1.5 w-1.5 rounded-full ${lead.status === 'contacted' ? 'bg-[#49a979]' : 'bg-[#c4bcae]'}`} />{statusLabel(lead.status)}</span><button type="button" disabled={saving} onClick={() => onStatus(lead.id, lead.status === 'pending' ? 'contacted' : 'pending')} data-testid={`button-toggle-status-${lead.id}`} className="min-h-9 rounded-lg border border-border px-3 text-[11px] font-bold text-primary disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : lead.status === 'pending' ? 'Mark contacted' : 'Reopen'}</button></div>
   </article>;
 }
 
-function HomePage({ leads, onContact }: { leads: Lead[]; onContact: (id: string) => void }) {
+function HomePage({ leads, timeZone, onStatus, savingLeadId }: { leads: Lead[]; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
   const pending = leads.filter((lead) => lead.status === 'pending');
-  return <><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pending.length ? `${pending.length} new call${pending.length === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pending.length}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pending.length}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">12<span className="ml-0.5 text-sm font-medium text-muted-foreground">m</span></p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{leads.length + 9}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onContact={onContact} /></div>) : <EmptyToday />}</div>{leads.filter((lead) => lead.status === 'contacted').length > 0 ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{leads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <div key={lead.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{lead.name}</p><p className="truncate text-xs text-muted-foreground">{lead.issue}</p></div><Check size={16} className="text-[#49a979]" /></div>)}</div></div> : null}</>;
+  const metrics = leadMetrics(leads, timeZone);
+  return <><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pending.length ? `${pending.length} new call${pending.length === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pending.length}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pending.length}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">{formatReplyTime(metrics.avgReplyMinutes)}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{metrics.thisWeek}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>) : <EmptyToday />}</div>{leads.filter((lead) => lead.status === 'contacted').length > 0 ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{leads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <div key={lead.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{lead.name}</p><p className="truncate text-xs text-muted-foreground">{lead.issue}</p></div><Check size={16} className="text-[#49a979]" /></div>)}</div></div> : null}</>;
 }
 
 function EmptyToday() {
   return <div className="grid-paper rounded-2xl border border-dashed border-border px-6 py-14 text-center"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><CheckCircle2 size={26} /></div><h2 className="text-lg font-bold">Clear runway</h2><p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">No new leads need you right now. Corvlio is keeping watch while you keep moving.</p></div>;
 }
 
-function CompletedPage({ leads }: { leads: Lead[] }) {
+function CompletedPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
   const completed = leads.filter((lead) => lead.status === 'contacted');
-  return <><PageHeading eyebrow="History" title="Completed calls" description="A quick record of the people you’ve already reached." /><div className="mb-5 flex items-center gap-2 rounded-xl bg-secondary/65 px-4 py-3 text-sm text-secondary-foreground"><CheckCircle2 size={17} /><span><strong>{completed.length}</strong> contacted lead{completed.length === 1 ? '' : 's'} in your history</span></div>{completed.length ? <div className="space-y-3">{completed.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 60}ms` }}><LeadCard lead={lead} onContact={() => undefined} /></div>)}</div> : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground"><Phone size={28} /></div><h2 className="text-xl font-800 tracking-[-0.03em]">Your call history starts here</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">When you call or text a new lead, they’ll move here automatically. Nothing gets lost between jobs.</p><Link href="/dashboard" data-testid="link-empty-go-today" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">See today’s leads <ArrowUpRight size={16} /></Link></div>}</>;
+  return <><PageHeading eyebrow="History" title="Completed calls" description="A quick record of the people you’ve already reached." /><div className="mb-5 flex items-center gap-2 rounded-xl bg-secondary/65 px-4 py-3 text-sm text-secondary-foreground"><CheckCircle2 size={17} /><span><strong>{completed.length}</strong> contacted lead{completed.length === 1 ? '' : 's'} in your history</span></div>{completed.length ? <div className="space-y-3">{completed.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 60}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>)}</div> : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground"><Phone size={28} /></div><h2 className="text-xl font-800 tracking-[-0.03em]">Your call history starts here</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">When you call or text a new lead, they’ll move here automatically. Nothing gets lost between jobs.</p><Link href="/dashboard" data-testid="link-empty-go-today" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">See today’s leads <ArrowUpRight size={16} /></Link></div>}</>;
 }
 
-function DetailPage({ leads, onContact, onStatus }: { leads: Lead[]; onContact: (id: string) => void; onStatus: (id: string, status: LeadStatus) => void }) {
+function DetailPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
   const params = useParams<{ id: string }>();
   const lead = leads.find((item) => item.id === params.id);
   if (!lead) return <NotFound />;
-  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{lead.name}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{lead.issue}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => onContact(lead.id)} data-testid={`button-detail-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-[.98]"><Phone size={18} /> Call {lead.name.split(' ')[0]}</a><a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => onContact(lead.id)} data-testid={`button-detail-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold active:scale-[.98]"><MessageSquare size={18} /> Send text</a></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={lead.phone} href={`tel:${lead.phone.replace(/\D/g, '')}`} /><InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5"><div><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Changes here are local until sheet write-back is enabled.</p></div>{lead.status === 'pending' ? <button onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="touch-target flex items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground"><Check size={16} /> Mark contacted</button> : <button onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="touch-target rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground">Reopen lead</button>}</div></div>;
+  const saving = savingLeadId === lead.id;
+  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{lead.name}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{lead.issue}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-[.98]"><Phone size={18} /> Call {lead.name.split(' ')[0]}</a><a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold active:scale-[.98]"><MessageSquare size={18} /> Send text</a></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={lead.phone} href={`tel:${lead.phone.replace(/\D/g, '')}`} /><InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5"><div><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Saved directly to the connected Google Sheet.</p></div>{lead.status === 'pending' ? <button disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="touch-target flex items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button> : <button disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="touch-target rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}</div></div>;
 }
 
 function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) {
@@ -274,10 +322,10 @@ function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string;
   return href ? <a href={href} className="flex min-h-14 items-center gap-3 rounded-xl px-2 hover:bg-muted" data-testid={`link-info-${label.toLowerCase()}`}>{content}</a> : <div className="flex min-h-14 items-center gap-3 rounded-xl px-2">{content}</div>;
 }
 
-function StatsPage({ leads }: { leads: Lead[] }) {
+function StatsPage({ leads, timeZone }: { leads: Lead[]; timeZone: string }) {
   const contacted = leads.filter((lead) => lead.status === 'contacted').length;
-  const bars = [42, 57, 36, 72, 51, 64, 28];
-  return <><PageHeading eyebrow="Live sheet" title="Field stats" description="A simple view of the leads currently synced from Google Sheets." /><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/55">Total leads</span><Phone size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em] text-primary">{leads.length}</p><p className="mt-2 text-xs text-sidebar-foreground/55">From the connected sheet</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Contacted</span><CheckCircle2 size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{contacted}</p><p className="mt-2 text-xs text-muted-foreground">{leads.length - contacted} still need a response</p></div></div></>;
+  const metrics = leadMetrics(leads, timeZone);
+  return <><PageHeading eyebrow="Live sheet" title="Field stats" description="Real activity calculated from this business’s connected Google Sheet." /><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/55">Total leads</span><Phone size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em] text-primary">{leads.length}</p><p className="mt-2 text-xs text-sidebar-foreground/55">From the connected sheet</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Contacted</span><CheckCircle2 size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{contacted}</p><p className="mt-2 text-xs text-muted-foreground">{leads.length - contacted} still need a response</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">This week</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{metrics.thisWeek}</p><p className="mt-2 text-xs text-muted-foreground">Received since Monday in {timeZone}</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Avg reply</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{formatReplyTime(metrics.avgReplyMinutes)}</p><p className="mt-2 text-xs text-muted-foreground">{metrics.avgReplyMinutes == null ? 'Available after the first timed reply' : 'Arrival to Contacted At, timed rows only'}</p></div></div></>;
 }
 
 function Metric({ label, value, color }: { label: string; value: number; color: string }) {
@@ -306,9 +354,9 @@ function NotFound() {
   return <div className="grid min-h-[60vh] place-items-center text-center"><div><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted"><X size={26} /></div><h1 className="text-2xl font-800">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">That field note wandered off.</p><Link href="/dashboard" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground" data-testid="link-not-found-home">Back to today</Link></div></div>;
 }
 
-function Router({ leads, businessName, onContact, onStatus }: { leads: Lead[]; businessName: string; onContact: (id: string) => void; onStatus: (id: string, status: LeadStatus) => void }) {
+function Router({ leads, businessName, timeZone, onStatus, savingLeadId }: { leads: Lead[]; businessName: string; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
   const [location] = useLocation();
-  return <AppShell leads={leads} businessName={businessName}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <HomePage leads={leads} onContact={onContact} />} /><Route path="/completed" component={() => <CompletedPage leads={leads} />} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onContact={onContact} onStatus={onStatus} />} /><Route path="/stats" component={() => <StatsPage leads={leads} />} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+  return <AppShell leads={leads} businessName={businessName}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/completed" component={() => <CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
 }
 
 function PublicHome() {
@@ -368,15 +416,47 @@ function SignUpPage() {
 
 function LeadDataRouter() {
   const { data, isLoading, isError, refetch } = useGetLeads();
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, LeadStatus>>({});
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const updateStatus = useUpdateLeadStatus();
+  const [savingLeadId, setSavingLeadId] = useState<string | null>(null);
+  const savingLeadIdRef = useRef<string | null>(null);
   const leads = useMemo(
-    () => (data?.leads ?? [])
-      .map((lead) => ({ ...lead, status: statusOverrides[lead.id] ?? lead.status }))
+    () => [...(data?.leads ?? [])]
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-    [data?.leads, statusOverrides],
+    [data?.leads],
   );
-  const onStatus = (id: string, status: LeadStatus) =>
-    setStatusOverrides((current) => ({ ...current, [id]: status }));
+  const onStatus: StatusHandler = (id, status) => {
+    if (savingLeadIdRef.current) return;
+    savingLeadIdRef.current = id;
+    setSavingLeadId(id);
+    void updateStatus.mutateAsync({ leadId: id, data: { status } })
+      .then((result) => {
+        queryClient.setQueryData<LeadWorkspace>(getGetLeadsQueryKey(), (current) => current
+          ? {
+              ...current,
+              leads: current.leads.map((lead) => lead.id === result.leadId
+                ? { ...lead, status: result.status, contactedAt: result.contactedAt }
+                : lead),
+            }
+          : current);
+        toast({
+          title: status === 'contacted' ? 'Lead marked contacted' : 'Lead reopened',
+          description: 'The connected Google Sheet is up to date.',
+        });
+      })
+      .catch((error: unknown) => {
+        toast({
+          variant: 'destructive',
+          title: 'Status wasn’t saved',
+          description: error instanceof Error ? error.message.replace(/^HTTP \d+ [^:]*:\s*/, '') : 'Google Sheets could not be updated. Try again.',
+        });
+      })
+      .finally(() => {
+        savingLeadIdRef.current = null;
+        setSavingLeadId(null);
+      });
+  };
 
   if (isLoading) {
     return <AppShell leads={[]}><div className="grid min-h-[55vh] place-items-center text-center"><div><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-secondary border-t-primary" /><h1 className="text-xl font-800">Loading today’s leads</h1><p className="mt-2 text-sm text-muted-foreground">Syncing the latest rows from Google Sheets.</p></div></div></AppShell>;
@@ -389,7 +469,7 @@ function LeadDataRouter() {
     return <AppShell leads={[]} businessName={null}><div className="grid min-h-[55vh] place-items-center text-center"><div className="max-w-md"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Users size={28} /></div><p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary">Account setup</p><h1 className="text-3xl font-800 tracking-[-0.045em]">No business configured</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">This owner account is signed in, but it hasn’t been linked to a Corvlio business yet. Contact Corvlio support to connect the correct lead sheet.</p><a href="mailto:hello@corvlio.com?subject=Connect%20my%20Corvlio%20business" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="link-configure-business">Contact Corvlio <ArrowUpRight size={16} /></a></div></div></AppShell>;
   }
 
-  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} onContact={(id) => onStatus(id, 'contacted')} onStatus={onStatus} />;
+  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;
 }
 
 function AuthenticatedRouter() {

@@ -24,6 +24,7 @@ export const HealthCheckResponse = zod.object({
 export const GetLeadsResponse = zod.object({
   "configured": zod.boolean(),
   "businessName": zod.string().nullable(),
+  "timeZone": zod.string().nullable(),
   "leads": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -32,8 +33,31 @@ export const GetLeadsResponse = zod.object({
   "address": zod.string(),
   "urgency": zod.enum(['urgent', 'normal', 'low']),
   "status": zod.enum(['pending', 'contacted']),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "contactedAt": zod.coerce.date().nullable()
 }))
+})
+
+
+/**
+ * Updates one lead in the signed-in business owner's Google Sheet.
+ * @summary Update a lead status
+ */
+
+
+
+export const UpdateLeadStatusParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const UpdateLeadStatusBody = zod.object({
+  "status": zod.enum(['pending', 'contacted'])
+})
+
+export const UpdateLeadStatusResponse = zod.object({
+  "leadId": zod.string(),
+  "status": zod.enum(['pending', 'contacted']),
+  "contactedAt": zod.coerce.date().nullable()
 })
 
 

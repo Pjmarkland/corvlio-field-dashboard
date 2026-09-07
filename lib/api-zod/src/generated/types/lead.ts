@@ -17,4 +17,6 @@ export interface Lead {
   urgency: LeadUrgency;
   status: LeadStatus;
   createdAt: Date;
+  /** @nullable */
+  contactedAt: Date | null;
 }

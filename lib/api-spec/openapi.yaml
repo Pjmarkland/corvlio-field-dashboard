@@ -43,8 +43,52 @@ paths:
                 $ref: "#/components/schemas/LeadWorkspace"
         "401":
           description: Authentication required
+        "429":
+          description: Google Sheets rate limit reached
         "502":
           description: Google Sheets could not be read
+  /leads/{leadId}/status:
+    patch:
+      operationId: updateLeadStatus
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Update a lead status
+      description: Updates one lead in the signed-in business owner's Google Sheet.
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadStatusUpdate"
+      responses:
+        "200":
+          description: Confirmed lead status update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadStatusResult"
+        "400":
+          description: Invalid lead ID or status
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Lead not found in the business sheet
+        "409":
+          description: The stable lead ID is duplicated
+        "429":
+          description: Google Sheets rate limit reached
+        "502":
+          description: Google Sheets could not be updated
 components:
   securitySchemes:
     clerkSession:
@@ -81,6 +125,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
       required:
         - id
         - name
@@ -90,12 +137,39 @@ components:
         - urgency
         - status
         - createdAt
+        - contactedAt
+    LeadStatusUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [pending, contacted]
+      required:
+        - status
+    LeadStatusResult:
+      type: object
+      properties:
+        leadId:
+          type: string
+        status:
+          type: string
+          enum: [pending, contacted]
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - leadId
+        - status
+        - contactedAt
     LeadWorkspace:
       type: object
       properties:
         configured:
           type: boolean
         businessName:
+          type: [string, "null"]
+        timeZone:
           type: [string, "null"]
         leads:
           type: array
@@ -104,5 +178,6 @@ components:
       required:
         - configured
         - businessName
+        - timeZone
         - leads
 

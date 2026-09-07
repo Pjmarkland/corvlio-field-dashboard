@@ -1,2 +1,3 @@
 - [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
 - [PWA data-source migrations](pwa-data-source-migrations.md) — invalidate installed app shells and legacy client data when replacing a persisted data source.
+- [Google Sheets row writes](google-sheets-row-writes.md) — stable-ID lookup handles normal reorders; strict simultaneous-sort safety needs a lock-bearing Apps Script.

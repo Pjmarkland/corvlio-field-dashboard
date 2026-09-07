@@ -6,22 +6,28 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   HealthStatus,
+  LeadStatusResult,
+  LeadStatusUpdate,
   LeadWorkspace
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -202,4 +208,77 @@ export function useGetLeads<TData = Awaited<ReturnType<typeof getLeads>>, TError
 
 
 
+
+export const getUpdateLeadStatusUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}/status`
+}
+
+/**
+ * Updates one lead in the signed-in business owner's Google Sheet.
+ * @summary Update a lead status
+ */
+export const updateLeadStatus = async (leadId: string,
+    leadStatusUpdate: LeadStatusUpdate, options?: Parameters<typeof customFetch>[1]): Promise<LeadStatusResult> => {
+
+  return customFetch<LeadStatusResult>(getUpdateLeadStatusUrl(leadId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(leadStatusUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateLeadStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeadStatus>>, TError,{leadId: string;data: BodyType<LeadStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLeadStatus>>, TError,{leadId: string;data: BodyType<LeadStatusUpdate>}, TContext> => {
+
+const mutationKey = ['updateLeadStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLeadStatus>>, {leadId: string;data: BodyType<LeadStatusUpdate>}> = (props) => {
+          const {leadId,data} = props ?? {};
+
+          return  updateLeadStatus(leadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLeadStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateLeadStatus>>>
+    export type UpdateLeadStatusMutationBody = BodyType<LeadStatusUpdate>
+    export type UpdateLeadStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a lead status
+ */
+export const useUpdateLeadStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeadStatus>>, TError,{leadId: string;data: BodyType<LeadStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLeadStatus>>,
+        TError,
+        {leadId: string;data: BodyType<LeadStatusUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateLeadStatusMutationOptions(options));
+    }
 

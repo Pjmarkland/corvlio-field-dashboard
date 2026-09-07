@@ -35,12 +35,43 @@ export interface Lead {
   urgency: LeadUrgency;
   status: LeadStatus;
   createdAt: string;
+  /** @nullable */
+  contactedAt: string | null;
+}
+
+export type LeadStatusUpdateStatus = typeof LeadStatusUpdateStatus[keyof typeof LeadStatusUpdateStatus];
+
+
+export const LeadStatusUpdateStatus = {
+  pending: 'pending',
+  contacted: 'contacted',
+} as const;
+
+export interface LeadStatusUpdate {
+  status: LeadStatusUpdateStatus;
+}
+
+export type LeadStatusResultStatus = typeof LeadStatusResultStatus[keyof typeof LeadStatusResultStatus];
+
+
+export const LeadStatusResultStatus = {
+  pending: 'pending',
+  contacted: 'contacted',
+} as const;
+
+export interface LeadStatusResult {
+  leadId: string;
+  status: LeadStatusResultStatus;
+  /** @nullable */
+  contactedAt: string | null;
 }
 
 export interface LeadWorkspace {
   configured: boolean;
   /** @nullable */
   businessName: string | null;
+  /** @nullable */
+  timeZone: string | null;
   leads: Lead[];
 }
 
