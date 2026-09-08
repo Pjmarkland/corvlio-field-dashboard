@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
+    "build:native": "PORT=4173 BASE_PATH=/ NODE_ENV=production vite build --config vite.config.ts",
+    "native:sync": "pnpm run build:native && cap sync",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -76,8 +78,10 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9",
     "@capacitor/push-notifications": "^7.0.7",
     "@clerk/react": "^6.15.1",
     "@clerk/themes": "^2.4.57"

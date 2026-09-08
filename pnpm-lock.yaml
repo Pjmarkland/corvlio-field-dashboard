@@ -231,12 +231,18 @@ importers:
 
   artifacts/corvlio-field-dashboard:
     dependencies:
+      '@capacitor/android':
+        specifier: ^7.6.9
+        version: 7.6.9(@capacitor/core@7.6.9)
       '@capacitor/app':
         specifier: ^7.1.2
         version: 7.1.2(@capacitor/core@7.6.9)
       '@capacitor/core':
         specifier: ^7.6.9
         version: 7.6.9
+      '@capacitor/ios':
+        specifier: ^7.6.9
+        version: 7.6.9(@capacitor/core@7.6.9)
       '@capacitor/push-notifications':
         specifier: ^7.0.7
         version: 7.0.7(@capacitor/core@7.6.9)
@@ -764,6 +770,11 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
+  '@capacitor/android@7.6.9':
+    resolution: {integrity: sha512-jvfU42aOuj92/KJqRscfDm+5612WzJainFL09xjJgD9oI3OMXN4PBfccn8Ig9i8x7bkVqZv/XNwFshiIRqmggg==}
+    peerDependencies:
+      '@capacitor/core': ^7.6.0
+
   '@capacitor/app@7.1.2':
     resolution: {integrity: sha512-d4I/oF/PRu4megL7/IGKYfe5j7yzSON1FRFgq6kH+m5kH6g7V+wyjHRLauCzGNjdRx4S+nWOumINds0qcRBtKg==}
     peerDependencies:
@@ -776,6 +787,11 @@ packages:
 
   '@capacitor/core@7.6.9':
     resolution: {integrity: sha512-4DOh/xySC9S5ryhUIqpOppasIyi2WiTdF0JuZ/2DEs+vf5eunRzHDdNYBp1snA3faHciTw/3SVGXfR+WkYxsMA==}
+
+  '@capacitor/ios@7.6.9':
+    resolution: {integrity: sha512-LANP81TfwuJk1zq9EuF+J5AJK71rKDgXB5XD+VFJQHC7BxSH4Dsma6DSMyrjFT03jtqc/0JTMEfSMBE7go3ZjA==}
+    peerDependencies:
+      '@capacitor/core': ^7.6.0
 
   '@capacitor/push-notifications@7.0.7':
     resolution: {integrity: sha512-TgFsPV4uOez0RtFKsWPz3XCrLxc9th+UyAkillUY9vL6ezVKT35te9Sn4vGR0jeU2U0KUNU7Dt6oSCALnSiEKg==}
@@ -3615,6 +3631,10 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@capacitor/android@7.6.9(@capacitor/core@7.6.9)':
+    dependencies:
+      '@capacitor/core': 7.6.9
+
   '@capacitor/app@7.1.2(@capacitor/core@7.6.9)':
     dependencies:
       '@capacitor/core': 7.6.9
@@ -3644,6 +3664,10 @@ snapshots:
   '@capacitor/core@7.6.9':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/ios@7.6.9(@capacitor/core@7.6.9)':
+    dependencies:
+      '@capacitor/core': 7.6.9
 
   '@capacitor/push-notifications@7.0.7(@capacitor/core@7.6.9)':
     dependencies:
