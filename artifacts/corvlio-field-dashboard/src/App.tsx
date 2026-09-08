@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import {
   getGetLeadsQueryKey,
   useGetLeads,
+  useGetNotificationStatus,
   useUpdateLeadStatus,
   type LeadWorkspace,
 } from '@workspace/api-client-react';
@@ -332,6 +333,38 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
   return <div><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{label}</span><span className="font-mono font-medium">{value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} /></div></div>;
 }
 
+function NotificationStatusRow() {
+  const { data, isLoading } = useGetNotificationStatus();
+  const pollerReady = data?.poller.initialized && !data?.poller.lastError;
+  const deviceCount = data?.enabledDeviceCount ?? 0;
+
+  let badge: ReactNode;
+  let detail: string;
+  if (isLoading) {
+    badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Checking…</span>;
+    detail = 'Fetching notification status from the server.';
+  } else if (!pollerReady) {
+    badge = <span className="rounded-full bg-[#f1e3bb] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#8c6418]">Initializing</span>;
+    detail = data?.poller.lastError ? `Poller error: ${data.poller.lastError}` : 'Lead poller is starting up — check back in a moment.';
+  } else if (deviceCount === 0) {
+    badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">No devices</span>;
+    detail = 'Poller is running. Install the app on your phone to enable push alerts.';
+  } else {
+    badge = <span className="rounded-full bg-[#d9eee1] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#398660]">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>;
+    detail = `Push alerts active on ${deviceCount} registered device${deviceCount !== 1 ? 's' : ''}.`;
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-border py-3" data-testid="row-notification-status">
+      <div>
+        <p className="text-sm font-semibold">Push alerts</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
+      </div>
+      {badge}
+    </div>
+  );
+}
+
 function SettingsPage() {
   const { signOut } = useClerk();
   const [settings, setSettings] = useState<SettingsState>(loadSettings);
@@ -343,7 +376,7 @@ function SettingsPage() {
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
   };
-  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />{saved ? <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#d9eee1] px-4 py-3 text-sm font-semibold text-[#398660] animate-rise-in" data-testid="status-settings-saved"><Check size={16} /> Saved locally</div> : null}<div className="space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Users size={17} /></div><div><h2 className="font-bold">Business profile</h2><p className="text-xs text-muted-foreground">Shown when you follow up with a lead.</p></div></div><label className="mb-4 block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business name</span><input value={settings.businessName} onChange={(event) => update({ businessName: event.target.value })} data-testid="input-business-name" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label><label className="block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business phone</span><input value={settings.phone} onChange={(event) => update({ phone: event.target.value })} data-testid="input-business-phone" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418]"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-xs text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><div className="flex items-center justify-between gap-4 border-b border-border py-3"><div><p className="text-sm font-semibold">Notification permission</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Browser push is not active yet. In-app alerts are on.</p></div><span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Coming soon</span></div><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out" className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Sign out</span><ExternalLink size={16} /></button></section></div></>;
+  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />{saved ? <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#d9eee1] px-4 py-3 text-sm font-semibold text-[#398660] animate-rise-in" data-testid="status-settings-saved"><Check size={16} /> Saved locally</div> : null}<div className="space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Users size={17} /></div><div><h2 className="font-bold">Business profile</h2><p className="text-xs text-muted-foreground">Shown when you follow up with a lead.</p></div></div><label className="mb-4 block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business name</span><input value={settings.businessName} onChange={(event) => update({ businessName: event.target.value })} data-testid="input-business-name" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label><label className="block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business phone</span><input value={settings.phone} onChange={(event) => update({ phone: event.target.value })} data-testid="input-business-phone" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418]"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-xs text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out" className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Sign out</span><ExternalLink size={16} /></button></section></div></>;
 }
 
 function ToggleRow({ label, description, checked, onChange, testId }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void; testId: string }) {

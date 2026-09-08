@@ -75,3 +75,72 @@ export interface LeadWorkspace {
   leads: Lead[];
 }
 
+export type NotificationPlatform = typeof NotificationPlatform[keyof typeof NotificationPlatform];
+
+
+export const NotificationPlatform = {
+  ios: 'ios',
+  android: 'android',
+} as const;
+
+export interface NotificationDeviceRegistration {
+  /**
+     * @minLength 16
+     * @maxLength 4096
+     */
+  token: string;
+  platform: NotificationPlatform;
+  enabled?: boolean;
+}
+
+export interface NotificationDevice {
+  id: number;
+  platform: NotificationPlatform;
+  enabled: boolean;
+  lastSeenAt: string;
+}
+
+export type NotificationStatusPoller = {
+  initialized: boolean;
+  /** @nullable */
+  lastSucceededAt: string | null;
+  /** @nullable */
+  lastError: string | null;
+};
+
+export interface NotificationStatus {
+  enabledDeviceCount: number;
+  devices: NotificationDevice[];
+  poller: NotificationStatusPoller;
+}
+
+export interface NotificationPollResult {
+  businessId: string;
+  baselineCreated: boolean;
+  rowsRead: number;
+  newEvents: number;
+  duplicateRows: number;
+  polledAt: string;
+}
+
+export type NotificationOutboxEventStatus = typeof NotificationOutboxEventStatus[keyof typeof NotificationOutboxEventStatus];
+
+
+export const NotificationOutboxEventStatus = {
+  queued: 'queued',
+  delivered: 'delivered',
+  failed: 'failed',
+} as const;
+
+export interface NotificationOutboxEvent {
+  id: number;
+  leadId: string;
+  status: NotificationOutboxEventStatus;
+  attempts: number;
+  createdAt: string;
+  /** @nullable */
+  deliveredAt: string | null;
+  /** @nullable */
+  lastError: string | null;
+}
+

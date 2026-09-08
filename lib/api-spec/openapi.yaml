@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: leads
     description: Lead operations
+  - name: notifications
+    description: Native lead notification operations
 paths:
   /healthz:
     get:
@@ -89,12 +91,137 @@ paths:
           description: Google Sheets rate limit reached
         "502":
           description: Google Sheets could not be updated
+  /notifications/status:
+    get:
+      operationId: getNotificationStatus
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Get notification readiness
+      responses:
+        "200":
+          description: Notification status for the signed-in owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationStatus"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+  /notification-devices:
+    post:
+      operationId: registerNotificationDevice
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Register or refresh a native push device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationDeviceRegistration"
+      responses:
+        "200":
+          description: Registered device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationDevice"
+        "400":
+          description: Invalid registration
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+  /notification-devices/{deviceId}:
+    delete:
+      operationId: revokeNotificationDevice
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Revoke one native push device
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "204":
+          description: Device revoked
+        "400":
+          description: Invalid device ID
+        "401":
+          description: Authentication required
+        "404":
+          description: Device not found
+  /notifications/poll/run:
+    post:
+      operationId: runNotificationPoll
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Run one poll for the signed-in business
+      description: Development verification endpoint. It is unavailable in production.
+      responses:
+        "200":
+          description: Poll result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPollResult"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Endpoint unavailable in production
+        "429":
+          description: Google Sheets rate limit reached
+        "502":
+          description: Google Sheets could not be read
+  /notifications/outbox:
+    get:
+      operationId: listNotificationOutbox
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Inspect queued notifications for the signed-in business
+      description: Development verification endpoint. It is unavailable in production.
+      responses:
+        "200":
+          description: Recent notification events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationOutboxEvent"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Endpoint unavailable in production
 components:
   securitySchemes:
     clerkSession:
       type: apiKey
       in: cookie
       name: __session
+    clerkBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthStatus:
       type: object
@@ -180,4 +307,125 @@ components:
         - businessName
         - timeZone
         - leads
+    NotificationPlatform:
+      type: string
+      enum: [ios, android]
+    NotificationDeviceRegistration:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 16
+          maxLength: 4096
+        platform:
+          $ref: "#/components/schemas/NotificationPlatform"
+        enabled:
+          type: boolean
+          default: true
+      required:
+        - token
+        - platform
+    NotificationDevice:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        platform:
+          $ref: "#/components/schemas/NotificationPlatform"
+        enabled:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - platform
+        - enabled
+        - lastSeenAt
+    NotificationStatus:
+      type: object
+      properties:
+        enabledDeviceCount:
+          type: number
+          multipleOf: 1
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationDevice"
+        poller:
+          type: object
+          properties:
+            initialized:
+              type: boolean
+            lastSucceededAt:
+              type: [string, "null"]
+              format: date-time
+            lastError:
+              type: [string, "null"]
+          required:
+            - initialized
+            - lastSucceededAt
+            - lastError
+      required:
+        - enabledDeviceCount
+        - devices
+        - poller
+    NotificationPollResult:
+      type: object
+      properties:
+        businessId:
+          type: string
+        baselineCreated:
+          type: boolean
+        rowsRead:
+          type: number
+          multipleOf: 1
+        newEvents:
+          type: number
+          multipleOf: 1
+        duplicateRows:
+          type: number
+          multipleOf: 1
+        polledAt:
+          type: string
+          format: date-time
+      required:
+        - businessId
+        - baselineCreated
+        - rowsRead
+        - newEvents
+        - duplicateRows
+        - polledAt
+    NotificationOutboxEvent:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        leadId:
+          type: string
+        status:
+          type: string
+          enum: [queued, delivered, failed]
+        attempts:
+          type: number
+          multipleOf: 1
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: [string, "null"]
+          format: date-time
+        lastError:
+          type: [string, "null"]
+      required:
+        - id
+        - leadId
+        - status
+        - attempts
+        - createdAt
+        - deliveredAt
+        - lastError
 

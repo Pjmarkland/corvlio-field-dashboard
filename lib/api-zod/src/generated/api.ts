@@ -61,3 +61,112 @@ export const UpdateLeadStatusResponse = zod.object({
 })
 
 
+/**
+ * @summary Get notification readiness
+ */
+export const getNotificationStatusResponseEnabledDeviceCountMultipleOf = 1;
+
+export const getNotificationStatusResponseDevicesItemIdMultipleOf = 1;
+
+
+
+export const GetNotificationStatusResponse = zod.object({
+  "enabledDeviceCount": zod.number().multipleOf(getNotificationStatusResponseEnabledDeviceCountMultipleOf),
+  "devices": zod.array(zod.object({
+  "id": zod.number().multipleOf(getNotificationStatusResponseDevicesItemIdMultipleOf),
+  "platform": zod.enum(['ios', 'android']),
+  "enabled": zod.boolean(),
+  "lastSeenAt": zod.coerce.date()
+})),
+  "poller": zod.object({
+  "initialized": zod.boolean(),
+  "lastSucceededAt": zod.coerce.date().nullable(),
+  "lastError": zod.string().nullable()
+})
+})
+
+
+/**
+ * @summary Register or refresh a native push device
+ */
+export const registerNotificationDeviceBodyTokenMin = 16;
+export const registerNotificationDeviceBodyTokenMax = 4096;
+
+export const registerNotificationDeviceBodyEnabledDefault = true;
+
+export const RegisterNotificationDeviceBody = zod.object({
+  "token": zod.string().min(registerNotificationDeviceBodyTokenMin).max(registerNotificationDeviceBodyTokenMax),
+  "platform": zod.enum(['ios', 'android']),
+  "enabled": zod.boolean().default(registerNotificationDeviceBodyEnabledDefault)
+})
+
+export const registerNotificationDeviceResponseIdMultipleOf = 1;
+
+
+
+export const RegisterNotificationDeviceResponse = zod.object({
+  "id": zod.number().multipleOf(registerNotificationDeviceResponseIdMultipleOf),
+  "platform": zod.enum(['ios', 'android']),
+  "enabled": zod.boolean(),
+  "lastSeenAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Revoke one native push device
+ */
+export const revokeNotificationDevicePathDeviceIdMultipleOf = 1;
+
+
+
+export const RevokeNotificationDeviceParams = zod.object({
+  "deviceId": zod.coerce.number().min(1).multipleOf(revokeNotificationDevicePathDeviceIdMultipleOf)
+})
+
+export const RevokeNotificationDeviceResponse = zod.void()
+
+
+/**
+ * Development verification endpoint. It is unavailable in production.
+ * @summary Run one poll for the signed-in business
+ */
+export const runNotificationPollResponseRowsReadMultipleOf = 1;
+
+export const runNotificationPollResponseNewEventsMultipleOf = 1;
+
+export const runNotificationPollResponseDuplicateRowsMultipleOf = 1;
+
+
+
+export const RunNotificationPollResponse = zod.object({
+  "businessId": zod.string(),
+  "baselineCreated": zod.boolean(),
+  "rowsRead": zod.number().multipleOf(runNotificationPollResponseRowsReadMultipleOf),
+  "newEvents": zod.number().multipleOf(runNotificationPollResponseNewEventsMultipleOf),
+  "duplicateRows": zod.number().multipleOf(runNotificationPollResponseDuplicateRowsMultipleOf),
+  "polledAt": zod.coerce.date()
+})
+
+
+/**
+ * Development verification endpoint. It is unavailable in production.
+ * @summary Inspect queued notifications for the signed-in business
+ */
+export const listNotificationOutboxResponseIdMultipleOf = 1;
+
+export const listNotificationOutboxResponseAttemptsMultipleOf = 1;
+
+
+
+export const ListNotificationOutboxResponseItem = zod.object({
+  "id": zod.number().multipleOf(listNotificationOutboxResponseIdMultipleOf),
+  "leadId": zod.string(),
+  "status": zod.enum(['queued', 'delivered', 'failed']),
+  "attempts": zod.number().multipleOf(listNotificationOutboxResponseAttemptsMultipleOf),
+  "createdAt": zod.coerce.date(),
+  "deliveredAt": zod.coerce.date().nullable(),
+  "lastError": zod.string().nullable()
+})
+export const ListNotificationOutboxResponse = zod.array(ListNotificationOutboxResponseItem)
+
+

@@ -23,7 +23,12 @@ import type {
   HealthStatus,
   LeadStatusResult,
   LeadStatusUpdate,
-  LeadWorkspace
+  LeadWorkspace,
+  NotificationDevice,
+  NotificationDeviceRegistration,
+  NotificationOutboxEvent,
+  NotificationPollResult,
+  NotificationStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -281,4 +286,373 @@ export const useUpdateLeadStatus = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateLeadStatusMutationOptions(options));
     }
+
+export const getGetNotificationStatusUrl = () => {
+
+
+
+
+  return `/api/notifications/status`
+}
+
+/**
+ * @summary Get notification readiness
+ */
+export const getNotificationStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<NotificationStatus> => {
+
+  return customFetch<NotificationStatus>(getGetNotificationStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNotificationStatusQueryKey = () => {
+    return [
+    `/api/notifications/status`
+    ] as const;
+    }
+
+
+export const getGetNotificationStatusQueryOptions = <TData = Awaited<ReturnType<typeof getNotificationStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNotificationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNotificationStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNotificationStatus>>> = ({ signal }) => getNotificationStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNotificationStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNotificationStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getNotificationStatus>>>
+export type GetNotificationStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get notification readiness
+ */
+
+export function useGetNotificationStatus<TData = Awaited<ReturnType<typeof getNotificationStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNotificationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNotificationStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRegisterNotificationDeviceUrl = () => {
+
+
+
+
+  return `/api/notification-devices`
+}
+
+/**
+ * @summary Register or refresh a native push device
+ */
+export const registerNotificationDevice = async (notificationDeviceRegistration: NotificationDeviceRegistration, options?: Parameters<typeof customFetch>[1]): Promise<NotificationDevice> => {
+
+  return customFetch<NotificationDevice>(getRegisterNotificationDeviceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(notificationDeviceRegistration)
+  }
+);}
+
+
+
+
+
+export const getRegisterNotificationDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerNotificationDevice>>, TError,{data: BodyType<NotificationDeviceRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerNotificationDevice>>, TError,{data: BodyType<NotificationDeviceRegistration>}, TContext> => {
+
+const mutationKey = ['registerNotificationDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerNotificationDevice>>, {data: BodyType<NotificationDeviceRegistration>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerNotificationDevice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterNotificationDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof registerNotificationDevice>>>
+    export type RegisterNotificationDeviceMutationBody = BodyType<NotificationDeviceRegistration>
+    export type RegisterNotificationDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Register or refresh a native push device
+ */
+export const useRegisterNotificationDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerNotificationDevice>>, TError,{data: BodyType<NotificationDeviceRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerNotificationDevice>>,
+        TError,
+        {data: BodyType<NotificationDeviceRegistration>},
+        TContext
+      > => {
+      return useMutation(getRegisterNotificationDeviceMutationOptions(options));
+    }
+
+export const getRevokeNotificationDeviceUrl = (deviceId: number,) => {
+
+
+
+
+  return `/api/notification-devices/${deviceId}`
+}
+
+/**
+ * @summary Revoke one native push device
+ */
+export const revokeNotificationDevice = async (deviceId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRevokeNotificationDeviceUrl(deviceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeNotificationDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeNotificationDevice>>, TError,{deviceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeNotificationDevice>>, TError,{deviceId: number}, TContext> => {
+
+const mutationKey = ['revokeNotificationDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeNotificationDevice>>, {deviceId: number}> = (props) => {
+          const {deviceId} = props ?? {};
+
+          return  revokeNotificationDevice(deviceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeNotificationDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof revokeNotificationDevice>>>
+
+    export type RevokeNotificationDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke one native push device
+ */
+export const useRevokeNotificationDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeNotificationDevice>>, TError,{deviceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeNotificationDevice>>,
+        TError,
+        {deviceId: number},
+        TContext
+      > => {
+      return useMutation(getRevokeNotificationDeviceMutationOptions(options));
+    }
+
+export const getRunNotificationPollUrl = () => {
+
+
+
+
+  return `/api/notifications/poll/run`
+}
+
+/**
+ * Development verification endpoint. It is unavailable in production.
+ * @summary Run one poll for the signed-in business
+ */
+export const runNotificationPoll = async ( options?: Parameters<typeof customFetch>[1]): Promise<NotificationPollResult> => {
+
+  return customFetch<NotificationPollResult>(getRunNotificationPollUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRunNotificationPollMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runNotificationPoll>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runNotificationPoll>>, TError,void, TContext> => {
+
+const mutationKey = ['runNotificationPoll'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runNotificationPoll>>, void> = () => {
+
+
+          return  runNotificationPoll(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunNotificationPollMutationResult = NonNullable<Awaited<ReturnType<typeof runNotificationPoll>>>
+
+    export type RunNotificationPollMutationError = ErrorType<void>
+
+    /**
+ * @summary Run one poll for the signed-in business
+ */
+export const useRunNotificationPoll = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runNotificationPoll>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runNotificationPoll>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRunNotificationPollMutationOptions(options));
+    }
+
+export const getListNotificationOutboxUrl = () => {
+
+
+
+
+  return `/api/notifications/outbox`
+}
+
+/**
+ * Development verification endpoint. It is unavailable in production.
+ * @summary Inspect queued notifications for the signed-in business
+ */
+export const listNotificationOutbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<NotificationOutboxEvent[]> => {
+
+  return customFetch<NotificationOutboxEvent[]>(getListNotificationOutboxUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNotificationOutboxQueryKey = () => {
+    return [
+    `/api/notifications/outbox`
+    ] as const;
+    }
+
+
+export const getListNotificationOutboxQueryOptions = <TData = Awaited<ReturnType<typeof listNotificationOutbox>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotificationOutbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNotificationOutboxQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNotificationOutbox>>> = ({ signal }) => listNotificationOutbox({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNotificationOutbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNotificationOutboxQueryResult = NonNullable<Awaited<ReturnType<typeof listNotificationOutbox>>>
+export type ListNotificationOutboxQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect queued notifications for the signed-in business
+ */
+
+export function useListNotificationOutbox<TData = Awaited<ReturnType<typeof listNotificationOutbox>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotificationOutbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNotificationOutboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

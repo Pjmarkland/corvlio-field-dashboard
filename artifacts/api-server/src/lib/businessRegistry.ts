@@ -20,6 +20,10 @@ const BUSINESSES: readonly Business[] = [
   },
 ];
 
+export function listBusinesses(): readonly Business[] {
+  return BUSINESSES;
+}
+
 export function findBusinessForClerkUser(userId: string): Business | undefined {
   const matches = BUSINESSES.filter((business) => business.clerkUserIds.includes(userId));
   if (matches.length > 1) {
