@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -13,7 +14,7 @@ try {
   // Storage can be unavailable in hardened browser contexts; the app remains usable.
 }
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator && import.meta.env.PROD) {
   let reloadingForUpdate = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloadingForUpdate) return;
