@@ -7,13 +7,15 @@ import {
   useUpdateLeadStatus,
   type LeadWorkspace,
 } from '@workspace/api-client-react';
-import { ClerkProvider, Show, SignIn, SignUp, useClerk } from '@clerk/react';
+import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
+import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { type PushStatus, usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -333,29 +335,77 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
   return <div><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{label}</span><span className="font-mono font-medium">{value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} /></div></div>;
 }
 
-function NotificationStatusRow() {
+type NotificationStatusRowProps = {
+  pushStatus: PushStatus;
+  pushError: string | null;
+  onRegister: () => void;
+  onRevoke: () => void;
+};
+
+function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
   const { data, isLoading } = useGetNotificationStatus();
   const pollerReady = data?.poller.initialized && !data?.poller.lastError;
-  const deviceCount = data?.enabledDeviceCount ?? 0;
+  const isNative = Capacitor.isNativePlatform();
 
   let badge: ReactNode;
   let detail: string;
+
   if (isLoading) {
     badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Checking…</span>;
     detail = 'Fetching notification status from the server.';
   } else if (!pollerReady) {
     badge = <span className="rounded-full bg-[#f1e3bb] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#8c6418]">Initializing</span>;
     detail = data?.poller.lastError ? `Poller error: ${data.poller.lastError}` : 'Lead poller is starting up — check back in a moment.';
-  } else if (deviceCount === 0) {
-    badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">No devices</span>;
-    detail = 'Poller is running. Install the app on your phone to enable push alerts.';
+  } else if (isNative) {
+    // Native Capacitor: show live push registration state.
+    switch (push.pushStatus) {
+      case 'idle':
+        detail = 'Poller is running. Tap Enable to receive push alerts on this device.';
+        badge = <button type="button" onClick={push.onRegister} className="shrink-0 min-h-9 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">Enable</button>;
+        break;
+      case 'requesting':
+        detail = 'Requesting permission…';
+        badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Requesting…</span>;
+        break;
+      case 'revoking':
+        detail = 'Disabling push alerts…';
+        badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Disabling…</span>;
+        break;
+      case 'registered': {
+        const platform = Capacitor.getPlatform();
+        detail = `Push alerts enabled on this ${platform === 'ios' ? 'iPhone' : 'Android device'}.`;
+        badge = (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full bg-[#d9eee1] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#398660]">{platform === 'ios' ? 'iOS' : 'Android'}</span>
+            <button type="button" onClick={push.onRevoke} className="min-h-9 rounded-xl border border-border px-3 text-xs font-semibold text-muted-foreground">Disable</button>
+          </div>
+        );
+        break;
+      }
+      case 'denied':
+        detail = 'Notifications blocked — open Settings to allow push alerts.';
+        badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Blocked</span>;
+        break;
+      case 'error':
+      default:
+        detail = push.pushError ?? 'Push registration failed.';
+        badge = <button type="button" onClick={push.onRegister} className="shrink-0 min-h-9 rounded-xl border border-border px-3 text-xs font-semibold text-primary">Retry</button>;
+        break;
+    }
   } else {
-    badge = <span className="rounded-full bg-[#d9eee1] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#398660]">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>;
-    detail = `Push alerts active on ${deviceCount} registered device${deviceCount !== 1 ? 's' : ''}.`;
+    // Web PWA: show server-reported device count (unchanged).
+    const deviceCount = data?.enabledDeviceCount ?? 0;
+    if (deviceCount === 0) {
+      badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">No devices</span>;
+      detail = 'Poller is running. Install the app on your phone to enable push alerts.';
+    } else {
+      badge = <span className="rounded-full bg-[#d9eee1] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#398660]">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>;
+      detail = `Push alerts active on ${deviceCount} registered device${deviceCount !== 1 ? 's' : ''}.`;
+    }
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-border py-3" data-testid="row-notification-status">
+    <div className="flex items-start justify-between gap-4 border-b border-border py-3" data-testid="row-notification-status">
       <div>
         <p className="text-sm font-semibold">Push alerts</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
@@ -367,6 +417,9 @@ function NotificationStatusRow() {
 
 function SettingsPage() {
   const { signOut } = useClerk();
+  const { user } = useUser();
+  const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
+  const { toast } = useToast();
   const [settings, setSettings] = useState<SettingsState>(loadSettings);
   const [saved, setSaved] = useState(false);
   const update = (patch: Partial<SettingsState>) => {
@@ -376,7 +429,23 @@ function SettingsPage() {
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
   };
-  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />{saved ? <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#d9eee1] px-4 py-3 text-sm font-semibold text-[#398660] animate-rise-in" data-testid="status-settings-saved"><Check size={16} /> Saved locally</div> : null}<div className="space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Users size={17} /></div><div><h2 className="font-bold">Business profile</h2><p className="text-xs text-muted-foreground">Shown when you follow up with a lead.</p></div></div><label className="mb-4 block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business name</span><input value={settings.businessName} onChange={(event) => update({ businessName: event.target.value })} data-testid="input-business-name" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label><label className="block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business phone</span><input value={settings.phone} onChange={(event) => update({ phone: event.target.value })} data-testid="input-business-phone" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418]"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-xs text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out" className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Sign out</span><ExternalLink size={16} /></button></section></div></>;
+  const handleSignOut = async () => {
+    try {
+      await revoke();
+    } catch {
+      // Revocation failed — the push row already shows 'error' with a Retry button.
+      // Block sign-out so the device ID is not lost before the backend confirms deletion.
+      toast({
+        variant: 'destructive',
+        title: 'Could not disable push alerts',
+        description:
+          'Alerts may still arrive on this device. Please tap Retry on the Push alerts row, then sign out again.',
+      });
+      return;
+    }
+    void signOut({ redirectUrl: basePath || '/' });
+  };
+  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />{saved ? <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#d9eee1] px-4 py-3 text-sm font-semibold text-[#398660] animate-rise-in" data-testid="status-settings-saved"><Check size={16} /> Saved locally</div> : null}<div className="space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Users size={17} /></div><div><h2 className="font-bold">Business profile</h2><p className="text-xs text-muted-foreground">Shown when you follow up with a lead.</p></div></div><label className="mb-4 block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business name</span><input value={settings.businessName} onChange={(event) => update({ businessName: event.target.value })} data-testid="input-business-name" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label><label className="block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business phone</span><input value={settings.phone} onChange={(event) => update({ phone: event.target.value })} data-testid="input-business-phone" className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none ring-primary transition focus:ring-2" /></label></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418]"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-xs text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" onClick={() => void handleSignOut()} data-testid="button-sign-out" className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Sign out</span><ExternalLink size={16} /></button></section></div></>;
 }
 
 function ToggleRow({ label, description, checked, onChange, testId }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void; testId: string }) {
