@@ -1,4 +1,5 @@
 import app from "./app";
+import { closeApnsSession } from "./lib/apnsAdapter";
 import { logger } from "./lib/logger";
 import { startLeadNotificationPoller, stopLeadNotificationPoller } from "./lib/notificationService";
 
@@ -31,6 +32,7 @@ async function shutdown(signal: string) {
   // Stop scheduling new poll cycles and wait for any in-flight cycle to finish
   // before closing the HTTP server so DB connections are not torn mid-transaction.
   await stopLeadNotificationPoller();
+  closeApnsSession();
   server.close((error) => {
     if (error) {
       logger.error({ error }, "API server shutdown failed");

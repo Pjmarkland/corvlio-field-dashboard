@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 import {
   db,
+  notificationDeliveryAttemptsTable,
   notificationDevicesTable,
   notificationEventsTable,
   notificationPollerLeasesTable,
   notificationPollStateTable,
   notificationSeenLeadsTable,
 } from "@workspace/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lte, sql } from "drizzle-orm";
 import type { Business } from "./businessRegistry";
 import { listBusinesses } from "./businessRegistry";
+import { sendApnsNotification, isApnsConfigured } from "./apnsAdapter";
 import { readGoogleSheetLeads } from "./googleSheets";
 import { logger } from "./logger";
 
@@ -218,6 +220,142 @@ async function releasePollerLease(): Promise<void> {
     );
 }
 
+// ─── APNs outbox processor ────────────────────────────────────────────────────
+
+const MAX_DELIVERY_ATTEMPTS = 3;
+
+/**
+ * Process all queued notification events and attempt delivery to registered
+ * iOS devices via APNs. Marks events delivered/failed and records per-device
+ * attempt rows in notification_delivery_attempts.
+ */
+async function processNotificationOutbox(): Promise<void> {
+  if (!isApnsConfigured()) {
+    logger.debug("APNs not configured — skipping outbox processing");
+    return;
+  }
+
+  const now = new Date();
+
+  // Fetch events that are ready for (re-)delivery.
+  const events = await db
+    .select()
+    .from(notificationEventsTable)
+    .where(
+      and(
+        eq(notificationEventsTable.status, "queued"),
+        lte(notificationEventsTable.nextAttemptAt, now),
+        sql`${notificationEventsTable.attempts} < ${MAX_DELIVERY_ATTEMPTS}`,
+      ),
+    )
+    .limit(50);
+
+  if (events.length === 0) return;
+
+  logger.info({ count: events.length }, "Processing notification outbox");
+
+  for (const event of events) {
+    // Fetch active iOS devices for this business.
+    const devices = await db
+      .select()
+      .from(notificationDevicesTable)
+      .where(
+        and(
+          eq(notificationDevicesTable.businessId, event.businessId),
+          eq(notificationDevicesTable.platform, "ios"),
+          eq(notificationDevicesTable.enabled, true),
+          sql`${notificationDevicesTable.invalidatedAt} is null`,
+        ),
+      );
+
+    const newAttempts = event.attempts + 1;
+
+    if (devices.length === 0) {
+      logger.debug({ eventId: event.id, businessId: event.businessId }, "No active iOS devices — deferring event");
+      // Increment attempts so events don't spin forever when no devices are
+      // registered yet; they will be retried until MAX_DELIVERY_ATTEMPTS.
+      const nextAttemptAt = new Date(now.getTime() + Math.pow(2, newAttempts) * 60_000);
+      await db
+        .update(notificationEventsTable)
+        .set({ attempts: newAttempts, lastError: "No active iOS devices", nextAttemptAt })
+        .where(eq(notificationEventsTable.id, event.id));
+      continue;
+    }
+
+    let anyDelivered = false;
+    let lastError: string | null = null;
+
+    for (const device of devices) {
+      const result = await sendApnsNotification({
+        deviceToken: device.token,
+        title: event.title,
+        body: event.body,
+        deepLink: event.deepLink,
+      });
+
+      // Record the per-device attempt.
+      await db.insert(notificationDeliveryAttemptsTable).values({
+        eventId: event.id,
+        deviceId: device.id,
+        provider: "apns",
+        outcome: result.outcome,
+        providerMessageId: result.outcome === "delivered" ? (result.apnsId ?? null) : null,
+        error:
+          result.outcome === "invalid_token"
+            ? "invalid_token (410)"
+            : result.outcome === "error"
+              ? (result.reason ?? `HTTP ${result.statusCode}`)
+              : null,
+        attemptedAt: now,
+      });
+
+      if (result.outcome === "delivered") {
+        anyDelivered = true;
+        logger.info({ eventId: event.id, deviceId: device.id }, "APNs delivery succeeded");
+      } else if (result.outcome === "invalid_token") {
+        // 410 Gone — the device token is no longer valid.
+        logger.info(
+          { deviceId: device.id, tokenSuffix: device.token.slice(-8) },
+          "APNs 410 Gone — invalidating device token",
+        );
+        await db
+          .update(notificationDevicesTable)
+          .set({ enabled: false, invalidatedAt: now, updatedAt: now })
+          .where(eq(notificationDevicesTable.id, device.id));
+      } else {
+        lastError = result.reason ?? `HTTP ${result.statusCode}`;
+        logger.warn(
+          { eventId: event.id, deviceId: device.id, statusCode: result.statusCode, reason: result.reason },
+          "APNs delivery failed",
+        );
+      }
+    }
+
+    // Update the event record with the outcome of this attempt batch.
+    if (anyDelivered) {
+      await db
+        .update(notificationEventsTable)
+        .set({ status: "delivered", attempts: newAttempts, deliveredAt: now, lastError: null })
+        .where(eq(notificationEventsTable.id, event.id));
+      logger.info({ eventId: event.id }, "Notification event marked delivered");
+    } else if (newAttempts >= MAX_DELIVERY_ATTEMPTS) {
+      await db
+        .update(notificationEventsTable)
+        .set({ status: "failed", attempts: newAttempts, lastError: lastError ?? "All delivery attempts exhausted" })
+        .where(eq(notificationEventsTable.id, event.id));
+      logger.warn({ eventId: event.id }, "Notification event permanently failed");
+    } else {
+      // Exponential back-off: 2^attempts minutes (2 min, 4 min, …).
+      const nextAttemptAt = new Date(now.getTime() + Math.pow(2, newAttempts) * 60_000);
+      await db
+        .update(notificationEventsTable)
+        .set({ attempts: newAttempts, lastError, nextAttemptAt })
+        .where(eq(notificationEventsTable.id, event.id));
+      logger.debug({ eventId: event.id, nextAttemptAt }, "Notification event scheduled for retry");
+    }
+  }
+}
+
 export async function runNotificationPollCycle(): Promise<void> {
   if (!(await acquirePollerLease())) {
     logger.debug("Skipping lead poll because another server owns the lease");
@@ -249,6 +387,16 @@ export async function runNotificationPollCycle(): Promise<void> {
           "Lead notification poll failed for business",
         );
       }
+    }
+
+    // After polling all businesses, deliver any queued notification events.
+    try {
+      await processNotificationOutbox();
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Notification outbox processing failed",
+      );
     }
   } finally {
     clearInterval(heartbeat);
