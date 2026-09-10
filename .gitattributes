@@ -1,1 +1,4 @@
 corvlio-latest.zip filter=lfs diff=lfs merge=lfs -text
+corvlio-partaa filter=lfs diff=lfs merge=lfs -text
+corvlio-partab filter=lfs diff=lfs merge=lfs -text
+corvlio-partac filter=lfs diff=lfs merge=lfs -text

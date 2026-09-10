@@ -1,0 +1,44 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "bkMbVQ2ocyTMYYoErQZwf"
+uri = "file://corvlio-partaa"
+type = "unspecified"
+title = "corvlio-partaa (part 1 of 3)"
+description = "87 MB — rejoin all 3 parts to get corvlio-latest.zip"
+logical_id = "7d43ed4a-b8ce-4e0c-96ad-60b7fc059410"
+content_hash = "sha256:614c7ba12ca0302c970644387cb6d70272e512fc1e9b888fd60ad082167824f2"
+size = 91226112
+mtime_ms = 1789003952092
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/7d43ed4a-b8ce-4e0c-96ad-60b7fc059410/94d68da1-6829-4fde-a50d-5cb28c739100"
+storage_version_token = "1789003967667779"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "P-WYogzVK9pu96FXcZzgD"
+uri = "file://corvlio-partab"
+type = "unspecified"
+title = "corvlio-partab (part 2 of 3)"
+description = "87 MB"
+logical_id = "bc8e7e5e-21e7-4f6f-b0a7-70d1e9728d6c"
+content_hash = "sha256:1ff7c4beb087feaeac65bfa3a55e407ff29ecf3257a9fdb28b1905cf4e0fb18e"
+size = 91226112
+mtime_ms = 1789003953846
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/bc8e7e5e-21e7-4f6f-b0a7-70d1e9728d6c/d88cd96b-5c9a-4cd9-9ae5-085a41c396d1"
+storage_version_token = "1789003969137666"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "f2SoCzfEEnrBVBPaXOgZa"
+uri = "file://corvlio-partac"
+type = "unspecified"
+title = "corvlio-partac (part 3 of 3)"
+description = "87 MB"
+logical_id = "3f89550b-4dde-4343-a798-1630cc994b39"
+content_hash = "sha256:38fc35ac30afb262661a7e4010cd874e70bc11502ca69c0a76d0aca937ab5658"
+size = 91081124
+mtime_ms = 1789003955872
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/3f89550b-4dde-4343-a798-1630cc994b39/68241916-4e78-4900-9684-f021ecf3e7a1"
+storage_version_token = "1789003970482697"
+content_type = "application/octet-stream"
