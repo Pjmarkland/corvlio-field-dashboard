@@ -4,8 +4,8 @@
   "description": "A field-ready lead dashboard for Corvlio clients.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f5f0",
-  "theme_color": "#19202d",
+  "background_color": "#F5F7FA",
+  "theme_color": "#0B1F3A",
   "orientation": "portrait-primary",
   "icons": [
     {

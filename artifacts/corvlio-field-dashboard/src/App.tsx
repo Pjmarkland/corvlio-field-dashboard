@@ -11,6 +11,7 @@ import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/r
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Capacitor } from '@capacitor/core';
+import logoUrl from '@/assets/logo.svg';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -85,42 +86,42 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
   },
   variables: {
-    colorPrimary: '#f36d48',
-    colorForeground: '#19202d',
-    colorMutedForeground: '#69707c',
+    colorPrimary: '#2563EB',
+    colorForeground: '#0F172A',
+    colorMutedForeground: '#64748B',
     colorDanger: '#c84b29',
-    colorBackground: '#f7f5f0',
-    colorInput: '#ffffff',
-    colorInputForeground: '#19202d',
-    colorNeutral: '#dedbd3',
+    colorBackground: '#F5F7FA',
+    colorInput: '#FFFFFF',
+    colorInputForeground: '#0F172A',
+    colorNeutral: '#E2E8F0',
     fontFamily: 'Outfit, sans-serif',
     borderRadius: '0.9rem',
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#f7f5f0] rounded-2xl w-[440px] max-w-full overflow-hidden',
+    cardBox: 'bg-white rounded-2xl w-[440px] max-w-full overflow-hidden',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-[#19202d] font-bold',
-    headerSubtitle: 'text-[#69707c]',
-    socialButtonsBlockButtonText: 'text-[#19202d]',
-    formFieldLabel: 'text-[#19202d]',
-    footerActionLink: 'text-[#c84b29] font-semibold',
-    footerActionText: 'text-[#69707c]',
-    dividerText: 'text-[#69707c]',
-    identityPreviewEditButton: 'text-[#c84b29]',
+    headerTitle: 'text-[#0F172A] font-bold',
+    headerSubtitle: 'text-[#64748B]',
+    socialButtonsBlockButtonText: 'text-[#0F172A]',
+    formFieldLabel: 'text-[#0F172A]',
+    footerActionLink: 'text-[#2563EB] font-semibold',
+    footerActionText: 'text-[#64748B]',
+    dividerText: 'text-[#64748B]',
+    identityPreviewEditButton: 'text-[#2563EB]',
     formFieldSuccessText: 'text-[#398660]',
     alertText: 'text-[#c84b29]',
     logoBox: 'h-12',
     logoImage: 'h-12 w-12 rounded-2xl',
-    socialButtonsBlockButton: 'border-[#dedbd3] bg-white',
-    formButtonPrimary: 'bg-[#f36d48] text-white hover:bg-[#df5d3b]',
-    formFieldInput: 'border-[#dedbd3] bg-white text-[#19202d]',
+    socialButtonsBlockButton: 'border-[#E2E8F0] bg-white',
+    formButtonPrimary: 'bg-[#2563EB] text-white hover:bg-[#60A5FA]',
+    formFieldInput: 'border-[#CBD5E1] bg-white text-[#0F172A]',
     footerAction: 'bg-transparent',
-    dividerLine: 'bg-[#dedbd3]',
+    dividerLine: 'bg-[#E2E8F0]',
     alert: 'border-[#f0c0b3] bg-[#fff4f0]',
-    otpCodeFieldInput: 'border-[#dedbd3] bg-white text-[#19202d]',
-    formFieldRow: 'text-[#19202d]',
+    otpCodeFieldInput: 'border-[#CBD5E1] bg-white text-[#0F172A]',
+    formFieldRow: 'text-[#0F172A]',
     main: 'bg-transparent',
   },
 };
@@ -218,11 +219,8 @@ function AppShell({ children, leads, businessName }: { children: ReactNode; lead
     <div className="min-h-[100dvh] bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground md:flex">
         <Link href="/dashboard" className="mb-10 flex items-center gap-3 px-3" data-testid="link-brand">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-[3px_3px_0_hsl(41_37%_93%)]">
-            <Signal size={19} strokeWidth={2.8} />
-          </div>
           <div>
-            <p className="text-[17px] font-800 tracking-[-0.04em]">corvlio</p>
+            <img src={logoUrl} alt="Corvlio" className="h-auto w-[142px] rounded-xl" />
             <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">field desk</p>
           </div>
         </Link>
@@ -251,8 +249,7 @@ function AppShell({ children, leads, businessName }: { children: ReactNode; lead
           <div className="mx-auto flex max-w-[1160px] items-center justify-between">
             <div className="md:hidden">
               <Link href="/dashboard" className="flex items-center gap-2.5" data-testid="link-mobile-brand">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground"><Signal size={16} strokeWidth={2.8} /></div>
-                <span className="text-[17px] font-800 tracking-[-0.04em]">corvlio</span>
+                <img src={logoUrl} alt="Corvlio" className="h-auto w-[116px] rounded-lg" />
               </Link>
             </div>
             <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex"><span className="h-2 w-2 rounded-full bg-[#49a979]" /> On the road · synced</div>
@@ -280,7 +277,7 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
 }
 
 function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHandler; saving: boolean }) {
-  return <article className="group rounded-2xl border border-border bg-card p-4 shadow-[0_1px_0_hsl(35_19%_84%)] transition-transform hover:-translate-y-0.5 sm:p-5" data-testid={`card-lead-${lead.id}`}>
+  return <article className="group rounded-2xl border border-border bg-card p-4 shadow-[0_1px_0_hsl(214_32%_85%)] transition-transform hover:-translate-y-0.5 sm:p-5" data-testid={`card-lead-${lead.id}`}>
     <div className="flex items-start gap-3">
       <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] text-xs font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`} data-testid={`avatar-lead-${lead.id}`}>{initials(lead.name)}</div>
       <div className="min-w-0 flex-1">
@@ -291,7 +288,7 @@ function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHand
     </div>
     <div className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><MapPin size={13} className="text-primary" /><span className="truncate">{lead.address}</span></div>
     <div className="mt-4 grid grid-cols-2 gap-2">
-      <a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition-transform active:scale-[.98]"><Phone size={16} />Call</a>
+      <a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover active:scale-[.98]"><Phone size={16} />Call</a>
       <a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-muted active:scale-[.98]"><MessageSquare size={16} />Text</a>
     </div>
     <div className="mt-3 flex items-center justify-between gap-3"><span className={`flex items-center gap-1.5 text-[11px] font-semibold ${lead.status === 'contacted' ? 'text-[#398660]' : 'text-muted-foreground'}`}><span className={`h-1.5 w-1.5 rounded-full ${lead.status === 'contacted' ? 'bg-[#49a979]' : 'bg-[#c4bcae]'}`} />{statusLabel(lead.status)}</span><button type="button" disabled={saving} onClick={() => onStatus(lead.id, lead.status === 'pending' ? 'contacted' : 'pending')} data-testid={`button-toggle-status-${lead.id}`} className="min-h-9 rounded-lg border border-border px-3 text-[11px] font-bold text-primary disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : lead.status === 'pending' ? 'Mark contacted' : 'Reopen'}</button></div>
@@ -318,7 +315,7 @@ function DetailPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; onStatus
   const lead = leads.find((item) => item.id === params.id);
   if (!lead) return <NotFound />;
   const saving = savingLeadId === lead.id;
-  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{lead.name}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{lead.issue}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-[.98]"><Phone size={18} /> Call {lead.name.split(' ')[0]}</a><a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold active:scale-[.98]"><MessageSquare size={18} /> Send text</a></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={lead.phone} href={`tel:${lead.phone.replace(/\D/g, '')}`} /><InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5"><div><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Saved directly to the connected Google Sheet.</p></div>{lead.status === 'pending' ? <button disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="touch-target flex items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button> : <button disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="touch-target rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}</div></div>;
+  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{lead.name}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{lead.issue}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><a href={`tel:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-call-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover active:scale-[.98]"><Phone size={18} /> Call {lead.name.split(' ')[0]}</a><a href={`sms:${lead.phone.replace(/\D/g, '')}`} onClick={() => { if (lead.status === 'pending') onStatus(lead.id, 'contacted'); }} data-testid={`button-detail-text-${lead.id}`} className="touch-target flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold active:scale-[.98]"><MessageSquare size={18} /> Send text</a></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={lead.phone} href={`tel:${lead.phone.replace(/\D/g, '')}`} /><InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5"><div><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Saved directly to the connected Google Sheet.</p></div>{lead.status === 'pending' ? <button disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="touch-target flex items-center gap-2 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button> : <button disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="touch-target rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}</div></div>;
 }
 
 function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) {
@@ -463,7 +460,7 @@ function Router({ leads, businessName, timeZone, onStatus, savingLeadId }: { lea
 }
 
 function PublicHome() {
-  return <main className="grid min-h-[100dvh] place-items-center bg-sidebar px-5 py-10 text-sidebar-foreground"><div className="w-full max-w-md"><div className="mb-12 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground"><Signal size={20} strokeWidth={2.8} /></div><div><p className="text-lg font-800 tracking-[-0.04em]">corvlio</p><p className="font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">field desk</p></div></div><div className="mb-8 inline-flex items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" /> Built for the road</div><h1 className="max-w-sm text-5xl font-800 leading-[.93] tracking-[-0.06em]">Your next job, one tap away.</h1><p className="mt-6 max-w-sm text-base leading-relaxed text-sidebar-foreground/65">See new receptionist leads, respond quickly, and keep your day moving without opening a desktop dashboard.</p><div className="mt-9 flex flex-col gap-3"><Link href="/sign-in" data-testid="link-public-sign-in" className="flex min-h-13 items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">Sign in to Field Desk <ArrowUpRight size={17} className="ml-2" /></Link><Link href="/sign-up" data-testid="link-public-sign-up" className="flex min-h-13 items-center justify-center rounded-xl border border-sidebar-border px-5 text-sm font-bold text-sidebar-foreground hover:bg-sidebar-accent">Create your owner account</Link></div><p className="mt-8 font-mono text-[10px] leading-relaxed text-sidebar-foreground/40">Single-owner access for Corvlio clients. Your account keeps the field view private.</p><Link href="/privacy" data-testid="link-public-privacy" className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-sidebar-foreground/55 underline decoration-sidebar-foreground/25 underline-offset-4 hover:text-sidebar-foreground">Privacy policy</Link></div></main>;
+  return <main className="grid min-h-[100dvh] place-items-center bg-sidebar px-5 py-10 text-sidebar-foreground"><div className="w-full max-w-md"><div className="mb-12 flex items-center"><img src={logoUrl} alt="Corvlio" className="h-auto w-[174px] rounded-xl" /></div><div className="mb-8 inline-flex items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" /> Built for the road</div><h1 className="max-w-sm text-5xl font-800 leading-[.93] tracking-[-0.06em]">Your next job, one tap away.</h1><p className="mt-6 max-w-sm text-base leading-relaxed text-sidebar-foreground/65">See new receptionist leads, respond quickly, and keep your day moving without opening a desktop dashboard.</p><div className="mt-9 flex flex-col gap-3"><Link href="/sign-in" data-testid="link-public-sign-in" className="flex min-h-13 items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover">Sign in to Field Desk <ArrowUpRight size={17} className="ml-2" /></Link><Link href="/sign-up" data-testid="link-public-sign-up" className="flex min-h-13 items-center justify-center rounded-xl border border-sidebar-border px-5 text-sm font-bold text-sidebar-foreground hover:bg-sidebar-accent">Create your owner account</Link></div><p className="mt-8 font-mono text-[10px] leading-relaxed text-sidebar-foreground/40">Single-owner access for Corvlio clients. Your account keeps the field view private.</p><Link href="/privacy" data-testid="link-public-privacy" className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-sidebar-foreground/55 underline decoration-sidebar-foreground/25 underline-offset-4 hover:text-sidebar-foreground">Privacy policy</Link></div></main>;
 }
 
 function PrivacyPage() {
@@ -484,7 +481,7 @@ function PrivacyPage() {
       <div className="mx-auto max-w-3xl">
         <Link href="/" data-testid="link-privacy-home" className="mb-10 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Back to Corvlio</Link>
         <header className="border-b border-border pb-8">
-          <div className="mb-5 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground"><Signal size={20} strokeWidth={2.8} /></div><div><p className="text-lg font-800 tracking-[-0.04em]">corvlio</p><p className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">field desk</p></div></div>
+          <div className="mb-5 flex items-center"><img src={logoUrl} alt="Corvlio" className="h-auto w-[174px] rounded-xl" /></div>
           <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">Privacy policy</p>
           <h1 className="text-4xl font-800 leading-none tracking-[-0.055em] sm:text-5xl">Your data stays focused on your business.</h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">Corvlio Field Dashboard helps business owners view and respond to leads captured by their AI phone receptionist. This policy explains, in plain language, what information we handle and why.</p>
