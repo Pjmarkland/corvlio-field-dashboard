@@ -391,7 +391,7 @@ export async function runNotificationPollCycle(): Promise<void> {
 
     // After polling all businesses, deliver any queued notification events.
     try {
-      await processNotificationOutbox();
+      await runNotificationOutboxNow();
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
@@ -402,6 +402,16 @@ export async function runNotificationPollCycle(): Promise<void> {
     clearInterval(heartbeat);
     await releasePollerLease();
   }
+}
+
+let outboxPromise: Promise<void> | null = null;
+
+export function runNotificationOutboxNow(): Promise<void> {
+  if (outboxPromise) return outboxPromise;
+  outboxPromise = processNotificationOutbox().finally(() => {
+    outboxPromise = null;
+  });
+  return outboxPromise;
 }
 
 // ─── Poller lifecycle ─────────────────────────────────────────────────────────

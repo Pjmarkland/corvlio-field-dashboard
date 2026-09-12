@@ -1,5 +1,6 @@
 import app from "./app";
 import { closeApnsSession } from "./lib/apnsAdapter";
+import { refreshBusinessPhoneCache } from "./lib/businessDirectory";
 import { logger } from "./lib/logger";
 import { startLeadNotificationPoller, stopLeadNotificationPoller } from "./lib/notificationService";
 
@@ -24,6 +25,14 @@ const server = app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  void refreshBusinessPhoneCache()
+    .then(() => logger.info("Business phone cache refreshed"))
+    .catch((error) => {
+      logger.error(
+        { error: error instanceof Error ? error.message : "Unknown cache refresh error" },
+        "Initial business phone cache refresh failed",
+      );
+    });
   startLeadNotificationPoller();
 });
 
