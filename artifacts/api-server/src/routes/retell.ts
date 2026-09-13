@@ -10,6 +10,7 @@ import {
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
+import { sendLeadNotificationEmail } from "../lib/gmail";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 
 const router: IRouter = Router();
@@ -186,6 +187,22 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       });
 
       return createdLead;
+    });
+
+    void sendLeadNotificationEmail({
+      ownerEmail: business.ownerEmail,
+      callerName,
+      phoneNumber: callerPhoneNumber,
+      issue: issueReason,
+    }).catch((error) => {
+      req.log.error(
+        {
+          leadId: lead.id,
+          businessId: business.id,
+          error: error instanceof Error ? error.message : "Unknown Gmail error",
+        },
+        "Retell lead email notification failed",
+      );
     });
 
     void runNotificationOutboxNow().catch((error) => {

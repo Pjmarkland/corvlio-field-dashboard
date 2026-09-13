@@ -1,0 +1,131 @@
+import { logger } from "./logger";
+
+let cachedAccessToken: { value: string; expiresAt: number } | null = null;
+
+function getGmailOAuthConfig():
+  | { clientId: string; clientSecret: string; refreshToken: string }
+  | null {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN;
+
+  if (!refreshToken) {
+    logger.info(
+      "Gmail lead email sending is not configured: GMAIL_OAUTH_REFRESH_TOKEN is not set",
+    );
+    return null;
+  }
+
+  if (!clientId || !clientSecret) {
+    logger.warn(
+      "Gmail lead email sending is not configured: Google OAuth client credentials are not set",
+    );
+    return null;
+  }
+
+  return { clientId, clientSecret, refreshToken };
+}
+
+async function getAccessToken(): Promise<string | null> {
+  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
+    return cachedAccessToken.value;
+  }
+
+  const config = getGmailOAuthConfig();
+  if (!config) return null;
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: config.refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const data = await response.json() as {
+    access_token?: string;
+    expires_in?: number;
+    error?: string;
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      `Google Gmail OAuth refresh failed${data.error ? `: ${data.error}` : ""}`,
+    );
+  }
+
+  cachedAccessToken = {
+    value: data.access_token,
+    expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+  };
+  return data.access_token;
+}
+
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function normalizedRecipient(ownerEmail: string | null | undefined): string | null {
+  const recipient = ownerEmail?.trim() ?? "";
+  if (!recipient || /[\r\n]/.test(recipient)) return null;
+  return recipient;
+}
+
+export async function sendLeadNotificationEmail(input: {
+  ownerEmail: string | null | undefined;
+  callerName: string | null;
+  phoneNumber: string | null;
+  issue: string | null;
+}): Promise<void> {
+  const recipient = normalizedRecipient(input.ownerEmail);
+  if (!recipient) {
+    logger.info(
+      "Skipping Gmail lead notification: business ownerEmail is empty",
+    );
+    return;
+  }
+
+  const accessToken = await getAccessToken();
+  if (!accessToken) return;
+
+  const messageBody = [
+    "A new lead came in.",
+    "",
+    `Caller name: ${input.callerName || "Not provided"}`,
+    `Phone: ${input.phoneNumber || "Not provided"}`,
+    `Issue: ${input.issue || "Not provided"}`,
+  ].join("\r\n");
+
+  const rawMessage = [
+    `To: ${recipient}`,
+    "Subject: New lead received",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    messageBody,
+  ].join("\r\n");
+
+  const response = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ raw: encodeBase64Url(rawMessage) }),
+    },
+  );
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Gmail API send failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`,
+    );
+  }
+}
