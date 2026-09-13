@@ -45,6 +45,22 @@ export async function findBusinessByPhoneNumber(
   return businessesByPhone.get(normalizePhoneNumber(phoneNumber));
 }
 
+export async function findBusinessByClerkUserId(
+  clerkUserId: string,
+): Promise<DatabaseBusiness | undefined> {
+  const matches = await db
+    .select()
+    .from(businessesTable)
+    .where(eq(businessesTable.clerkUserId, clerkUserId))
+    .limit(2);
+
+  if (matches.length > 1) {
+    throw new Error(`Clerk user is linked to multiple businesses: ${clerkUserId}`);
+  }
+
+  return matches[0];
+}
+
 export async function createBusiness(input: NewBusiness): Promise<DatabaseBusiness> {
   const [business] = await db.insert(businessesTable).values(input).returning();
   if (!business) throw new Error("Business creation did not return a record");
