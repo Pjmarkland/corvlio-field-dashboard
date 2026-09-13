@@ -27,3 +27,5 @@ packages = ["jdk17"]
 
 [userenv.shared]
 VITE_NATIVE_API_BASE_URL = "https://corvlio-field-dashboard--pjmarkland08.replit.app"
+PUBLIC_API_BASE_URL = "https://corvlio-field-dashboard--pjmarkland08.replit.app"
+RETELL_API_BASE_URL = "https://api.retellai.com"
