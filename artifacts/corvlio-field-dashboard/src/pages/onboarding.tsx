@@ -5,6 +5,7 @@ import logoUrl from '@/assets/logo.svg';
 
 type OnboardingForm = {
   businessName: string;
+  ownerEmail: string;
   serviceArea: string;
   receptionistTone: string;
   servicesNotOffered: string;
@@ -24,6 +25,7 @@ type OnboardingForm = {
 
 const initialForm: OnboardingForm = {
   businessName: '',
+  ownerEmail: '',
   serviceArea: '',
   receptionistTone: '',
   servicesNotOffered: '',
@@ -48,6 +50,7 @@ function Field({
   onChange,
   placeholder,
   required = false,
+  type = 'text',
   multiline = false,
   rows = 4,
   hint,
@@ -58,6 +61,7 @@ function Field({
   onChange: (value: string) => void;
   placeholder: string;
   required?: boolean;
+  type?: 'text' | 'email';
   multiline?: boolean;
   rows?: number;
   hint?: string;
@@ -86,6 +90,7 @@ function Field({
         <input
           id={id}
           name={id}
+          type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
@@ -175,6 +180,7 @@ function OnboardingPage() {
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
+                <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required />
               </div>
               <div className="mt-5">
