@@ -5,15 +5,29 @@ import {
   UpdateLeadStatusParams,
   UpdateLeadStatusResponse,
 } from "@workspace/api-zod";
+import { db, leadsTable } from "@workspace/db";
+import { and, desc, eq } from "drizzle-orm";
 import { Router, type IRouter } from "express";
-import { findBusinessForClerkUser } from "../lib/businessRegistry";
-import {
-  GoogleSheetStatusError,
-  readGoogleSheetLeads,
-  writeGoogleSheetLeadStatus,
-} from "../lib/googleSheets";
+import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 
 const router: IRouter = Router();
+
+function normalizeUrgency(value: string | null): "urgent" | "normal" | "low" {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (["urgent", "high", "emergency", "same-day", "same day"].some((label) => normalized.includes(label))) {
+    return "urgent";
+  }
+  if (["low", "flexible", "can wait", "whenever"].some((label) => normalized.includes(label))) {
+    return "low";
+  }
+  return "normal";
+}
+
+function normalizeStatus(value: string | null): "pending" | "contacted" {
+  return ["contacted", "complete", "completed", "done"].includes((value ?? "").trim().toLowerCase())
+    ? "contacted"
+    : "pending";
+}
 
 router.get("/leads", async (req, res): Promise<void> => {
   res.set({
@@ -29,7 +43,7 @@ router.get("/leads", async (req, res): Promise<void> => {
   }
 
   try {
-    const business = findBusinessForClerkUser(userId);
+    const business = await findBusinessByClerkUserId(userId);
     if (!business) {
       res.json(GetLeadsResponse.parse({
         configured: false,
@@ -40,27 +54,36 @@ router.get("/leads", async (req, res): Promise<void> => {
       return;
     }
 
-    const { leads, timeZone } = await readGoogleSheetLeads(business.googleSheetId);
+    const leads = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.businessId, business.id))
+      .orderBy(desc(leadsTable.createdAt));
+
     res.json(GetLeadsResponse.parse({
       configured: true,
-      businessName: business.name,
-      timeZone,
-      leads,
+      businessName: business.businessName,
+      timeZone: null,
+      leads: leads.map((lead) => ({
+        id: String(lead.id),
+        name: lead.callerName ?? "",
+        phone: lead.phoneNumber ?? "",
+        issue: lead.issueReason ?? "",
+        address: lead.address ?? "",
+        urgency: normalizeUrgency(lead.urgencyLevel),
+        status: normalizeStatus(lead.status),
+        createdAt: lead.createdAt,
+        contactedAt: lead.contactedAt,
+      })),
     }));
   } catch (error) {
-    const status = error instanceof GoogleSheetStatusError && error.status === 429 ? 429 : 502;
     req.log.error(
       {
-        status,
-        error: error instanceof Error ? error.message : "Unknown Google Sheets error",
+        error: error instanceof Error ? error.message : "Unknown database error",
       },
-      "Unable to load Google Sheet leads",
+      "Unable to load database leads",
     );
-    res.status(status).json({
-      error: status === 429
-        ? "Google Sheets is busy. Wait a moment and try again"
-        : "Unable to load leads from Google Sheets",
-    });
+    res.status(502).json({ error: "Unable to load leads" });
   }
 });
 
@@ -85,37 +108,52 @@ router.patch("/leads/:leadId/status", async (req, res): Promise<void> => {
   }
 
   try {
-    const business = findBusinessForClerkUser(userId);
+    const business = await findBusinessByClerkUserId(userId);
     if (!business) {
       res.status(403).json({ error: "No business is configured for this account" });
       return;
     }
 
-    const result = await writeGoogleSheetLeadStatus(
-      business.googleSheetId,
-      params.data.leadId,
-      body.data.status,
-    );
-    res.json(UpdateLeadStatusResponse.parse(result));
+    const leadId = Number(params.data.leadId);
+    if (!Number.isSafeInteger(leadId) || leadId < 1) {
+      res.status(404).json({ error: "Lead not found" });
+      return;
+    }
+
+    const [updatedLead] = await db
+      .update(leadsTable)
+      .set({
+        status: body.data.status,
+        contactedAt: body.data.status === "contacted" ? new Date() : null,
+      })
+      .where(and(
+        eq(leadsTable.id, leadId),
+        eq(leadsTable.businessId, business.id),
+      ))
+      .returning({
+        id: leadsTable.id,
+        status: leadsTable.status,
+        contactedAt: leadsTable.contactedAt,
+      });
+
+    if (!updatedLead) {
+      res.status(404).json({ error: "Lead not found" });
+      return;
+    }
+
+    res.json(UpdateLeadStatusResponse.parse({
+      leadId: String(updatedLead.id),
+      status: normalizeStatus(updatedLead.status),
+      contactedAt: updatedLead.contactedAt,
+    }));
   } catch (error) {
-    const status = error instanceof GoogleSheetStatusError ? error.status : 502;
     req.log.error(
       {
-        status,
-        error: error instanceof Error ? error.message : "Unknown Google Sheets error",
+        error: error instanceof Error ? error.message : "Unknown database error",
       },
-      "Unable to update Google Sheet lead status",
+      "Unable to update database lead status",
     );
-
-    const message =
-      status === 404
-        ? "Lead not found in the connected Google Sheet"
-        : status === 409
-          ? "This lead has a duplicated record ID and cannot be updated safely"
-          : status === 429
-            ? "Google Sheets is busy. Wait a moment and try again"
-            : "Unable to update lead status in Google Sheets";
-    res.status(status).json({ error: message });
+    res.status(502).json({ error: "Unable to update lead status" });
   }
 });
 
