@@ -147,7 +147,7 @@ function OnboardingPage() {
   };
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.privacyAccepted || isSubmitting) return;
+    if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting) return;
 
     setIsSubmitting(true);
     setSubmission(null);
@@ -330,13 +330,13 @@ function OnboardingPage() {
                   />
                   <span>I agree to the <Link href="/privacy" className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary" data-testid="link-onboarding-privacy">Privacy Policy</Link>.</span>
                 </label>
-                <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground" htmlFor="termsAccepted">
-                  <input id="termsAccepted" type="checkbox" checked={form.termsAccepted} onChange={(event) => updateField('termsAccepted', event.target.checked)} data-testid="checkbox-terms" className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" disabled />
-                  <span>Terms of Service <span className="ml-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 align-middle font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Coming soon</span></span>
+                <label className="flex items-start gap-3 text-sm leading-relaxed" htmlFor="termsAccepted">
+                  <input id="termsAccepted" type="checkbox" checked={form.termsAccepted} onChange={(event) => updateField('termsAccepted', event.target.checked)} data-testid="checkbox-terms" className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" required />
+                  <span>I agree to the <Link href="/terms" className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary" data-testid="link-onboarding-terms">Terms of Service</Link>.</span>
                 </label>
-                <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground" htmlFor="serviceAgreementAccepted">
-                  <input id="serviceAgreementAccepted" type="checkbox" checked={form.serviceAgreementAccepted} onChange={(event) => updateField('serviceAgreementAccepted', event.target.checked)} data-testid="checkbox-client-service-agreement" className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" disabled />
-                  <span>Client Service Agreement <span className="ml-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 align-middle font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Coming soon</span></span>
+                <label className="flex items-start gap-3 text-sm leading-relaxed" htmlFor="serviceAgreementAccepted">
+                  <input id="serviceAgreementAccepted" type="checkbox" checked={form.serviceAgreementAccepted} onChange={(event) => updateField('serviceAgreementAccepted', event.target.checked)} data-testid="checkbox-client-service-agreement" className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" required />
+                  <span>I agree to the <Link href="/client-agreement" className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary" data-testid="link-onboarding-client-service-agreement">Client Service Agreement</Link>.</span>
                 </label>
               </div>
               <button type="submit" disabled={isSubmitting} data-testid="button-submit-onboarding" className={`mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity ${isSubmitting ? 'cursor-wait opacity-55' : 'hover:bg-primary-hover'}`}>
