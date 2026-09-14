@@ -138,8 +138,82 @@ function SectionHeading({
 
 function OnboardingPage() {
   const [form, setForm] = useState<OnboardingForm>(initialForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submission, setSubmission] = useState<
+    { kind: 'success' | 'error'; message: string } | null
+  >(null);
   const updateField = <K extends keyof OnboardingForm>(key: K, value: OnboardingForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.privacyAccepted || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmission(null);
+
+    try {
+      const response = await fetch('/api/businesses/onboard', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: form.businessName,
+          ownerEmail: form.ownerEmail,
+          serviceArea: form.serviceArea,
+          personalityToneDescription: form.receptionistTone,
+          servicesNotOffered: form.servicesNotOffered,
+          pricingPolicy: form.pricingPolicy,
+          financingPolicy: form.financingPolicy,
+          brandsWorkedWith: form.brandsWorkedWith,
+          responseTimeCommitment: form.responseTime,
+          warrantyInfo: form.warrantyInfo,
+          maintenancePlanOfferings: form.maintenancePlans,
+          credentials: form.credentials,
+          ownerAvailability: form.ownerAvailability,
+          emergencyContactInfo: form.emergencyContact,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        setSubmission({
+          kind: 'error',
+          message: 'Please sign in or sign up before submitting your business setup.',
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        setSubmission({
+          kind: 'error',
+          message: typeof payload.error === 'string'
+            ? payload.error
+            : 'We could not submit your business setup. Please try again.',
+        });
+        return;
+      }
+
+      if (typeof payload.phoneNumber !== 'string' || !payload.phoneNumber.trim()) {
+        setSubmission({
+          kind: 'error',
+          message: 'The setup response did not include an assigned phone number. Please try again.',
+        });
+        return;
+      }
+
+      setSubmission({
+        kind: 'success',
+        message: `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
+      });
+    } catch {
+      setSubmission({
+        kind: 'error',
+        message: 'We could not reach Corvlio. Please check your connection and try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -174,7 +248,7 @@ function OnboardingPage() {
           </div>
         </div>
 
-        <form className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]" onSubmit={(event) => event.preventDefault()} data-testid="form-onboarding">
+        <form className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]" onSubmit={handleSubmit} data-testid="form-onboarding">
           <div className="space-y-4">
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
@@ -265,10 +339,18 @@ function OnboardingPage() {
                   <span>Client Service Agreement <span className="ml-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 align-middle font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Coming soon</span></span>
                 </label>
               </div>
-              <button type="submit" disabled title="Submission is coming soon" data-testid="button-submit-onboarding" className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground opacity-55 disabled:cursor-not-allowed">
-                Submit setup <ArrowUpRight size={16} />
+              <button type="submit" disabled={isSubmitting} data-testid="button-submit-onboarding" className={`mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity ${isSubmitting ? 'cursor-wait opacity-55' : 'hover:bg-primary-hover'}`}>
+                {isSubmitting ? 'Submitting…' : 'Submit setup'} {!isSubmitting ? <ArrowUpRight size={16} /> : null}
               </button>
-              <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground" data-testid="status-onboarding-submit">Submission is coming soon. Your answers are not sent or saved yet.</p>
+              {submission ? (
+                <p
+                  className={`mt-3 text-center text-xs leading-relaxed ${submission.kind === 'success' ? 'text-[#398660]' : 'text-[#c84b29]'}`}
+                  data-testid="status-onboarding-submit"
+                  role="status"
+                >
+                  {submission.message}{submission.kind === 'error' && submission.message.includes('sign in or sign up') ? <> <Link href="/sign-up" className="font-semibold underline underline-offset-2">Sign up</Link>.</> : null}
+                </p>
+              ) : null}
             </div>
           </aside>
         </form>
