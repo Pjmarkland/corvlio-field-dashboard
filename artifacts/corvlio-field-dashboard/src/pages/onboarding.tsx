@@ -5,10 +5,12 @@ import logoUrl from '@/assets/logo.svg';
 
 type OnboardingForm = {
   businessName: string;
+  businessType: string;
   ownerEmail: string;
   serviceArea: string;
   receptionistTone: string;
   servicesNotOffered: string;
+  majorIssueExamples: string;
   pricingPolicy: string;
   financingPolicy: string;
   brandsWorkedWith: string;
@@ -25,10 +27,12 @@ type OnboardingForm = {
 
 const initialForm: OnboardingForm = {
   businessName: '',
+  businessType: '',
   ownerEmail: '',
   serviceArea: '',
   receptionistTone: '',
   servicesNotOffered: '',
+  majorIssueExamples: '',
   pricingPolicy: '',
   financingPolicy: '',
   brandsWorkedWith: '',
@@ -159,10 +163,12 @@ function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessName: form.businessName,
+          businessType: form.businessType,
           ownerEmail: form.ownerEmail,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
           servicesNotOffered: form.servicesNotOffered,
+          majorIssueExamples: form.majorIssueExamples,
           pricingPolicy: form.pricingPolicy,
           financingPolicy: form.financingPolicy,
           brandsWorkedWith: form.brandsWorkedWith,
@@ -254,6 +260,7 @@ function OnboardingPage() {
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
+                <Field id="businessType" label="Business type" value={form.businessType} onChange={(value) => updateField('businessType', value)} placeholder="Heating and air conditioning company" />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required />
               </div>
@@ -275,6 +282,7 @@ function OnboardingPage() {
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={Wrench} eyebrow="02 · The work" title="Set the boundaries before calls begin." description="Clear limits help the receptionist qualify the right jobs without making promises your team cannot keep." tone="warm" />
               <div className="space-y-5">
+                <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." />
                 <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field id="pricingPolicy" label="Pricing policy" value={form.pricingPolicy} onChange={(value) => updateField('pricingPolicy', value)} placeholder="Diagnostic visits start at $129; quote after inspection." multiline rows={4} />
