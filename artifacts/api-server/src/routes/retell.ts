@@ -61,7 +61,9 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
 function dynamicVariables(business: NonNullable<Awaited<ReturnType<typeof findBusinessByPhoneNumber>>>) {
   return {
     business_name: business.businessName,
+    business_type: business.businessType ?? "",
     service_area: business.serviceArea ?? "",
+    major_issue_examples: business.majorIssueExamples ?? "",
     pricing_policy: business.pricingPolicy ?? "",
     personality_tone_description: business.personalityToneDescription ?? "",
     services_not_offered: business.servicesNotOffered ?? "",
