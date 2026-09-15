@@ -7,10 +7,12 @@ const router: IRouter = Router();
 
 const OnboardBusinessBody = z.object({
   businessName: z.string().min(1),
+  businessType: z.string().optional(),
   ownerEmail: z.string().email(),
   serviceArea: z.string().optional(),
   personalityToneDescription: z.string().optional(),
   servicesNotOffered: z.string().optional(),
+  majorIssueExamples: z.string().optional(),
   pricingPolicy: z.string().optional(),
   financingPolicy: z.string().optional(),
   brandsWorkedWith: z.string().optional(),
@@ -40,10 +42,12 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     const business = await provisionBusinessPhoneNumber({
       clerkUserId: userId,
       businessName: body.data.businessName,
+      businessType: body.data.businessType,
       ownerEmail: body.data.ownerEmail,
       serviceArea: body.data.serviceArea,
       personalityToneDescription: body.data.personalityToneDescription,
       servicesNotOffered: body.data.servicesNotOffered,
+      majorIssueExamples: body.data.majorIssueExamples,
       pricingPolicy: body.data.pricingPolicy,
       financingPolicy: body.data.financingPolicy,
       brandsWorkedWith: body.data.brandsWorkedWith,
