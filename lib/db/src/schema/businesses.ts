@@ -8,6 +8,8 @@ export const businessesTable = pgTable("businesses", {
   retellPhoneNumber: text("retell_phone_number").notNull(),
   retellAgentId: text("retell_agent_id").notNull(),
   serviceArea: text("service_area"),
+  businessType: text("business_type"),
+  majorIssueExamples: text("major_issue_examples"),
   personalityToneDescription: text("personality_tone_description"),
   servicesNotOffered: text("services_not_offered"),
   pricingPolicy: text("pricing_policy"),
