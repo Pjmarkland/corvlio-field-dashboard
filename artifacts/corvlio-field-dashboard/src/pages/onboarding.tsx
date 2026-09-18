@@ -224,7 +224,10 @@ function OnboardingPage() {
           phoneNumber: payload.phoneNumber.trim(),
         });
       }
-      await queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
+      await queryClient.invalidateQueries({
+        queryKey: getGetLeadsQueryKey(),
+        refetchType: 'all',
+      });
       setLocation('/dashboard');
     } catch {
       setSubmission({
