@@ -24,7 +24,7 @@ export function readOnboardingConfirmation(): OnboardingConfirmation | null {
       typeof confirmation.businessName !== 'string' ||
       (confirmation.phoneNumber !== null && typeof confirmation.phoneNumber !== 'string') ||
       !confirmation.userId ||
-      !confirmation.businessName ||
+      !confirmation.businessName
     ) {
       return null;
     }
