@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, FileCheck2, Headphones, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
-import { Link } from 'wouter';
+import { useUser } from '@clerk/react';
+import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
+import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 
 type OnboardingForm = {
   businessName: string;
@@ -141,6 +143,8 @@ function SectionHeading({
 }
 
 function OnboardingPage() {
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<
@@ -212,6 +216,14 @@ function OnboardingPage() {
         kind: 'success',
         message: `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
       });
+      if (user?.id) {
+        saveOnboardingConfirmation({
+          userId: user.id,
+          businessName: form.businessName.trim(),
+          phoneNumber: payload.phoneNumber.trim(),
+        });
+      }
+      setLocation('/dashboard');
     } catch {
       setSubmission({
         kind: 'error',
