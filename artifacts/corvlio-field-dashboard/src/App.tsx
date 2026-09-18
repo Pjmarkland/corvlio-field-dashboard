@@ -624,7 +624,7 @@ function LeadDataRouter() {
   }
 
   if (!data?.configured) {
-    return <AppShell leads={[]} businessName={null}><UnconfiguredAccountScreen /></AppShell>;
+    return <Redirect to="/onboarding" />;
   }
 
   return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;
