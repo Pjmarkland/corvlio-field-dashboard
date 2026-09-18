@@ -18,6 +18,17 @@ export type RetellPhoneNumberOptions = {
   nickname?: string;
 };
 
+export type BusinessProvisioningResult = {
+  business: DatabaseBusiness;
+  phoneProvisioningPending: boolean;
+  provisioningError: unknown | null;
+};
+
+type BusinessCreator = (input: NewBusiness) => Promise<DatabaseBusiness>;
+type PhoneProvisioner = (
+  businessInfo: BusinessProvisioningInput,
+) => Promise<DatabaseBusiness>;
+
 type RetellPhoneNumberResponse = {
   phone_number?: unknown;
 };
@@ -132,4 +143,33 @@ export async function provisionBusinessPhoneNumber(
     retellPhoneNumber: responseBody.phone_number,
     retellAgentId: sharedAgentId,
   });
+}
+
+export async function saveBusinessWithOptionalPhone(
+  businessInfo: BusinessProvisioningInput,
+  dependencies: {
+    provision?: PhoneProvisioner;
+    create?: BusinessCreator;
+  } = {},
+): Promise<BusinessProvisioningResult> {
+  const provision = dependencies.provision ?? provisionBusinessPhoneNumber;
+  const create = dependencies.create ?? createBusiness;
+
+  try {
+    return {
+      business: await provision(businessInfo),
+      phoneProvisioningPending: false,
+      provisioningError: null,
+    };
+  } catch (error) {
+    return {
+      business: await create({
+        ...businessInfo,
+        retellPhoneNumber: null,
+        retellAgentId: null,
+      }),
+      phoneProvisioningPending: true,
+      provisioningError: error,
+    };
+  }
 }

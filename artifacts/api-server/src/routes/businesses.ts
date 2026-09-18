@@ -2,7 +2,7 @@ import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
 import { createBusiness } from "../lib/businessDirectory";
-import { provisionBusinessPhoneNumber } from "../lib/retellProvisioning";
+import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
 
 const router: IRouter = Router();
 
@@ -60,27 +60,32 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     agreementsAcceptedAt: new Date(),
   };
 
-  let business;
-  let phoneProvisioningPending = false;
   try {
-    business = await provisionBusinessPhoneNumber(businessInfo);
+    const result = await saveBusinessWithOptionalPhone(businessInfo);
+    if (result.phoneProvisioningPending) {
+      req.log.warn(
+        {
+          error: result.provisioningError instanceof Error
+            ? result.provisioningError.message
+            : "Unknown Retell provisioning error",
+        },
+        "Business saved; Retell phone provisioning is pending",
+      );
+    }
+
+    res.status(201).json({
+      phoneNumber: result.business.retellPhoneNumber,
+      phoneProvisioningPending: result.phoneProvisioningPending,
+    });
   } catch (error) {
-    phoneProvisioningPending = true;
-    req.log.warn(
+    req.log.error(
       { error: error instanceof Error ? error.message : "Unknown business onboarding error" },
-      "Business saved; Retell phone provisioning is pending",
+      "Business onboarding failed while saving business",
     );
-    business = await createBusiness({
-      ...businessInfo,
-      retellPhoneNumber: null,
-      retellAgentId: null,
+    res.status(502).json({
+      error: error instanceof Error ? error.message : "Unable to save business setup",
     });
   }
-
-  res.status(201).json({
-    phoneNumber: business.retellPhoneNumber,
-    phoneProvisioningPending,
-  });
 });
 
 export default router;
