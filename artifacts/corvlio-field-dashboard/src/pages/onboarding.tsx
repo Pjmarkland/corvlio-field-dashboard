@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, FileCheck2, Headphones, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { getGetLeadsQueryKey } from '@workspace/api-client-react';
+import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useSignOut } from '@/hooks/useSignOut';
 
 type OnboardingForm = {
   businessName: string;
@@ -145,6 +149,9 @@ function SectionHeading({
 function OnboardingPage() {
   const { user } = useUser();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { revoke } = usePushNotifications(user?.id);
+  const { handleSignOut, isSigningOut } = useSignOut(revoke);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<
@@ -223,6 +230,7 @@ function OnboardingPage() {
           phoneNumber: payload.phoneNumber.trim(),
         });
       }
+      await queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
       setLocation('/dashboard');
     } catch {
       setSubmission({
@@ -242,10 +250,24 @@ function OnboardingPage() {
             <img src={logoUrl} alt="Corvlio" className="h-auto w-[128px]" />
             <span className="hidden border-l border-border pl-3 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground sm:inline">field desk</span>
           </Link>
-          <Link href="/" className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" data-testid="link-onboarding-back">
-            <ArrowLeft size={15} />
-            Back to Corvlio
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" data-testid="link-onboarding-back">
+              <ArrowLeft size={15} />
+              Back to Corvlio
+            </Link>
+            {user ? (
+              <button
+                type="button"
+                disabled={isSigningOut}
+                onClick={() => void handleSignOut()}
+                data-testid="button-sign-out-onboarding"
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground disabled:cursor-wait disabled:opacity-60 hover:bg-muted"
+              >
+                <span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span>
+                <ExternalLink size={14} />
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
