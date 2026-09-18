@@ -18,6 +18,11 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { type PushStatus, usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePushDeepLink } from '@/hooks/usePushDeepLink';
+import {
+  clearOnboardingConfirmation,
+  readOnboardingConfirmation,
+  type OnboardingConfirmation,
+} from '@/lib/onboardingConfirmation';
 import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
@@ -298,14 +303,43 @@ function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHand
   </article>;
 }
 
-function HomePage({ leads, timeZone, onStatus, savingLeadId }: { leads: Lead[]; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+function BusinessWelcomeCard({
+  businessName,
+  confirmation,
+}: {
+  businessName: string;
+  confirmation: OnboardingConfirmation | null;
+}) {
+  if (!confirmation || confirmation.businessName !== businessName) return null;
+
+  return (
+    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-[#b9dfc8] bg-[#edf8f0] p-4 text-[#285f3d] sm:items-center sm:justify-between sm:p-5" data-testid="banner-onboarding-complete">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d9eee1] text-[#398660]">
+          <CheckCircle2 size={20} />
+        </div>
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#398660]">Setup complete</p>
+          <h2 className="mt-1 text-base font-800 tracking-[-0.02em]">Welcome to {businessName}</h2>
+          <p className="mt-1 text-sm text-[#427652]">Your Corvlio receptionist is ready to receive calls.</p>
+        </div>
+      </div>
+      <div className="shrink-0 rounded-xl border border-[#b9dfc8] bg-white/70 px-3 py-2 sm:text-right">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#398660]">Assigned phone</p>
+        <p className="mt-0.5 text-sm font-800">{confirmation.phoneNumber}</p>
+      </div>
+    </div>
+  );
+}
+
+function HomePage({ leads, businessName, onboardingConfirmation, timeZone, onStatus, savingLeadId }: { leads: Lead[]; businessName: string; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
   const pending = leads.filter((lead) => lead.status === 'pending');
   const metrics = leadMetrics(leads, timeZone);
   return <><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pending.length ? `${pending.length} new call${pending.length === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pending.length}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pending.length}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">{formatReplyTime(metrics.avgReplyMinutes)}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{metrics.thisWeek}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>) : <EmptyToday />}</div>{leads.filter((lead) => lead.status === 'contacted').length > 0 ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{leads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <div key={lead.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{lead.name}</p><p className="truncate text-xs text-muted-foreground">{lead.issue}</p></div><Check size={16} className="text-[#49a979]" /></div>)}</div></div> : null}</>;
 }
 
 function EmptyToday() {
-  return <div className="grid-paper rounded-2xl border border-dashed border-border px-6 py-14 text-center"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><CheckCircle2 size={26} /></div><h2 className="text-lg font-bold">Clear runway</h2><p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">No new leads need you right now. Corvlio is keeping watch while you keep moving.</p></div>;
+  return <div className="grid-paper rounded-2xl border border-dashed border-border px-6 py-14 text-center" data-testid="empty-leads-state"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><CheckCircle2 size={26} /></div><h2 className="text-lg font-bold">No leads yet</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">No leads yet — leads will appear here automatically once your business starts receiving calls.</p></div>;
 }
 
 function CompletedPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
