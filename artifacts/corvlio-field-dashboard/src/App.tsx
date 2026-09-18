@@ -213,7 +213,7 @@ function formatReplyTime(minutes: number | null) {
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
-function AppShell({ children, leads, businessName }: { children: ReactNode; leads: Lead[]; businessName?: string | null }) {
+function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
   const [location] = useLocation();
   const pendingCount = leads.filter((lead) => lead.status === 'pending').length;
   const nav = [
@@ -267,7 +267,7 @@ function AppShell({ children, leads, businessName }: { children: ReactNode; lead
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{children}</div>
+        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden" aria-label="Mobile navigation">
@@ -332,7 +332,7 @@ function BusinessWelcomeCard({
   );
 }
 
-function HomePage({ leads, businessName, onboardingConfirmation, timeZone, onStatus, savingLeadId }: { leads: Lead[]; businessName: string; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+function HomePage({ leads, timeZone, onStatus, savingLeadId }: { leads: Lead[]; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
   const pending = leads.filter((lead) => lead.status === 'pending');
   const metrics = leadMetrics(leads, timeZone);
   return <><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pending.length ? `${pending.length} new call${pending.length === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pending.length}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pending.length}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">{formatReplyTime(metrics.avgReplyMinutes)}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{metrics.thisWeek}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>) : <EmptyToday />}</div>{leads.filter((lead) => lead.status === 'contacted').length > 0 ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{leads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <div key={lead.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{lead.name}</p><p className="truncate text-xs text-muted-foreground">{lead.issue}</p></div><Check size={16} className="text-[#49a979]" /></div>)}</div></div> : null}</>;
@@ -553,11 +553,21 @@ function SignUpPage() {
 
 function LeadDataRouter() {
   const { data, isLoading, isError, refetch } = useGetLeads();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const updateStatus = useUpdateLeadStatus();
   const [savingLeadId, setSavingLeadId] = useState<string | null>(null);
   const savingLeadIdRef = useRef<string | null>(null);
+  const [onboardingConfirmation, setOnboardingConfirmation] = useState<OnboardingConfirmation | null>(
+    readOnboardingConfirmation,
+  );
+  useEffect(() => {
+    if (onboardingConfirmation && user?.id && onboardingConfirmation.userId !== user.id) {
+      clearOnboardingConfirmation();
+      setOnboardingConfirmation(null);
+    }
+  }, [onboardingConfirmation, user?.id]);
   const leads = useMemo(
     () => [...(data?.leads ?? [])]
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
@@ -606,7 +616,7 @@ function LeadDataRouter() {
     return <AppShell leads={[]} businessName={null}><div className="grid min-h-[55vh] place-items-center text-center"><div className="max-w-md"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Users size={28} /></div><p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary">Account setup</p><h1 className="text-3xl font-800 tracking-[-0.045em]">No business configured</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">This owner account is signed in, but it hasn’t been linked to a Corvlio business yet. Contact Corvlio support to connect the correct lead sheet.</p><a href="mailto:hello@corvlio.com?subject=Connect%20my%20Corvlio%20business" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="link-configure-business">Contact Corvlio <ArrowUpRight size={16} /></a></div></div></AppShell>;
   }
 
-  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;
+  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;
 }
 
 function AuthenticatedRouter() {
