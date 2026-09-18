@@ -12,6 +12,8 @@ export interface LeadWorkspace {
   /** @nullable */
   businessName: string | null;
   /** @nullable */
+  retellPhoneNumber: string | null;
+  /** @nullable */
   timeZone: string | null;
   leads: Lead[];
 }

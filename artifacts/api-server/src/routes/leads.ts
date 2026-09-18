@@ -48,6 +48,7 @@ router.get("/leads", async (req, res): Promise<void> => {
       res.json(GetLeadsResponse.parse({
         configured: false,
         businessName: null,
+        retellPhoneNumber: null,
         timeZone: null,
         leads: [],
       }));
@@ -63,6 +64,7 @@ router.get("/leads", async (req, res): Promise<void> => {
     res.json(GetLeadsResponse.parse({
       configured: true,
       businessName: business.businessName,
+      retellPhoneNumber: business.retellPhoneNumber,
       timeZone: null,
       leads: leads.map((lead) => ({
         id: String(lead.id),

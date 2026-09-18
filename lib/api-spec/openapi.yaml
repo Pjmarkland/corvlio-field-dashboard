@@ -296,6 +296,8 @@ components:
           type: boolean
         businessName:
           type: [string, "null"]
+        retellPhoneNumber:
+          type: [string, "null"]
         timeZone:
           type: [string, "null"]
         leads:
@@ -305,6 +307,7 @@ components:
       required:
         - configured
         - businessName
+        - retellPhoneNumber
         - timeZone
         - leads
     NotificationPlatform:

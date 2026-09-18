@@ -24,6 +24,7 @@ export const HealthCheckResponse = zod.object({
 export const GetLeadsResponse = zod.object({
   "configured": zod.boolean(),
   "businessName": zod.string().nullable(),
+  "retellPhoneNumber": zod.string().nullable(),
   "timeZone": zod.string().nullable(),
   "leads": zod.array(zod.object({
   "id": zod.string(),
