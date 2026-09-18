@@ -4,3 +4,4 @@
 - [Native asset compositing](native-asset-compositing.md) — preserve output canvases with parenthesized ImageMagick overlays; repeated PNG renders may differ in metadata.
 - [Secure secret submission](secure-secret-submission.md) — wait for the platform’s added-secret confirmation before restarting dependent workflows.
 - [Browser navigation tests](browser-navigation-tests.md) — inject full-page redirects in UI tests because jsdom makes window.location.assign non-spyable.
+- [Retell onboarding fallback](retell-onboarding-fallback.md) — persist core business setup independently from optional Retell phone provisioning.
