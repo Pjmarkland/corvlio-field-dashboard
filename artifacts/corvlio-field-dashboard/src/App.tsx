@@ -451,6 +451,8 @@ function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
   );
 }
 
+type PublicRootNavigator = (path: string) => void;
+
 function SettingsPage() {
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
@@ -478,6 +480,31 @@ function NotFound() {
 function Router({ leads, businessName, onboardingConfirmation, timeZone, onStatus, savingLeadId }: { leads: Lead[]; businessName: string; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
   const [location] = useLocation();
   return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/completed" component={() => <CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={SettingsPage} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+}
+
+export function UnconfiguredAccountScreen({
+  navigate,
+}: {
+  navigate?: PublicRootNavigator;
+} = {}) {
+  const { user } = useUser();
+  const { revoke } = usePushNotifications(user?.id);
+  const { handleSignOut, isSigningOut } = useSignOut(revoke, navigate);
+
+  return (
+    <div className="grid min-h-[55vh] place-items-center text-center">
+      <div className="max-w-md">
+        <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Users size={28} /></div>
+        <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary">Account setup</p>
+        <h1 className="text-3xl font-800 tracking-[-0.045em]">No business configured</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">This owner account is signed in, but it hasn’t been linked to a Corvlio business yet. Contact Corvlio support to connect the correct lead sheet.</p>
+        <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+          <a href="mailto:hello@corvlio.com?subject=Connect%20my%20Corvlio%20business" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="link-configure-business">Contact Corvlio <ArrowUpRight size={16} /></a>
+          <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-unconfigured" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-bold text-foreground disabled:cursor-wait disabled:opacity-60"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={16} /></button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PublicHome() {
@@ -597,7 +624,7 @@ function LeadDataRouter() {
   }
 
   if (!data?.configured) {
-    return <Redirect to="/onboarding" />;
+    return <AppShell leads={[]} businessName={null}><UnconfiguredAccountScreen /></AppShell>;
   }
 
   return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;

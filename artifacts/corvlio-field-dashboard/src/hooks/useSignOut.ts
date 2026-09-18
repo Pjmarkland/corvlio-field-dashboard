@@ -3,8 +3,16 @@ import { useClerk } from '@clerk/react';
 import { useToast } from '@/hooks/use-toast';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+type PublicRootNavigator = (path: string) => void;
 
-export function useSignOut(revoke: () => Promise<void>) {
+const navigateToPublicRoot: PublicRootNavigator = (path) => {
+  window.location.assign(path);
+};
+
+export function useSignOut(
+  revoke: () => Promise<void>,
+  navigate: PublicRootNavigator = navigateToPublicRoot,
+) {
   const { signOut } = useClerk();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -26,7 +34,7 @@ export function useSignOut(revoke: () => Promise<void>) {
     }
     try {
       await signOut();
-      window.location.assign(basePath || '/');
+      navigate(basePath || '/');
     } catch (error) {
       setIsSigningOut(false);
       toast({

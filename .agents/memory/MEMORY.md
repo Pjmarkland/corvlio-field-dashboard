@@ -3,3 +3,4 @@
 - [Google Sheets row writes](google-sheets-row-writes.md) — stable-ID lookup handles normal reorders; strict simultaneous-sort safety needs a lock-bearing Apps Script.
 - [Native asset compositing](native-asset-compositing.md) — preserve output canvases with parenthesized ImageMagick overlays; repeated PNG renders may differ in metadata.
 - [Secure secret submission](secure-secret-submission.md) — wait for the platform’s added-secret confirmation before restarting dependent workflows.
+- [Browser navigation tests](browser-navigation-tests.md) — inject full-page redirects in UI tests because jsdom makes window.location.assign non-spyable.
