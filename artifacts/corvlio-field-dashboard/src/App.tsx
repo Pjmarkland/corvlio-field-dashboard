@@ -317,6 +317,7 @@ function BusinessWelcomeCard({
   confirmation: OnboardingConfirmation | null;
 }) {
   if (!confirmation || confirmation.businessName !== businessName) return null;
+  const phoneNumber = confirmation.phoneNumber?.trim() || null;
 
   return (
     <div className="mb-6 flex items-start gap-3 rounded-2xl border border-[#b9dfc8] bg-[#edf8f0] p-4 text-[#285f3d] sm:items-center sm:justify-between sm:p-5" data-testid="banner-onboarding-complete">
@@ -327,12 +328,16 @@ function BusinessWelcomeCard({
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#398660]">Setup complete</p>
           <h2 className="mt-1 text-base font-800 tracking-[-0.02em]">Welcome to {businessName}</h2>
-          <p className="mt-1 text-sm text-[#427652]">Your Corvlio receptionist is ready to receive calls.</p>
+          <p className="mt-1 text-sm text-[#427652]">
+            {phoneNumber
+              ? 'Your Corvlio receptionist is ready to receive calls.'
+              : 'Your business setup is saved. Phone number provisioning is still pending.'}
+          </p>
         </div>
       </div>
       <div className="shrink-0 rounded-xl border border-[#b9dfc8] bg-white/70 px-3 py-2 sm:text-right">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#398660]">Assigned phone</p>
-        <p className="mt-0.5 text-sm font-800">{confirmation.phoneNumber}</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#398660]">{phoneNumber ? 'Assigned phone' : 'Phone setup'}</p>
+        <p className="mt-0.5 text-sm font-800">{phoneNumber ?? 'Pending'}</p>
       </div>
     </div>
   );
@@ -605,7 +610,7 @@ function LeadDataRouter() {
           : current);
         toast({
           title: status === 'contacted' ? 'Lead marked contacted' : 'Lead reopened',
-          description: 'The connected Google Sheet is up to date.',
+          description: 'Status updated.',
         });
       })
       .catch((error: unknown) => {
@@ -632,7 +637,7 @@ function LeadDataRouter() {
     return <Redirect to="/onboarding" />;
   }
 
-  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} retellPhoneNumber={data.retellPhoneNumber} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'UTC'} onStatus={onStatus} savingLeadId={savingLeadId} />;
+  return <Router leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} retellPhoneNumber={data.retellPhoneNumber} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'America/New_York'} onStatus={onStatus} savingLeadId={savingLeadId} />;
 }
 
 function AuthenticatedRouter() {

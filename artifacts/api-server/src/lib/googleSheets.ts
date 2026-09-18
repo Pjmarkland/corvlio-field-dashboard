@@ -203,7 +203,7 @@ export async function readGoogleSheetLeads(spreadsheetId: string) {
   const cell = (row: unknown[], header: typeof REQUIRED_HEADERS[number]) =>
     String(rawCell(row, header) ?? "").trim();
 
-  const timeZone = metadata.properties?.timeZone ?? "UTC";
+  const timeZone = metadata.properties?.timeZone ?? "America/New_York";
   const leads = rows
     .map((row, index) => ({ row, rowNumber: index + 2 }))
     .filter(({ row }) => row.some((value) => String(value ?? "").trim() !== ""))

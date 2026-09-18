@@ -217,11 +217,13 @@ function OnboardingPage() {
           ? "Business setup saved. Phone number setup is pending — we'll notify you once it's ready."
           : `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
       });
-      if (user?.id && typeof payload.phoneNumber === 'string' && payload.phoneNumber.trim()) {
+      if (user?.id) {
         saveOnboardingConfirmation({
           userId: user.id,
           businessName: form.businessName.trim(),
-          phoneNumber: payload.phoneNumber.trim(),
+          phoneNumber: typeof payload.phoneNumber === 'string' && payload.phoneNumber.trim()
+            ? payload.phoneNumber.trim()
+            : null,
         });
       }
       await queryClient.invalidateQueries({

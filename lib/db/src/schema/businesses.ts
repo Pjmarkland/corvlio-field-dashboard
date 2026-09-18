@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
@@ -24,7 +24,9 @@ export const businessesTable = pgTable("businesses", {
   agreementsAcceptedAt: timestamp("agreements_accepted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("businesses_clerk_user_id_unique").on(table.clerkUserId),
+]);
 
 export type Business = typeof businessesTable.$inferSelect;
 export type NewBusiness = typeof businessesTable.$inferInsert;

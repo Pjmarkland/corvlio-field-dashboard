@@ -3,7 +3,7 @@ const ONBOARDING_CONFIRMATION_KEY = 'corvlio-onboarding-confirmation';
 export type OnboardingConfirmation = {
   userId: string;
   businessName: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
 };
 
 export function saveOnboardingConfirmation(confirmation: OnboardingConfirmation) {
@@ -22,10 +22,9 @@ export function readOnboardingConfirmation(): OnboardingConfirmation | null {
     if (
       typeof confirmation.userId !== 'string' ||
       typeof confirmation.businessName !== 'string' ||
-      typeof confirmation.phoneNumber !== 'string' ||
+      (confirmation.phoneNumber !== null && typeof confirmation.phoneNumber !== 'string') ||
       !confirmation.userId ||
       !confirmation.businessName ||
-      !confirmation.phoneNumber
     ) {
       return null;
     }

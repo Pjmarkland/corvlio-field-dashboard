@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
+import { findBusinessByClerkUserId, updateBusiness } from "../lib/businessDirectory";
 
 const router: IRouter = Router();
 
@@ -60,6 +61,20 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   };
 
   try {
+    const existingBusiness = await findBusinessByClerkUserId(userId);
+    if (existingBusiness) {
+      const business = await updateBusiness(existingBusiness.id, businessInfo);
+      if (!business) {
+        throw new Error("Existing business could not be updated");
+      }
+
+      res.status(200).json({
+        phoneNumber: business.retellPhoneNumber,
+        phoneProvisioningPending: !business.retellPhoneNumber,
+      });
+      return;
+    }
+
     const result = await saveBusinessWithOptionalPhone(businessInfo);
     if (result.phoneProvisioningPending) {
       req.log.warn(

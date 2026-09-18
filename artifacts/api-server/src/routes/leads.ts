@@ -49,7 +49,7 @@ router.get("/leads", async (req, res): Promise<void> => {
         configured: false,
         businessName: null,
         retellPhoneNumber: null,
-        timeZone: null,
+        timeZone: "America/New_York",
         leads: [],
       }));
       return;
@@ -65,7 +65,7 @@ router.get("/leads", async (req, res): Promise<void> => {
       configured: true,
       businessName: business.businessName,
       retellPhoneNumber: business.retellPhoneNumber,
-      timeZone: null,
+      timeZone: "America/New_York",
       leads: leads.map((lead) => ({
         id: String(lead.id),
         name: lead.callerName ?? "",
