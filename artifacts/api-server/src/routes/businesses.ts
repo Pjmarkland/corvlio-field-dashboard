@@ -1,7 +1,6 @@
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
-import { createBusiness } from "../lib/businessDirectory";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
 
 const router: IRouter = Router();
