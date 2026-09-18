@@ -1,6 +1,7 @@
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
+import { createBusiness } from "../lib/businessDirectory";
 import { provisionBusinessPhoneNumber } from "../lib/retellProvisioning";
 
 const router: IRouter = Router();
@@ -38,38 +39,48 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     return;
   }
 
-  try {
-    const business = await provisionBusinessPhoneNumber({
-      clerkUserId: userId,
-      businessName: body.data.businessName,
-      businessType: body.data.businessType,
-      ownerEmail: body.data.ownerEmail,
-      serviceArea: body.data.serviceArea,
-      personalityToneDescription: body.data.personalityToneDescription,
-      servicesNotOffered: body.data.servicesNotOffered,
-      majorIssueExamples: body.data.majorIssueExamples,
-      pricingPolicy: body.data.pricingPolicy,
-      financingPolicy: body.data.financingPolicy,
-      brandsWorkedWith: body.data.brandsWorkedWith,
-      typicalResponseTimeCommitment: body.data.responseTimeCommitment,
-      warrantyInfo: body.data.warrantyInfo,
-      maintenancePlanOfferings: body.data.maintenancePlanOfferings,
-      credentialsCertifications: body.data.credentials,
-      ownerAvailability: body.data.ownerAvailability,
-      emergencyContactInfo: body.data.emergencyContactInfo,
-      agreementsAcceptedAt: new Date(),
-    });
+  const businessInfo = {
+    clerkUserId: userId,
+    businessName: body.data.businessName,
+    businessType: body.data.businessType,
+    ownerEmail: body.data.ownerEmail,
+    serviceArea: body.data.serviceArea,
+    personalityToneDescription: body.data.personalityToneDescription,
+    servicesNotOffered: body.data.servicesNotOffered,
+    majorIssueExamples: body.data.majorIssueExamples,
+    pricingPolicy: body.data.pricingPolicy,
+    financingPolicy: body.data.financingPolicy,
+    brandsWorkedWith: body.data.brandsWorkedWith,
+    typicalResponseTimeCommitment: body.data.responseTimeCommitment,
+    warrantyInfo: body.data.warrantyInfo,
+    maintenancePlanOfferings: body.data.maintenancePlanOfferings,
+    credentialsCertifications: body.data.credentials,
+    ownerAvailability: body.data.ownerAvailability,
+    emergencyContactInfo: body.data.emergencyContactInfo,
+    agreementsAcceptedAt: new Date(),
+  };
 
-    res.status(201).json({ phoneNumber: business.retellPhoneNumber });
+  let business;
+  let phoneProvisioningPending = false;
+  try {
+    business = await provisionBusinessPhoneNumber(businessInfo);
   } catch (error) {
-    req.log.error(
+    phoneProvisioningPending = true;
+    req.log.warn(
       { error: error instanceof Error ? error.message : "Unknown business onboarding error" },
-      "Business onboarding failed",
+      "Business saved; Retell phone provisioning is pending",
     );
-    res.status(502).json({
-      error: error instanceof Error ? error.message : "Unable to provision business phone number",
+    business = await createBusiness({
+      ...businessInfo,
+      retellPhoneNumber: null,
+      retellAgentId: null,
     });
   }
+
+  res.status(201).json({
+    phoneNumber: business.retellPhoneNumber,
+    phoneProvisioningPending,
+  });
 });
 
 export default router;

@@ -10,8 +10,8 @@ let businessesByPhone = new Map<string, DatabaseBusiness>();
 let cacheRefresh: Promise<void> | null = null;
 let cacheInitialized = false;
 
-function normalizePhoneNumber(phoneNumber: string): string {
-  return phoneNumber.replace(/\D/g, "");
+function normalizePhoneNumber(phoneNumber: string | null | undefined): string {
+  return phoneNumber?.replace(/\D/g, "") ?? "";
 }
 
 export async function refreshBusinessPhoneCache(): Promise<void> {

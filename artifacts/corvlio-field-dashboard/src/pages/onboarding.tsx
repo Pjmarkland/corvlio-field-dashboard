@@ -211,19 +211,13 @@ function OnboardingPage() {
         return;
       }
 
-      if (typeof payload.phoneNumber !== 'string' || !payload.phoneNumber.trim()) {
-        setSubmission({
-          kind: 'error',
-          message: 'The setup response did not include an assigned phone number. Please try again.',
-        });
-        return;
-      }
-
       setSubmission({
         kind: 'success',
-        message: `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
+        message: payload.phoneProvisioningPending
+          ? "Business setup saved. Phone number setup is pending — we'll notify you once it's ready."
+          : `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
       });
-      if (user?.id) {
+      if (user?.id && typeof payload.phoneNumber === 'string' && payload.phoneNumber.trim()) {
         saveOnboardingConfirmation({
           userId: user.id,
           businessName: form.businessName.trim(),
