@@ -186,7 +186,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         title: `New lead from ${firstName}`,
         body: issueReason || "A new receptionist lead is waiting.",
         deepLink: `/leads/${encodeURIComponent(String(createdLead.id))}`,
-      });
+      }).onConflictDoNothing();
 
       return createdLead;
     });
