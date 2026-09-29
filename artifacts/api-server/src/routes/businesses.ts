@@ -2,13 +2,20 @@ import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
-import { findBusinessByClerkUserId, updateBusiness } from "../lib/businessDirectory";
+import {
+  claimWebsiteEnrichment,
+  findBusinessByClerkUserId,
+  updateBusiness,
+  WEBSITE_ENRICHMENT_FIELDS,
+} from "../lib/businessDirectory";
+import { enrichBusinessFromWebsite } from "../lib/websiteEnrichment";
 
 const router: IRouter = Router();
 
 const OnboardBusinessBody = z.object({
   businessName: z.string().min(1),
   businessType: z.string().optional(),
+  businessWebsiteUrl: z.string().trim().max(2048).optional().or(z.literal("")),
   ownerEmail: z.string().email(),
   serviceArea: z.string().optional(),
   personalityToneDescription: z.string().optional(),
@@ -59,13 +66,58 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     emergencyContactInfo: body.data.emergencyContactInfo,
     agreementsAcceptedAt: new Date(),
   };
+  const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() || "";
+  const websiteUrl = rawWebsiteUrl.length <= 2048 ? rawWebsiteUrl || null : null;
+
+  const scheduleWebsiteEnrichment = (businessId: number, url: string) => {
+    void enrichBusinessFromWebsite(businessId, url)
+      .catch((error: unknown) => {
+        req.log.warn(
+          {
+            businessId,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          },
+          "Optional website enrichment did not complete",
+        );
+      });
+  };
 
   try {
     const existingBusiness = await findBusinessByClerkUserId(userId);
     if (existingBusiness) {
-      const business = await updateBusiness(existingBusiness.id, businessInfo);
+      const websiteEnrichmentSources = {
+        ...(existingBusiness.websiteEnrichmentSources ?? {}),
+      };
+      for (const field of WEBSITE_ENRICHMENT_FIELDS) {
+        if (businessInfo[field] !== undefined) {
+          delete websiteEnrichmentSources[field];
+        }
+      }
+
+      const business = await updateBusiness(existingBusiness.id, {
+        ...businessInfo,
+        websiteEnrichmentSources,
+      });
       if (!business) {
         throw new Error("Existing business could not be updated");
+      }
+
+      if (websiteUrl && !existingBusiness.websiteEnrichmentAttemptedAt) {
+        void claimWebsiteEnrichment(existingBusiness.id, websiteUrl)
+          .then((claimedBusiness) => {
+            if (claimedBusiness) {
+              scheduleWebsiteEnrichment(claimedBusiness.id, websiteUrl);
+            }
+          })
+          .catch((error: unknown) => {
+            req.log.warn(
+              {
+                businessId: existingBusiness.id,
+                errorName: error instanceof Error ? error.name : "UnknownError",
+              },
+              "Optional website enrichment could not be scheduled",
+            );
+          });
       }
 
       res.status(200).json({
@@ -75,7 +127,15 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
       return;
     }
 
-    const result = await saveBusinessWithOptionalPhone(businessInfo);
+    const result = await saveBusinessWithOptionalPhone({
+      ...businessInfo,
+      businessWebsiteUrl: websiteUrl,
+      websiteEnrichmentAttemptedAt: websiteUrl ? new Date() : null,
+    });
+    if (websiteUrl) {
+      scheduleWebsiteEnrichment(result.business.id, websiteUrl);
+    }
+
     if (result.phoneProvisioningPending) {
       req.log.warn(
         {

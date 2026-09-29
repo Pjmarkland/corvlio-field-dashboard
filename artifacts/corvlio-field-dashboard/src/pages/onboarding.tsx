@@ -12,6 +12,7 @@ import { useSignOut } from '@/hooks/useSignOut';
 type OnboardingForm = {
   businessName: string;
   businessType: string;
+  businessWebsiteUrl: string;
   ownerEmail: string;
   serviceArea: string;
   receptionistTone: string;
@@ -34,6 +35,7 @@ type OnboardingForm = {
 const initialForm: OnboardingForm = {
   businessName: '',
   businessType: '',
+  businessWebsiteUrl: '',
   ownerEmail: '',
   serviceArea: '',
   receptionistTone: '',
@@ -175,6 +177,7 @@ function OnboardingPage() {
         body: JSON.stringify({
           businessName: form.businessName,
           businessType: form.businessType,
+          businessWebsiteUrl: form.businessWebsiteUrl,
           ownerEmail: form.ownerEmail,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
@@ -294,6 +297,14 @@ function OnboardingPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
                 <Field id="businessType" label="Business type" value={form.businessType} onChange={(value) => updateField('businessType', value)} placeholder="Heating and air conditioning company" />
+                <Field
+                  id="businessWebsiteUrl"
+                  label="Business website URL"
+                  value={form.businessWebsiteUrl}
+                  onChange={(value) => updateField('businessWebsiteUrl', value)}
+                  placeholder="https://www.yourbusiness.com"
+                  hint="Optional. We may use public details to fill fields you leave blank; your answers always take priority."
+                />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required />
               </div>

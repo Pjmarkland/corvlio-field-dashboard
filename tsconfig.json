@@ -7,6 +7,9 @@
       "path": "./lib/db"
     },
     {
+      "path": "./lib/integrations-openai-ai-server"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

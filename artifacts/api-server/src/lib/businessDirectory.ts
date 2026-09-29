@@ -4,7 +4,26 @@ import {
   type Business as DatabaseBusiness,
   type NewBusiness,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+
+export const WEBSITE_ENRICHMENT_FIELDS = [
+  "businessType",
+  "majorIssueExamples",
+  "servicesNotOffered",
+  "pricingPolicy",
+  "financingPolicy",
+  "brandsWorkedWith",
+  "typicalResponseTimeCommitment",
+  "warrantyInfo",
+  "maintenancePlanOfferings",
+  "credentialsCertifications",
+  "ownerAvailability",
+  "emergencyContactInfo",
+] as const;
+
+export type WebsiteEnrichmentField = (typeof WEBSITE_ENRICHMENT_FIELDS)[number];
+export type WebsiteEnrichmentValues = Partial<Record<WebsiteEnrichmentField, string>>;
+export type WebsiteEnrichmentSources = Partial<Record<WebsiteEnrichmentField, string>>;
 
 let businessesByPhone = new Map<string, DatabaseBusiness>();
 let cacheRefresh: Promise<void> | null = null;
@@ -77,6 +96,81 @@ export async function updateBusiness(
     .set({ ...changes, updatedAt: new Date() })
     .where(eq(businessesTable.id, id))
     .returning();
+
+  if (business) await refreshBusinessPhoneCache();
+  return business;
+}
+
+export async function claimWebsiteEnrichment(
+  id: number,
+  websiteUrl: string,
+): Promise<DatabaseBusiness | undefined> {
+  const [business] = await db
+    .update(businessesTable)
+    .set({
+      businessWebsiteUrl: websiteUrl,
+      websiteEnrichmentAttemptedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(businessesTable.id, id),
+      isNull(businessesTable.websiteEnrichmentAttemptedAt),
+    ))
+    .returning();
+
+  return business;
+}
+
+export async function applyWebsiteEnrichment(
+  id: number,
+  values: WebsiteEnrichmentValues,
+  sources: WebsiteEnrichmentSources,
+): Promise<DatabaseBusiness | undefined> {
+  const business = await db.transaction(async (transaction) => {
+    const [current] = await transaction
+      .select()
+      .from(businessesTable)
+      .where(eq(businessesTable.id, id))
+      .for("update");
+
+    if (!current) return undefined;
+
+    const changes: Partial<Pick<NewBusiness, WebsiteEnrichmentField>> = {};
+    const nextSources: Record<string, string> = {
+      ...(current.websiteEnrichmentSources ?? {}),
+    };
+
+    for (const field of WEBSITE_ENRICHMENT_FIELDS) {
+      const value = values[field]?.trim();
+      const sourceUrl = sources[field]?.trim();
+      const currentValue = current[field];
+
+      if (
+        !value
+        || !sourceUrl
+        || (currentValue !== null && currentValue.trim().length > 0)
+      ) {
+        continue;
+      }
+
+      changes[field] = value;
+      nextSources[field] = sourceUrl;
+    }
+
+    if (Object.keys(changes).length === 0) return current;
+
+    const [updated] = await transaction
+      .update(businessesTable)
+      .set({
+        ...changes,
+        websiteEnrichmentSources: nextSources,
+        updatedAt: new Date(),
+      })
+      .where(eq(businessesTable.id, id))
+      .returning();
+
+    return updated;
+  });
 
   if (business) await refreshBusinessPhoneCache();
   return business;
