@@ -146,3 +146,149 @@ export interface NotificationOutboxEvent {
   lastError: string | null;
 }
 
+export interface AdminMetrics {
+  businessCount: number;
+  provisionedBusinessCount: number;
+  totalLeadCount: number;
+  zeroLeadBusinessCount: number;
+  uncontactedLeadCount: number;
+  uncontactedOver24HoursCount: number;
+  activePushDeviceCount: number;
+}
+
+export type AdminBusinessSummaryProvisioningStatus = typeof AdminBusinessSummaryProvisioningStatus[keyof typeof AdminBusinessSummaryProvisioningStatus];
+
+
+export const AdminBusinessSummaryProvisioningStatus = {
+  ready: 'ready',
+  partial: 'partial',
+  pending: 'pending',
+} as const;
+
+export interface AdminBusinessSummary {
+  id: number;
+  businessName: string;
+  /** @nullable */
+  ownerEmail: string | null;
+  /** @nullable */
+  ownerName: string | null;
+  /** @nullable */
+  ownerLastSignInAt: string | null;
+  /** @nullable */
+  retellPhoneNumber: string | null;
+  provisioningStatus: AdminBusinessSummaryProvisioningStatus;
+  createdAt: string;
+  onboardingFieldCount: number;
+  completedOnboardingFieldCount: number;
+  onboardingCompletenessPercent: number;
+  missingOnboardingFields: string[];
+  totalLeadCount: number;
+  uncontactedLeadCount: number;
+  contactedLeadCount: number;
+  /** @nullable */
+  averageResponseTimeMs: number | null;
+  pushEnabledDeviceCount: number;
+  pushPlatforms: NotificationPlatform[];
+  /** @nullable */
+  agreementsAcceptedAt: string | null;
+  hasNoLeads: boolean;
+  hasUncontactedOver24Hours: boolean;
+  /** @nullable */
+  oldestUncontactedAt: string | null;
+}
+
+export interface AdminOverview {
+  metrics: AdminMetrics;
+  businesses: AdminBusinessSummary[];
+}
+
+export type AdminOnboardingAnswersWebsiteEnrichmentSources = {[key: string]: string};
+
+export interface AdminOnboardingAnswers {
+  businessName: string;
+  /** @nullable */
+  serviceArea: string | null;
+  /** @nullable */
+  businessType: string | null;
+  /** @nullable */
+  majorIssueExamples: string | null;
+  /** @nullable */
+  personalityToneDescription: string | null;
+  /** @nullable */
+  servicesNotOffered: string | null;
+  /** @nullable */
+  pricingPolicy: string | null;
+  /** @nullable */
+  financingPolicy: string | null;
+  /** @nullable */
+  brandsWorkedWith: string | null;
+  /** @nullable */
+  typicalResponseTimeCommitment: string | null;
+  /** @nullable */
+  warrantyInfo: string | null;
+  /** @nullable */
+  maintenancePlanOfferings: string | null;
+  /** @nullable */
+  credentialsCertifications: string | null;
+  /** @nullable */
+  ownerAvailability: string | null;
+  /** @nullable */
+  emergencyContactInfo: string | null;
+  /** @nullable */
+  businessWebsiteUrl: string | null;
+  /** @nullable */
+  websiteEnrichmentAttemptedAt: string | null;
+  websiteEnrichmentSources: AdminOnboardingAnswersWebsiteEnrichmentSources;
+  /** @nullable */
+  agreementsAcceptedAt: string | null;
+}
+
+export interface AdminLeadActivity {
+  id: number;
+  businessId: number;
+  businessName: string;
+  /** @nullable */
+  callerName: string | null;
+  /** @nullable */
+  phoneNumber: string | null;
+  /** @nullable */
+  issueReason: string | null;
+  /** @nullable */
+  address: string | null;
+  /** @nullable */
+  urgencyLevel: string | null;
+  /** @nullable */
+  availability: string | null;
+  status: string;
+  createdAt: string;
+  /** @nullable */
+  contactedAt: string | null;
+}
+
+export interface AdminCallRecord {
+  id: number;
+  retellCallId: string;
+  /** @nullable */
+  callStartedAt: string | null;
+  /** @nullable */
+  durationMs: number | null;
+  /** @nullable */
+  outcome: string | null;
+  recordedAt: string;
+}
+
+export interface AdminBusinessDetail {
+  business: AdminBusinessSummary;
+  onboarding: AdminOnboardingAnswers;
+  leads: AdminLeadActivity[];
+  calls: AdminCallRecord[];
+}
+
+export interface AdminActivity {
+  businessCount: number;
+  totalLeadCount: number;
+  uncontactedLeadCount: number;
+  uncontactedOver24HoursCount: number;
+  recentLeads: AdminLeadActivity[];
+}
+

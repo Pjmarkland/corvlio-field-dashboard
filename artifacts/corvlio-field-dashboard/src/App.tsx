@@ -27,6 +27,9 @@ import {
 import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
+import AdminOverviewPage from '@/pages/admin/AdminOverviewPage';
+import AdminActivityPage from '@/pages/admin/AdminActivityPage';
+import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -644,6 +647,27 @@ function AuthenticatedRouter() {
   return <><Show when="signed-in"><LeadDataRouter /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
 }
 
+function AdminNativeHidden() {
+  return <div className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center"><div className="max-w-sm"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted text-muted-foreground"><ShieldCheck size={24} /></div><h1 className="text-2xl font-800">Founder console unavailable</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">This internal view is available in the web console only.</p></div></div>;
+}
+
+function AdminGuard({ children }: { children: ReactNode }) {
+  if (Capacitor.isNativePlatform()) return <AdminNativeHidden />;
+  return children;
+}
+
+function AdminOverviewRoute() {
+  return <AdminGuard><AdminOverviewPage /></AdminGuard>;
+}
+
+function AdminActivityRoute() {
+  return <AdminGuard><AdminActivityPage /></AdminGuard>;
+}
+
+function AdminBusinessRoute() {
+  return <AdminGuard><AdminBusinessPage /></AdminGuard>;
+}
+
 /**
  * Mounts usePushDeepLink inside the Wouter router and ClerkProvider so that
  * useLocation and the toast helper are both available. Placed outside
@@ -673,7 +697,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {

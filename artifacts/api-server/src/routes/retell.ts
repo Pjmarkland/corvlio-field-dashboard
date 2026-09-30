@@ -2,10 +2,12 @@ import {
   RetellPostCallWebhookBody,
   RetellPreCallWebhookBody,
 } from "@workspace/api-zod";
+import type { RetellCall } from "@workspace/api-zod";
 import {
   db,
   leadsTable,
   notificationEventsTable,
+  retellCallRecordsTable,
 } from "@workspace/db";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
@@ -34,6 +36,32 @@ function analysisValue(
 ): string | null {
   if (!analysis) return null;
   return firstString(...keys.map((key) => analysis[key]));
+}
+
+function callStartedAt(timestamp: number | undefined): Date | null {
+  if (
+    timestamp === undefined
+    || !Number.isSafeInteger(timestamp)
+    || timestamp < 0
+    || timestamp > 8_640_000_000_000_000
+  ) {
+    return null;
+  }
+  return new Date(timestamp);
+}
+
+function callDurationMs(duration: number | undefined): number | null {
+  if (duration === undefined || !Number.isSafeInteger(duration) || duration < 0) return null;
+  return duration;
+}
+
+function callOutcome(call: RetellCall): string | null {
+  const reason = call.disconnection_reason?.trim();
+  if (reason) return reason;
+
+  const successful = call.call_analysis?.call_successful;
+  if (typeof successful === "boolean") return successful ? "successful" : "unsuccessful";
+  return null;
 }
 
 function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
@@ -190,6 +218,38 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
 
       return createdLead;
     });
+
+    const retellCallId = firstString(call.call_id);
+    if (retellCallId) {
+      try {
+        await db
+          .insert(retellCallRecordsTable)
+          .values({
+            businessId: business.id,
+            retellCallId,
+            callStartedAt: callStartedAt(call.start_timestamp),
+            durationMs: callDurationMs(call.duration_ms),
+            outcome: callOutcome(call),
+          })
+          .onConflictDoNothing({
+            target: retellCallRecordsTable.retellCallId,
+          });
+      } catch (error) {
+        req.log.error(
+          {
+            callId: retellCallId,
+            businessId: business.id,
+            error: error instanceof Error ? error.message : "Unknown call record error",
+          },
+          "Retell call metadata could not be stored; lead processing succeeded",
+        );
+      }
+    } else {
+      req.log.warn(
+        { businessId: business.id },
+        "Retell call record skipped because the webhook did not include a call ID",
+      );
+    }
 
     void sendLeadNotificationEmail({
       ownerEmail: business.ownerEmail,

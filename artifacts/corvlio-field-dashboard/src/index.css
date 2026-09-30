@@ -147,3 +147,57 @@
   background-image: linear-gradient(hsl(214 32% 85% / .4) 1px, transparent 1px), linear-gradient(90deg, hsl(214 32% 85% / .4) 1px, transparent 1px);
   background-size: 28px 28px;
 }
+
+/* Founder console: a warmer, quieter layer over the field app theme. */
+.admin-console {
+  --admin-ink: #17231f;
+  --admin-ink-soft: #5c6862;
+  --admin-paper: #f4f4ef;
+  --admin-panel: #fbfbf7;
+  --admin-line: #dfe4dc;
+  --admin-moss: #2c6b56;
+  --admin-moss-soft: #e4f0e9;
+  --admin-coral: #c9674d;
+  --admin-coral-soft: #f8e8e1;
+  background:
+    radial-gradient(circle at 82% -5%, rgba(213, 231, 218, .55), transparent 25rem),
+    var(--admin-paper);
+  color: var(--admin-ink);
+}
+
+.admin-console.admin-grain::after,
+.admin-console .admin-grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+}
+
+.admin-console .admin-label {
+  color: var(--admin-ink-soft);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.admin-console .admin-panel {
+  border: 1px solid var(--admin-line);
+  background: color-mix(in srgb, var(--admin-panel) 92%, transparent);
+  box-shadow: 0 1px 2px rgba(23, 35, 31, .03), 0 12px 32px rgba(23, 35, 31, .035);
+}
+
+.admin-console .admin-link {
+  transition: transform .2s ease, color .2s ease, background-color .2s ease;
+}
+
+.admin-console .admin-link:hover {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console .admin-link { transition: none; }
+}

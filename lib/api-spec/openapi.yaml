@@ -14,6 +14,8 @@ tags:
     description: Lead operations
   - name: notifications
     description: Native lead notification operations
+  - name: admin
+    description: Read-only founder administration operations
 paths:
   /healthz:
     get:
@@ -212,6 +214,65 @@ paths:
           description: No business is configured for this account
         "404":
           description: Endpoint unavailable in production
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get the read-only founder overview
+      description: Requires a verified Clerk email listed in ADMIN_EMAILS. Unauthorized requests receive a not-found response.
+      responses:
+        "200":
+          description: Business overview and global metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/businesses/{businessId}:
+    get:
+      operationId: getAdminBusiness
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get a business, its leads, and its Retell call history
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "200":
+          description: Business details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessDetail"
+        "400":
+          description: Invalid business ID
+        "404":
+          description: Not found, business missing, or administrator access unavailable
+  /admin/activity:
+    get:
+      operationId: getAdminActivity
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get the global lead activity feed
+      responses:
+        "200":
+          description: Newest leads and global lead counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminActivity"
+        "404":
+          description: Not found or administrator access is unavailable
 components:
   securitySchemes:
     clerkSession:
@@ -431,4 +492,303 @@ components:
         - createdAt
         - deliveredAt
         - lastError
+    AdminOverview:
+      type: object
+      properties:
+        metrics:
+          $ref: "#/components/schemas/AdminMetrics"
+        businesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminBusinessSummary"
+      required: [metrics, businesses]
+    AdminMetrics:
+      type: object
+      properties:
+        businessCount:
+          type: number
+          multipleOf: 1
+        provisionedBusinessCount:
+          type: number
+          multipleOf: 1
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        zeroLeadBusinessCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedOver24HoursCount:
+          type: number
+          multipleOf: 1
+        activePushDeviceCount:
+          type: number
+          multipleOf: 1
+      required:
+        - businessCount
+        - provisionedBusinessCount
+        - totalLeadCount
+        - zeroLeadBusinessCount
+        - uncontactedLeadCount
+        - uncontactedOver24HoursCount
+        - activePushDeviceCount
+    AdminBusinessSummary:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        businessName:
+          type: string
+        ownerEmail:
+          type: [string, "null"]
+        ownerName:
+          type: [string, "null"]
+        ownerLastSignInAt:
+          type: [string, "null"]
+          format: date-time
+        retellPhoneNumber:
+          type: [string, "null"]
+        provisioningStatus:
+          type: string
+          enum: [ready, partial, pending]
+        createdAt:
+          type: string
+          format: date-time
+        onboardingFieldCount:
+          type: number
+          multipleOf: 1
+        completedOnboardingFieldCount:
+          type: number
+          multipleOf: 1
+        onboardingCompletenessPercent:
+          type: number
+          multipleOf: 1
+        missingOnboardingFields:
+          type: array
+          items:
+            type: string
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        contactedLeadCount:
+          type: number
+          multipleOf: 1
+        averageResponseTimeMs:
+          type: [number, "null"]
+        pushEnabledDeviceCount:
+          type: number
+          multipleOf: 1
+        pushPlatforms:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationPlatform"
+        agreementsAcceptedAt:
+          type: [string, "null"]
+          format: date-time
+        hasNoLeads:
+          type: boolean
+        hasUncontactedOver24Hours:
+          type: boolean
+        oldestUncontactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - id
+        - businessName
+        - ownerEmail
+        - ownerName
+        - ownerLastSignInAt
+        - retellPhoneNumber
+        - provisioningStatus
+        - createdAt
+        - onboardingFieldCount
+        - completedOnboardingFieldCount
+        - onboardingCompletenessPercent
+        - missingOnboardingFields
+        - totalLeadCount
+        - uncontactedLeadCount
+        - contactedLeadCount
+        - averageResponseTimeMs
+        - pushEnabledDeviceCount
+        - pushPlatforms
+        - agreementsAcceptedAt
+        - hasNoLeads
+        - hasUncontactedOver24Hours
+        - oldestUncontactedAt
+    AdminOnboardingAnswers:
+      type: object
+      properties:
+        businessName:
+          type: string
+        serviceArea:
+          type: [string, "null"]
+        businessType:
+          type: [string, "null"]
+        majorIssueExamples:
+          type: [string, "null"]
+        personalityToneDescription:
+          type: [string, "null"]
+        servicesNotOffered:
+          type: [string, "null"]
+        pricingPolicy:
+          type: [string, "null"]
+        financingPolicy:
+          type: [string, "null"]
+        brandsWorkedWith:
+          type: [string, "null"]
+        typicalResponseTimeCommitment:
+          type: [string, "null"]
+        warrantyInfo:
+          type: [string, "null"]
+        maintenancePlanOfferings:
+          type: [string, "null"]
+        credentialsCertifications:
+          type: [string, "null"]
+        ownerAvailability:
+          type: [string, "null"]
+        emergencyContactInfo:
+          type: [string, "null"]
+        businessWebsiteUrl:
+          type: [string, "null"]
+        websiteEnrichmentAttemptedAt:
+          type: [string, "null"]
+          format: date-time
+        websiteEnrichmentSources:
+          type: object
+          additionalProperties:
+            type: string
+        agreementsAcceptedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - businessName
+        - serviceArea
+        - businessType
+        - majorIssueExamples
+        - personalityToneDescription
+        - servicesNotOffered
+        - pricingPolicy
+        - financingPolicy
+        - brandsWorkedWith
+        - typicalResponseTimeCommitment
+        - warrantyInfo
+        - maintenancePlanOfferings
+        - credentialsCertifications
+        - ownerAvailability
+        - emergencyContactInfo
+        - businessWebsiteUrl
+        - websiteEnrichmentAttemptedAt
+        - websiteEnrichmentSources
+        - agreementsAcceptedAt
+    AdminLeadActivity:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        businessId:
+          type: number
+          multipleOf: 1
+        businessName:
+          type: string
+        callerName:
+          type: [string, "null"]
+        phoneNumber:
+          type: [string, "null"]
+        issueReason:
+          type: [string, "null"]
+        address:
+          type: [string, "null"]
+        urgencyLevel:
+          type: [string, "null"]
+        availability:
+          type: [string, "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - id
+        - businessId
+        - businessName
+        - callerName
+        - phoneNumber
+        - issueReason
+        - address
+        - urgencyLevel
+        - availability
+        - status
+        - createdAt
+        - contactedAt
+    AdminCallRecord:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        retellCallId:
+          type: string
+        callStartedAt:
+          type: [string, "null"]
+          format: date-time
+        durationMs:
+          type: [number, "null"]
+          multipleOf: 1
+        outcome:
+          type: [string, "null"]
+        recordedAt:
+          type: string
+          format: date-time
+      required: [id, retellCallId, callStartedAt, durationMs, outcome, recordedAt]
+    AdminBusinessDetail:
+      type: object
+      properties:
+        business:
+          $ref: "#/components/schemas/AdminBusinessSummary"
+        onboarding:
+          $ref: "#/components/schemas/AdminOnboardingAnswers"
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminLeadActivity"
+        calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCallRecord"
+      required: [business, onboarding, leads, calls]
+    AdminActivity:
+      type: object
+      properties:
+        businessCount:
+          type: number
+          multipleOf: 1
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedOver24HoursCount:
+          type: number
+          multipleOf: 1
+        recentLeads:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminLeadActivity"
+      required:
+        - businessCount
+        - totalLeadCount
+        - uncontactedLeadCount
+        - uncontactedOver24HoursCount
+        - recentLeads
 

@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminActivity,
+  AdminBusinessDetail,
+  AdminOverview,
   HealthStatus,
   LeadStatusResult,
   LeadStatusUpdate,
@@ -644,6 +647,238 @@ export function useListNotificationOutbox<TData = Awaited<ReturnType<typeof list
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListNotificationOutboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminOverviewUrl = () => {
+
+
+
+
+  return `/api/admin/overview`
+}
+
+/**
+ * Requires a verified Clerk email listed in ADMIN_EMAILS. Unauthorized requests receive a not-found response.
+ * @summary Get the read-only founder overview
+ */
+export const getAdminOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminOverview> => {
+
+  return customFetch<AdminOverview>(getGetAdminOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminOverviewQueryKey = () => {
+    return [
+    `/api/admin/overview`
+    ] as const;
+    }
+
+
+export const getGetAdminOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOverview>>> = ({ signal }) => getAdminOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminOverview>>>
+export type GetAdminOverviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the read-only founder overview
+ */
+
+export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminBusinessUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}`
+}
+
+/**
+ * @summary Get a business, its leads, and its Retell call history
+ */
+export const getAdminBusiness = async (businessId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminBusinessDetail> => {
+
+  return customFetch<AdminBusinessDetail>(getGetAdminBusinessUrl(businessId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminBusinessQueryKey = (businessId: number,) => {
+    return [
+    `/api/admin/businesses/${businessId}`
+    ] as const;
+    }
+
+
+export const getGetAdminBusinessQueryOptions = <TData = Awaited<ReturnType<typeof getAdminBusiness>>, TError = ErrorType<void>>(businessId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminBusiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminBusinessQueryKey(businessId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminBusiness>>> = ({ signal }) => getAdminBusiness(businessId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminBusiness>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminBusinessQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminBusiness>>>
+export type GetAdminBusinessQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a business, its leads, and its Retell call history
+ */
+
+export function useGetAdminBusiness<TData = Awaited<ReturnType<typeof getAdminBusiness>>, TError = ErrorType<void>>(
+ businessId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminBusiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminBusinessQueryOptions(businessId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminActivityUrl = () => {
+
+
+
+
+  return `/api/admin/activity`
+}
+
+/**
+ * @summary Get the global lead activity feed
+ */
+export const getAdminActivity = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminActivity> => {
+
+  return customFetch<AdminActivity>(getGetAdminActivityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminActivityQueryKey = () => {
+    return [
+    `/api/admin/activity`
+    ] as const;
+    }
+
+
+export const getGetAdminActivityQueryOptions = <TData = Awaited<ReturnType<typeof getAdminActivity>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminActivityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminActivity>>> = ({ signal }) => getAdminActivity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminActivity>>>
+export type GetAdminActivityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the global lead activity feed
+ */
+
+export function useGetAdminActivity<TData = Awaited<ReturnType<typeof getAdminActivity>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminActivityQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

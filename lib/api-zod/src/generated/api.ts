@@ -171,3 +171,223 @@ export const ListNotificationOutboxResponseItem = zod.object({
 export const ListNotificationOutboxResponse = zod.array(ListNotificationOutboxResponseItem)
 
 
+/**
+ * Requires a verified Clerk email listed in ADMIN_EMAILS. Unauthorized requests receive a not-found response.
+ * @summary Get the read-only founder overview
+ */
+export const getAdminOverviewResponseMetricsBusinessCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsProvisionedBusinessCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsTotalLeadCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsZeroLeadBusinessCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsUncontactedLeadCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsUncontactedOver24HoursCountMultipleOf = 1;
+
+export const getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemIdMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemOnboardingFieldCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemCompletedOnboardingFieldCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemOnboardingCompletenessPercentMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemTotalLeadCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemUncontactedLeadCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemContactedLeadCountMultipleOf = 1;
+
+export const getAdminOverviewResponseBusinessesItemPushEnabledDeviceCountMultipleOf = 1;
+
+
+
+export const GetAdminOverviewResponse = zod.object({
+  "metrics": zod.object({
+  "businessCount": zod.number().multipleOf(getAdminOverviewResponseMetricsBusinessCountMultipleOf),
+  "provisionedBusinessCount": zod.number().multipleOf(getAdminOverviewResponseMetricsProvisionedBusinessCountMultipleOf),
+  "totalLeadCount": zod.number().multipleOf(getAdminOverviewResponseMetricsTotalLeadCountMultipleOf),
+  "zeroLeadBusinessCount": zod.number().multipleOf(getAdminOverviewResponseMetricsZeroLeadBusinessCountMultipleOf),
+  "uncontactedLeadCount": zod.number().multipleOf(getAdminOverviewResponseMetricsUncontactedLeadCountMultipleOf),
+  "uncontactedOver24HoursCount": zod.number().multipleOf(getAdminOverviewResponseMetricsUncontactedOver24HoursCountMultipleOf),
+  "activePushDeviceCount": zod.number().multipleOf(getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf)
+}),
+  "businesses": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemIdMultipleOf),
+  "businessName": zod.string(),
+  "ownerEmail": zod.string().nullable(),
+  "ownerName": zod.string().nullable(),
+  "ownerLastSignInAt": zod.coerce.date().nullable(),
+  "retellPhoneNumber": zod.string().nullable(),
+  "provisioningStatus": zod.enum(['ready', 'partial', 'pending']),
+  "createdAt": zod.coerce.date(),
+  "onboardingFieldCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemOnboardingFieldCountMultipleOf),
+  "completedOnboardingFieldCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemCompletedOnboardingFieldCountMultipleOf),
+  "onboardingCompletenessPercent": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemOnboardingCompletenessPercentMultipleOf),
+  "missingOnboardingFields": zod.array(zod.string()),
+  "totalLeadCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemTotalLeadCountMultipleOf),
+  "uncontactedLeadCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemUncontactedLeadCountMultipleOf),
+  "contactedLeadCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemContactedLeadCountMultipleOf),
+  "averageResponseTimeMs": zod.number().nullable(),
+  "pushEnabledDeviceCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemPushEnabledDeviceCountMultipleOf),
+  "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
+  "agreementsAcceptedAt": zod.coerce.date().nullable(),
+  "hasNoLeads": zod.boolean(),
+  "hasUncontactedOver24Hours": zod.boolean(),
+  "oldestUncontactedAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * @summary Get a business, its leads, and its Retell call history
+ */
+export const getAdminBusinessPathBusinessIdMultipleOf = 1;
+
+
+
+export const GetAdminBusinessParams = zod.object({
+  "businessId": zod.coerce.number().min(1).multipleOf(getAdminBusinessPathBusinessIdMultipleOf)
+})
+
+export const getAdminBusinessResponseBusinessIdMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessOnboardingFieldCountMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessCompletedOnboardingFieldCountMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessOnboardingCompletenessPercentMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessTotalLeadCountMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessUncontactedLeadCountMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessContactedLeadCountMultipleOf = 1;
+
+export const getAdminBusinessResponseBusinessPushEnabledDeviceCountMultipleOf = 1;
+
+export const getAdminBusinessResponseLeadsItemIdMultipleOf = 1;
+
+export const getAdminBusinessResponseLeadsItemBusinessIdMultipleOf = 1;
+
+export const getAdminBusinessResponseCallsItemIdMultipleOf = 1;
+
+export const getAdminBusinessResponseCallsItemDurationMsMultipleOf = 1;
+
+
+
+export const GetAdminBusinessResponse = zod.object({
+  "business": zod.object({
+  "id": zod.number().multipleOf(getAdminBusinessResponseBusinessIdMultipleOf),
+  "businessName": zod.string(),
+  "ownerEmail": zod.string().nullable(),
+  "ownerName": zod.string().nullable(),
+  "ownerLastSignInAt": zod.coerce.date().nullable(),
+  "retellPhoneNumber": zod.string().nullable(),
+  "provisioningStatus": zod.enum(['ready', 'partial', 'pending']),
+  "createdAt": zod.coerce.date(),
+  "onboardingFieldCount": zod.number().multipleOf(getAdminBusinessResponseBusinessOnboardingFieldCountMultipleOf),
+  "completedOnboardingFieldCount": zod.number().multipleOf(getAdminBusinessResponseBusinessCompletedOnboardingFieldCountMultipleOf),
+  "onboardingCompletenessPercent": zod.number().multipleOf(getAdminBusinessResponseBusinessOnboardingCompletenessPercentMultipleOf),
+  "missingOnboardingFields": zod.array(zod.string()),
+  "totalLeadCount": zod.number().multipleOf(getAdminBusinessResponseBusinessTotalLeadCountMultipleOf),
+  "uncontactedLeadCount": zod.number().multipleOf(getAdminBusinessResponseBusinessUncontactedLeadCountMultipleOf),
+  "contactedLeadCount": zod.number().multipleOf(getAdminBusinessResponseBusinessContactedLeadCountMultipleOf),
+  "averageResponseTimeMs": zod.number().nullable(),
+  "pushEnabledDeviceCount": zod.number().multipleOf(getAdminBusinessResponseBusinessPushEnabledDeviceCountMultipleOf),
+  "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
+  "agreementsAcceptedAt": zod.coerce.date().nullable(),
+  "hasNoLeads": zod.boolean(),
+  "hasUncontactedOver24Hours": zod.boolean(),
+  "oldestUncontactedAt": zod.coerce.date().nullable()
+}),
+  "onboarding": zod.object({
+  "businessName": zod.string(),
+  "serviceArea": zod.string().nullable(),
+  "businessType": zod.string().nullable(),
+  "majorIssueExamples": zod.string().nullable(),
+  "personalityToneDescription": zod.string().nullable(),
+  "servicesNotOffered": zod.string().nullable(),
+  "pricingPolicy": zod.string().nullable(),
+  "financingPolicy": zod.string().nullable(),
+  "brandsWorkedWith": zod.string().nullable(),
+  "typicalResponseTimeCommitment": zod.string().nullable(),
+  "warrantyInfo": zod.string().nullable(),
+  "maintenancePlanOfferings": zod.string().nullable(),
+  "credentialsCertifications": zod.string().nullable(),
+  "ownerAvailability": zod.string().nullable(),
+  "emergencyContactInfo": zod.string().nullable(),
+  "businessWebsiteUrl": zod.string().nullable(),
+  "websiteEnrichmentAttemptedAt": zod.coerce.date().nullable(),
+  "websiteEnrichmentSources": zod.record(zod.string(), zod.string()),
+  "agreementsAcceptedAt": zod.coerce.date().nullable()
+}),
+  "leads": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminBusinessResponseLeadsItemIdMultipleOf),
+  "businessId": zod.number().multipleOf(getAdminBusinessResponseLeadsItemBusinessIdMultipleOf),
+  "businessName": zod.string(),
+  "callerName": zod.string().nullable(),
+  "phoneNumber": zod.string().nullable(),
+  "issueReason": zod.string().nullable(),
+  "address": zod.string().nullable(),
+  "urgencyLevel": zod.string().nullable(),
+  "availability": zod.string().nullable(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "contactedAt": zod.coerce.date().nullable()
+})),
+  "calls": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminBusinessResponseCallsItemIdMultipleOf),
+  "retellCallId": zod.string(),
+  "callStartedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().multipleOf(getAdminBusinessResponseCallsItemDurationMsMultipleOf).nullable(),
+  "outcome": zod.string().nullable(),
+  "recordedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get the global lead activity feed
+ */
+export const getAdminActivityResponseBusinessCountMultipleOf = 1;
+
+export const getAdminActivityResponseTotalLeadCountMultipleOf = 1;
+
+export const getAdminActivityResponseUncontactedLeadCountMultipleOf = 1;
+
+export const getAdminActivityResponseUncontactedOver24HoursCountMultipleOf = 1;
+
+export const getAdminActivityResponseRecentLeadsItemIdMultipleOf = 1;
+
+export const getAdminActivityResponseRecentLeadsItemBusinessIdMultipleOf = 1;
+
+
+
+export const GetAdminActivityResponse = zod.object({
+  "businessCount": zod.number().multipleOf(getAdminActivityResponseBusinessCountMultipleOf),
+  "totalLeadCount": zod.number().multipleOf(getAdminActivityResponseTotalLeadCountMultipleOf),
+  "uncontactedLeadCount": zod.number().multipleOf(getAdminActivityResponseUncontactedLeadCountMultipleOf),
+  "uncontactedOver24HoursCount": zod.number().multipleOf(getAdminActivityResponseUncontactedOver24HoursCountMultipleOf),
+  "recentLeads": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminActivityResponseRecentLeadsItemIdMultipleOf),
+  "businessId": zod.number().multipleOf(getAdminActivityResponseRecentLeadsItemBusinessIdMultipleOf),
+  "businessName": zod.string(),
+  "callerName": zod.string().nullable(),
+  "phoneNumber": zod.string().nullable(),
+  "issueReason": zod.string().nullable(),
+  "address": zod.string().nullable(),
+  "urgencyLevel": zod.string().nullable(),
+  "availability": zod.string().nullable(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "contactedAt": zod.coerce.date().nullable()
+}))
+})
+
+
