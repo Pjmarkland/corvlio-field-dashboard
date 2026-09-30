@@ -44,14 +44,26 @@ function ownerName(firstName: string | null, lastName: string | null): string | 
   return fullName || null;
 }
 
-async function loadOwnerProfile(clerkUserId: string | null): Promise<OwnerProfile> {
+export async function loadOwnerProfile(clerkUserId: string | null): Promise<OwnerProfile> {
   if (!clerkUserId) return { ownerName: null, ownerLastSignInAt: null };
 
-  const user = await clerkClient.users.getUser(clerkUserId);
-  return {
-    ownerName: ownerName(user.firstName, user.lastName),
-    ownerLastSignInAt: user.lastSignInAt ? new Date(user.lastSignInAt) : null,
-  };
+  try {
+    const user = await clerkClient.users.getUser(clerkUserId);
+    return {
+      ownerName: ownerName(user.firstName, user.lastName),
+      ownerLastSignInAt: user.lastSignInAt ? new Date(user.lastSignInAt) : null,
+    };
+  } catch (error) {
+    if (
+      typeof error === "object"
+      && error !== null
+      && "status" in error
+      && error.status === 404
+    ) {
+      return { ownerName: null, ownerLastSignInAt: null };
+    }
+    throw error;
+  }
 }
 
 function getLeadCounts(leads: AdminLead[], now: number) {

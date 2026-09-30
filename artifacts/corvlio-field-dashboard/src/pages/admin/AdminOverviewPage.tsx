@@ -24,7 +24,7 @@ function BusinessRow({ business }: { business: AdminBusinessSummary }) {
   return <tr className="group border-t border-[#e1e6df] align-top hover:bg-[#f4f7f1]" data-testid={`row-admin-business-${business.id}`}>
     <td className="px-4 py-4 sm:px-5">
       <Link href={`/admin/businesses/${business.id}`} data-testid={`link-admin-business-${business.id}`} className="admin-link block min-w-[190px]">
-        <span className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#dcebe1] text-xs font-800 text-[#2c6b56]">{business.businessName.slice(0, 1).toUpperCase()}</span><span><strong className="block text-sm font-800 text-[#25362e]">{business.businessName}</strong><span className="mt-0.5 block max-w-[190px] truncate text-xs text-[#7b877f]">{business.ownerEmail ?? 'Owner email not recorded'}</span></span></span>
+        <span className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#dcebe1] text-xs font-800 text-[#2c6b56]">{business.businessName.slice(0, 1).toUpperCase()}</span><span><strong className="block text-sm font-800 text-[#25362e]">{business.businessName}</strong><span className="mt-0.5 block max-w-[190px] truncate text-xs text-[#647168]">{business.ownerName ?? 'Owner details unavailable'}</span><span className="block max-w-[190px] truncate text-xs text-[#7b877f]">{business.ownerEmail ?? 'Owner email not recorded'}</span></span></span>
       </Link>
     </td>
     <td className="px-4 py-4 sm:px-5"><AdminStatus status={business.provisioningStatus} /><p className="mt-2 text-xs text-[#718078]">{business.retellPhoneNumber ?? 'No Retell number'}</p></td>
