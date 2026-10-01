@@ -77,6 +77,136 @@ export interface LeadWorkspace {
   leads: Lead[];
 }
 
+export interface BusinessProfile {
+  businessName: string;
+  /** @nullable */
+  agentName: string | null;
+  /** @nullable */
+  businessType: string | null;
+  /** @nullable */
+  businessWebsiteUrl: string | null;
+  /** @nullable */
+  ownerEmail: string | null;
+  /** @nullable */
+  serviceArea: string | null;
+  /** @nullable */
+  personalityToneDescription: string | null;
+  /** @nullable */
+  servicesNotOffered: string | null;
+  /** @nullable */
+  majorIssueExamples: string | null;
+  /** @nullable */
+  pricingPolicy: string | null;
+  /** @nullable */
+  financingPolicy: string | null;
+  /** @nullable */
+  brandsWorkedWith: string | null;
+  /** @nullable */
+  responseTimeCommitment: string | null;
+  /** @nullable */
+  warrantyInfo: string | null;
+  /** @nullable */
+  maintenancePlanOfferings: string | null;
+  /** @nullable */
+  credentials: string | null;
+  /** @nullable */
+  ownerAvailability: string | null;
+  /** @nullable */
+  emergencyContactInfo: string | null;
+  /** @nullable */
+  retellPhoneNumber: string | null;
+}
+
+export interface BusinessProfileUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  businessName?: string;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  agentName?: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  businessType?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  businessWebsiteUrl?: string | null;
+  /** @maxLength 320 */
+  ownerEmail?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  serviceArea?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  personalityToneDescription?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  servicesNotOffered?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  majorIssueExamples?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  pricingPolicy?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  financingPolicy?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  brandsWorkedWith?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  responseTimeCommitment?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  warrantyInfo?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  maintenancePlanOfferings?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  credentials?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  ownerAvailability?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  emergencyContactInfo?: string | null;
+}
+
 export type NotificationPlatform = typeof NotificationPlatform[keyof typeof NotificationPlatform];
 
 

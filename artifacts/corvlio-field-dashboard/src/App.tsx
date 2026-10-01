@@ -1,15 +1,21 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
+  getGetBusinessProfileQueryKey,
   getGetLeadsQueryKey,
+  useGetBusinessProfile,
   useGetLeads,
   useGetNotificationStatus,
+  useUpdateBusinessProfile,
+  type BusinessProfile,
+  type BusinessProfileUpdate,
   useUpdateLeadStatus,
   type LeadWorkspace,
 } from '@workspace/api-client-react';
 import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
+import { ThemeProvider, useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
 import logoUrl from '@/assets/logo.svg';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -233,7 +239,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground">
+    <div data-owner-ui className="min-h-[100dvh] bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground md:flex">
         <Link href="/dashboard" className="mb-10 flex items-center gap-3 px-3" data-testid="link-brand">
           <div>
@@ -466,20 +472,76 @@ function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
 
 type PublicRootNavigator = (path: string) => void;
 
+export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { businessName: string; retellPhoneNumber: string | null }) {
+  const query = useGetBusinessProfile();
+  const mutation = useUpdateBusinessProfile();
+  const client = useQueryClient();
+  const [draft, setDraft] = useState<BusinessProfile | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const initialized = useRef(false);
+  const { theme, setTheme } = useTheme();
+  useEffect(() => { if (query.data && !initialized.current) { initialized.current = true; setDraft(query.data); } }, [query.data]);
+  const fields: { key: keyof BusinessProfileUpdate; label: string; multiline?: boolean; type?: string }[] = [
+    { key: 'businessName', label: 'Business name' }, { key: 'agentName', label: 'Receptionist name' },
+    { key: 'businessType', label: 'Business type' }, { key: 'businessWebsiteUrl', label: 'Business website URL', type: 'url' },
+    { key: 'ownerEmail', label: 'Owner email', type: 'email' }, { key: 'serviceArea', label: 'Service area' },
+    { key: 'personalityToneDescription', label: 'Receptionist personality and tone', multiline: true },
+    { key: 'majorIssueExamples', label: 'Urgent issue examples', multiline: true }, { key: 'servicesNotOffered', label: 'Services not offered', multiline: true },
+    { key: 'pricingPolicy', label: 'Pricing policy', multiline: true }, { key: 'financingPolicy', label: 'Financing policy', multiline: true },
+    { key: 'brandsWorkedWith', label: 'Brands worked with', multiline: true }, { key: 'responseTimeCommitment', label: 'Response time commitment', multiline: true },
+    { key: 'warrantyInfo', label: 'Warranty information', multiline: true }, { key: 'maintenancePlanOfferings', label: 'Maintenance plan offerings', multiline: true },
+    { key: 'credentials', label: 'Credentials', multiline: true }, { key: 'ownerAvailability', label: 'Owner availability', multiline: true },
+    { key: 'emergencyContactInfo', label: 'Emergency contact information', multiline: true },
+  ];
+  const change = (key: keyof BusinessProfile, value: string) => setDraft((current) => current ? { ...current, [key]: value } : current);
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft || mutation.isPending) return;
+    if (!draft.businessName.trim() || !draft.ownerEmail?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.ownerEmail)) {
+      setNotice({ type: 'error', message: 'Enter a business name and valid owner email.' });
+      return;
+    }
+    setNotice(null);
+    const data = Object.fromEntries(fields.map(({ key }) => {
+      const value = draft[key as keyof BusinessProfile];
+      if (key === 'businessType') return [key, value];
+      return [key, key === 'businessName' || key === 'ownerEmail' ? (typeof value === 'string' ? value.trim() : value) : typeof value === 'string' && value.trim() ? value.trim() : null];
+    })) as BusinessProfileUpdate;
+    mutation.mutate({ data }, {
+      onSuccess: (profile) => {
+        setDraft(profile);
+        client.setQueryData(getGetBusinessProfileQueryKey(), profile);
+        if (profile.businessName !== businessName) void client.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
+        setNotice({ type: 'success', message: 'Business details saved.' });
+      },
+      onError: () => setNotice({ type: 'error', message: 'Could not save your details. Check your connection and try again.' }),
+    });
+  };
+  return <div className="space-y-4">
+    <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="mb-5"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Business profile</p><h2 className="mt-1 text-lg font-bold">Details your receptionist needs</h2><p className="mt-1 text-sm text-muted-foreground">Update these anytime. Changes are saved to your business profile.</p></div>
+      {query.isLoading ? <div className="space-y-3" aria-label="Loading business profile"><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div> : query.isError ? <div role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm">Could not load your business details. <button type="button" onClick={() => void query.refetch()} className="font-semibold text-primary underline">Try again</button></div> : draft ? <form onSubmit={submit} data-testid="form-business-profile">
+        <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, multiline, type }) => { const value = draft[key as keyof BusinessProfile]; return <label key={key} className={`block ${multiline ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-xs font-semibold">{label}{key === 'businessName' || key === 'ownerEmail' ? <span className="ml-1 text-primary">*</span> : null}</span>{multiline ? <textarea rows={3} maxLength={4000} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} /> : <input type={type ?? 'text'} required={key === 'businessName' || key === 'ownerEmail'} pattern={key === 'businessWebsiteUrl' ? 'https?://.+' : undefined} title={key === 'businessWebsiteUrl' ? 'Enter a URL beginning with http:// or https://' : undefined} maxLength={key === 'businessName' ? 160 : key === 'ownerEmail' ? 320 : key === 'agentName' ? 40 : key === 'businessType' ? 200 : 2048} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} placeholder={key === 'agentName' ? 'Aria' : key === 'businessWebsiteUrl' ? 'https://yourbusiness.com' : ''} className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} />}</label>; })}</div>
+        <label className="mt-4 block"><span className="mb-1.5 block text-xs font-semibold">Corvlio phone number</span><input readOnly value={draft.retellPhoneNumber ?? retellPhoneNumber ?? 'Pending'} data-testid="input-profile-retellPhoneNumber" className="min-h-12 w-full rounded-xl border border-input bg-muted/50 px-3.5 text-sm text-muted-foreground" /><span className="mt-1.5 block text-xs text-muted-foreground">Assigned and managed by Corvlio.</span></label>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="text-xs text-muted-foreground">Receptionist name is optional. Blank uses Aria.</p><button type="submit" disabled={mutation.isPending} data-testid="button-save-business-profile" className="min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-60">{mutation.isPending ? 'Saving details…' : 'Save business details'}</button></div>
+        {notice ? <p role={notice.type === 'error' ? 'alert' : 'status'} data-testid="status-profile-save" className={`mt-3 text-sm ${notice.type === 'error' ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-300'}`}>{notice.message}</p> : null}
+      </form> : <p className="text-sm text-muted-foreground">No profile details are available yet.</p>}
+    </section>
+    <section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><h2 className="font-bold">Appearance</h2><p className="mt-1 text-sm text-muted-foreground">Choose how Field Desk looks on this device.</p><label className="mt-4 block max-w-sm"><span className="mb-2 block text-xs font-semibold">Color theme</span><select aria-label="Color theme" data-testid="select-theme" value={theme ?? 'system'} onChange={(event) => setTheme(event.target.value)} className="min-h-12 w-full rounded-xl border border-input bg-background px-3 text-sm"><option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option></select><span className="mt-2 block text-xs text-muted-foreground">System default follows your device preference. Your choice is remembered.</span></label></section>
+  </div>;
+}
+
 function SettingsPage({ businessName, retellPhoneNumber }: { businessName: string; retellPhoneNumber: string | null }) {
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
   const [settings, setSettings] = useState<SettingsState>(loadSettings);
-  const [saved, setSaved] = useState(false);
   const update = (patch: Partial<SettingsState>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1600);
   };
-  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />{saved ? <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#d9eee1] px-4 py-3 text-sm font-semibold text-[#398660] animate-rise-in" data-testid="status-settings-saved"><Check size={16} /> Saved locally</div> : null}<div className="space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-secondary-foreground"><Users size={17} /></div><div><h2 className="font-bold">Business profile</h2><p className="text-xs text-muted-foreground">Current details saved for your authenticated business.</p></div></div><label className="mb-4 block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business name</span><input value={businessName} readOnly data-testid="input-business-name" className="min-h-12 w-full rounded-xl border border-input bg-muted/40 px-3 text-sm font-semibold outline-none" /></label><label className="block"><span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Business phone</span><input value={retellPhoneNumber ?? 'Pending'} readOnly data-testid="input-business-phone" aria-describedby="business-phone-status" className="min-h-12 w-full rounded-xl border border-input bg-muted/40 px-3 text-sm font-semibold outline-none" /><span id="business-phone-status" className="mt-2 block text-xs text-muted-foreground">{retellPhoneNumber ? 'Assigned Retell phone number' : 'Phone number provisioning is pending.'}</span></label></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418]"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-sm leading-relaxed text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out" className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground disabled:cursor-wait disabled:opacity-60 hover:bg-muted"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={16} /></button></section></div></>;
+  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." /><BusinessProfileEditor key={user?.id ?? 'signed-out'} businessName={businessName} retellPhoneNumber={retellPhoneNumber} /><div className="mt-4 space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418] dark:bg-amber-950 dark:text-amber-200"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-sm leading-relaxed text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button></section></div></>;
 }
 
 function ToggleRow({ label, description, checked, onChange, testId }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void; testId: string }) {
@@ -701,7 +763,7 @@ function ClerkRoutes() {
 }
 
 function App() {
-  return <WouterRouter base={basePath}><ClerkRoutes /></WouterRouter>;
+  return <WouterRouter base={basePath}><ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="corvlio-theme"><ClerkRoutes /></ThemeProvider></WouterRouter>;
 }
 
 export default App;

@@ -101,6 +101,24 @@ export async function updateBusiness(
   return business;
 }
 
+export async function updateOwnedBusiness(
+  id: number,
+  clerkUserId: string,
+  changes: Partial<Omit<NewBusiness, "id" | "createdAt">>,
+): Promise<DatabaseBusiness | undefined> {
+  const [business] = await db
+    .update(businessesTable)
+    .set({ ...changes, updatedAt: new Date() })
+    .where(and(
+      eq(businessesTable.id, id),
+      eq(businessesTable.clerkUserId, clerkUserId),
+    ))
+    .returning();
+
+  if (business) await refreshBusinessPhoneCache();
+  return business;
+}
+
 export async function claimWebsiteEnrichment(
   id: number,
   websiteUrl: string,

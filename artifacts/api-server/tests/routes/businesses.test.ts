@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   saveBusinessWithOptionalPhone: vi.fn(),
   findBusinessByClerkUserId: vi.fn(),
   updateBusiness: vi.fn(),
+  updateOwnedBusiness: vi.fn(),
   claimWebsiteEnrichment: vi.fn(),
   enrichBusinessFromWebsite: vi.fn(),
   logWarn: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("../../src/lib/businessDirectory", () => ({
   claimWebsiteEnrichment: mocks.claimWebsiteEnrichment,
   findBusinessByClerkUserId: mocks.findBusinessByClerkUserId,
   updateBusiness: mocks.updateBusiness,
+  updateOwnedBusiness: mocks.updateOwnedBusiness,
   WEBSITE_ENRICHMENT_FIELDS: [
     "businessType",
     "majorIssueExamples",
@@ -84,6 +86,24 @@ beforeEach(() => {
   vi.clearAllMocks();
   business = {
     id: 44,
+    businessName: "Example Heating",
+    agentName: null,
+    businessType: "HVAC",
+    businessWebsiteUrl: "https://example.com",
+    ownerEmail: "owner@example.com",
+    serviceArea: "Northside",
+    personalityToneDescription: null,
+    servicesNotOffered: null,
+    majorIssueExamples: null,
+    pricingPolicy: null,
+    financingPolicy: null,
+    brandsWorkedWith: null,
+    typicalResponseTimeCommitment: null,
+    warrantyInfo: null,
+    maintenancePlanOfferings: null,
+    credentialsCertifications: null,
+    ownerAvailability: null,
+    emergencyContactInfo: null,
     retellPhoneNumber: null,
     websiteEnrichmentAttemptedAt: null,
     websiteEnrichmentSources: {},
@@ -91,6 +111,15 @@ beforeEach(() => {
   mocks.getAuth.mockReturnValue({ userId: "clerk-user-44" });
   mocks.findBusinessByClerkUserId.mockImplementation(async () => business);
   mocks.updateBusiness.mockImplementation(async (_id: number, changes: Record<string, unknown>) => {
+    business = { ...business, ...changes };
+    return business;
+  });
+  mocks.updateOwnedBusiness.mockImplementation(async (
+    _id: number,
+    _clerkUserId: string,
+    changes: Record<string, unknown>,
+  ) => {
+    if (!business) return undefined;
     business = { ...business, ...changes };
     return business;
   });
@@ -118,6 +147,122 @@ async function onboard(body: Record<string, unknown>) {
     body: JSON.stringify(body),
   });
 }
+
+async function getMyBusiness() {
+  return fetch(`${baseUrl}/businesses/me`);
+}
+
+async function updateMyBusiness(body: Record<string, unknown>) {
+  return fetch(`${baseUrl}/businesses/me`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("owner business profile API", () => {
+  it("returns the signed-in owner's business profile without cacheable data", async () => {
+    const response = await getMyBusiness();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({
+      businessName: "Example Heating",
+      businessType: "HVAC",
+      ownerEmail: "owner@example.com",
+      retellPhoneNumber: null,
+    });
+    expect(mocks.findBusinessByClerkUserId).toHaveBeenCalledWith("clerk-user-44");
+  });
+
+  it("requires a signed-in owner for profile reads and updates", async () => {
+    mocks.getAuth.mockReturnValue({ userId: null });
+
+    const getResponse = await getMyBusiness();
+    const updateResponse = await updateMyBusiness({ businessName: "New name" });
+
+    expect(getResponse.status).toBe(401);
+    expect(updateResponse.status).toBe(401);
+    expect(mocks.findBusinessByClerkUserId).not.toHaveBeenCalled();
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
+
+  it("does not update a profile when the signed-in user has no business", async () => {
+    business = undefined;
+
+    const response = await updateMyBusiness({ businessName: "Someone else's business" });
+
+    expect(response.status).toBe(404);
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
+
+  it("rejects client-supplied business ownership identifiers", async () => {
+    const response = await updateMyBusiness({
+      businessName: "Attempted takeover",
+      businessId: 99,
+      clerkUserId: "another-owner",
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
+
+  it("validates owner email and website URLs before saving", async () => {
+    const invalidEmail = await updateMyBusiness({ ownerEmail: "not-an-email" });
+    const invalidWebsite = await updateMyBusiness({
+      businessWebsiteUrl: "javascript:alert(1)",
+    });
+
+    expect(invalidEmail.status).toBe(400);
+    expect(invalidWebsite.status).toBe(400);
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
+
+  it("updates the Clerk-owned business and clears sources only for edited enriched fields", async () => {
+    business = {
+      ...business,
+      websiteEnrichmentSources: {
+        businessType: "https://example.com/about",
+        typicalResponseTimeCommitment: "https://example.com/service",
+        pricingPolicy: "https://example.com/pricing",
+      },
+    };
+
+    const response = await updateMyBusiness({
+      businessName: "  Example Heating and Cooling  ",
+      businessType: "  Heating & cooling  ",
+      businessWebsiteUrl: null,
+      responseTimeCommitment: "Same-day service",
+      credentials: "NATE certified",
+    });
+
+    expect(response.status).toBe(200);
+    const profile = await response.json();
+    expect(profile).toMatchObject({
+      businessName: "Example Heating and Cooling",
+      businessType: "Heating & cooling",
+      businessWebsiteUrl: null,
+      responseTimeCommitment: "Same-day service",
+      credentials: "NATE certified",
+    });
+
+    const [businessId, clerkUserId, changes] = mocks.updateOwnedBusiness.mock.calls[0];
+    expect(businessId).toBe(44);
+    expect(clerkUserId).toBe("clerk-user-44");
+    expect(changes).toMatchObject({
+      businessName: "Example Heating and Cooling",
+      businessType: "Heating & cooling",
+      businessWebsiteUrl: null,
+      typicalResponseTimeCommitment: "Same-day service",
+      credentialsCertifications: "NATE certified",
+      websiteEnrichmentSources: {
+        pricingPolicy: "https://example.com/pricing",
+      },
+    });
+    expect(changes).not.toHaveProperty("id");
+    expect(changes).not.toHaveProperty("clerkUserId");
+  });
+});
 
 describe("business onboarding website enrichment", () => {
   it("keeps owner-entered details and clears their website source marker", async () => {

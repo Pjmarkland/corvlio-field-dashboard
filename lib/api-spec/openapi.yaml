@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: leads
     description: Lead operations
+  - name: businesses
+    description: Signed-in owner business profile operations
   - name: notifications
     description: Native lead notification operations
   - name: admin
@@ -30,6 +32,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /businesses/me:
+    get:
+      operationId: getBusinessProfile
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Get the signed-in owner's business profile
+      responses:
+        "200":
+          description: Business profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessProfile"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
+        "502":
+          description: Business profile could not be loaded
+    patch:
+      operationId: updateBusinessProfile
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Update the signed-in owner's business profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessProfileUpdate"
+      responses:
+        "200":
+          description: Updated business profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessProfile"
+        "400":
+          description: Invalid or empty business profile update
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
+        "502":
+          description: Business profile could not be updated
   /leads:
     get:
       operationId: getLeads
@@ -371,6 +420,127 @@ components:
         - retellPhoneNumber
         - timeZone
         - leads
+    BusinessProfile:
+      type: object
+      additionalProperties: false
+      properties:
+        businessName:
+          type: string
+        agentName:
+          type: [string, "null"]
+        businessType:
+          type: [string, "null"]
+        businessWebsiteUrl:
+          type: [string, "null"]
+        ownerEmail:
+          type: [string, "null"]
+        serviceArea:
+          type: [string, "null"]
+        personalityToneDescription:
+          type: [string, "null"]
+        servicesNotOffered:
+          type: [string, "null"]
+        majorIssueExamples:
+          type: [string, "null"]
+        pricingPolicy:
+          type: [string, "null"]
+        financingPolicy:
+          type: [string, "null"]
+        brandsWorkedWith:
+          type: [string, "null"]
+        responseTimeCommitment:
+          type: [string, "null"]
+        warrantyInfo:
+          type: [string, "null"]
+        maintenancePlanOfferings:
+          type: [string, "null"]
+        credentials:
+          type: [string, "null"]
+        ownerAvailability:
+          type: [string, "null"]
+        emergencyContactInfo:
+          type: [string, "null"]
+        retellPhoneNumber:
+          type: [string, "null"]
+      required:
+        - businessName
+        - agentName
+        - businessType
+        - businessWebsiteUrl
+        - ownerEmail
+        - serviceArea
+        - personalityToneDescription
+        - servicesNotOffered
+        - majorIssueExamples
+        - pricingPolicy
+        - financingPolicy
+        - brandsWorkedWith
+        - responseTimeCommitment
+        - warrantyInfo
+        - maintenancePlanOfferings
+        - credentials
+        - ownerAvailability
+        - emergencyContactInfo
+        - retellPhoneNumber
+    BusinessProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        businessName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        agentName:
+          type: [string, "null"]
+          maxLength: 40
+        businessType:
+          type: [string, "null"]
+          maxLength: 200
+        businessWebsiteUrl:
+          type: [string, "null"]
+          maxLength: 2048
+        ownerEmail:
+          type: string
+          maxLength: 320
+        serviceArea:
+          type: [string, "null"]
+          maxLength: 1000
+        personalityToneDescription:
+          type: [string, "null"]
+          maxLength: 4000
+        servicesNotOffered:
+          type: [string, "null"]
+          maxLength: 4000
+        majorIssueExamples:
+          type: [string, "null"]
+          maxLength: 4000
+        pricingPolicy:
+          type: [string, "null"]
+          maxLength: 4000
+        financingPolicy:
+          type: [string, "null"]
+          maxLength: 4000
+        brandsWorkedWith:
+          type: [string, "null"]
+          maxLength: 4000
+        responseTimeCommitment:
+          type: [string, "null"]
+          maxLength: 4000
+        warrantyInfo:
+          type: [string, "null"]
+          maxLength: 4000
+        maintenancePlanOfferings:
+          type: [string, "null"]
+          maxLength: 4000
+        credentials:
+          type: [string, "null"]
+          maxLength: 4000
+        ownerAvailability:
+          type: [string, "null"]
+          maxLength: 4000
+        emergencyContactInfo:
+          type: [string, "null"]
+          maxLength: 4000
     NotificationPlatform:
       type: string
       enum: [ios, android]

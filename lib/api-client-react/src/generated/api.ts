@@ -23,6 +23,8 @@ import type {
   AdminActivity,
   AdminBusinessDetail,
   AdminOverview,
+  BusinessProfile,
+  BusinessProfileUpdate,
   HealthStatus,
   LeadStatusResult,
   LeadStatusUpdate,
@@ -138,6 +140,154 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getGetBusinessProfileUrl = () => {
+
+
+
+
+  return `/api/businesses/me`
+}
+
+/**
+ * @summary Get the signed-in owner's business profile
+ */
+export const getBusinessProfile = async ( options?: Parameters<typeof customFetch>[1]): Promise<BusinessProfile> => {
+
+  return customFetch<BusinessProfile>(getGetBusinessProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBusinessProfileQueryKey = () => {
+    return [
+    `/api/businesses/me`
+    ] as const;
+    }
+
+
+export const getGetBusinessProfileQueryOptions = <TData = Awaited<ReturnType<typeof getBusinessProfile>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBusinessProfileQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBusinessProfile>>> = ({ signal }) => getBusinessProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBusinessProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBusinessProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getBusinessProfile>>>
+export type GetBusinessProfileQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in owner's business profile
+ */
+
+export function useGetBusinessProfile<TData = Awaited<ReturnType<typeof getBusinessProfile>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBusinessProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateBusinessProfileUrl = () => {
+
+
+
+
+  return `/api/businesses/me`
+}
+
+/**
+ * @summary Update the signed-in owner's business profile
+ */
+export const updateBusinessProfile = async (businessProfileUpdate: BusinessProfileUpdate, options?: Parameters<typeof customFetch>[1]): Promise<BusinessProfile> => {
+
+  return customFetch<BusinessProfile>(getUpdateBusinessProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(businessProfileUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateBusinessProfileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBusinessProfile>>, TError,{data: BodyType<BusinessProfileUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBusinessProfile>>, TError,{data: BodyType<BusinessProfileUpdate>}, TContext> => {
+
+const mutationKey = ['updateBusinessProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBusinessProfile>>, {data: BodyType<BusinessProfileUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateBusinessProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBusinessProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateBusinessProfile>>>
+    export type UpdateBusinessProfileMutationBody = BodyType<BusinessProfileUpdate>
+    export type UpdateBusinessProfileMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the signed-in owner's business profile
+ */
+export const useUpdateBusinessProfile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBusinessProfile>>, TError,{data: BodyType<BusinessProfileUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBusinessProfile>>,
+        TError,
+        {data: BodyType<BusinessProfileUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBusinessProfileMutationOptions(options));
+    }
 
 export const getGetLeadsUrl = () => {
 

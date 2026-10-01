@@ -148,6 +148,21 @@
   background-size: 28px 28px;
 }
 
+/* Owner-facing inline status colors retain their meaning without light-mode backgrounds. */
+.dark [data-owner-ui] [class~="bg-[#f1e3bb]"] { background-color: hsl(36 62% 18%); }
+.dark [data-owner-ui] [class~="text-[#8c6418]"] { color: hsl(38 92% 72%); }
+.dark [data-owner-ui] [class~="bg-[#d9eee1]"] { background-color: hsl(155 48% 16%); }
+.dark [data-owner-ui] [class~="text-[#398660]"] { color: hsl(145 54% 72%); }
+.dark [data-owner-ui] [class~="bg-[#49a979]"] { background-color: hsl(145 49% 59%); }
+.dark [data-owner-ui] [class~="text-[#49a979]"] { color: hsl(145 60% 73%); }
+.dark [data-owner-ui] [class~="bg-[#c4bcae]"] { background-color: hsl(35 22% 66%); }
+.dark [data-owner-ui] [class~="text-[#427652]"] { color: hsl(145 40% 78%); }
+.dark [data-owner-ui] [class~="bg-[#edf8f0]"] { background-color: hsl(150 40% 13%); }
+.dark [data-owner-ui] [class~="text-[#285f3d]"] { color: hsl(145 43% 83%); }
+.dark [data-owner-ui] [class~="border-[#b9dfc8]"] { border-color: hsl(150 32% 29%); }
+.dark [data-owner-ui] [class~="bg-white/70"] { background-color: hsl(150 35% 19% / .8); }
+.dark [data-owner-ui] [class~="text-[#c84b29]"] { color: hsl(8 75% 72%); }
+
 /* Founder console: a warmer, quieter layer over the field app theme. */
 .admin-console {
   --admin-ink: #17231f;

@@ -18,6 +18,117 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get the signed-in owner's business profile
+ */
+export const GetBusinessProfileResponse = zod.object({
+  "businessName": zod.string(),
+  "agentName": zod.string().nullable(),
+  "businessType": zod.string().nullable(),
+  "businessWebsiteUrl": zod.string().nullable(),
+  "ownerEmail": zod.string().nullable(),
+  "serviceArea": zod.string().nullable(),
+  "personalityToneDescription": zod.string().nullable(),
+  "servicesNotOffered": zod.string().nullable(),
+  "majorIssueExamples": zod.string().nullable(),
+  "pricingPolicy": zod.string().nullable(),
+  "financingPolicy": zod.string().nullable(),
+  "brandsWorkedWith": zod.string().nullable(),
+  "responseTimeCommitment": zod.string().nullable(),
+  "warrantyInfo": zod.string().nullable(),
+  "maintenancePlanOfferings": zod.string().nullable(),
+  "credentials": zod.string().nullable(),
+  "ownerAvailability": zod.string().nullable(),
+  "emergencyContactInfo": zod.string().nullable(),
+  "retellPhoneNumber": zod.string().nullable()
+})
+
+
+/**
+ * @summary Update the signed-in owner's business profile
+ */
+export const updateBusinessProfileBodyBusinessNameMax = 160;
+
+export const updateBusinessProfileBodyAgentNameMax = 40;
+
+export const updateBusinessProfileBodyBusinessTypeMax = 200;
+
+export const updateBusinessProfileBodyBusinessWebsiteUrlMax = 2048;
+
+export const updateBusinessProfileBodyOwnerEmailMax = 320;
+
+export const updateBusinessProfileBodyServiceAreaMax = 1000;
+
+export const updateBusinessProfileBodyPersonalityToneDescriptionMax = 4000;
+
+export const updateBusinessProfileBodyServicesNotOfferedMax = 4000;
+
+export const updateBusinessProfileBodyMajorIssueExamplesMax = 4000;
+
+export const updateBusinessProfileBodyPricingPolicyMax = 4000;
+
+export const updateBusinessProfileBodyFinancingPolicyMax = 4000;
+
+export const updateBusinessProfileBodyBrandsWorkedWithMax = 4000;
+
+export const updateBusinessProfileBodyResponseTimeCommitmentMax = 4000;
+
+export const updateBusinessProfileBodyWarrantyInfoMax = 4000;
+
+export const updateBusinessProfileBodyMaintenancePlanOfferingsMax = 4000;
+
+export const updateBusinessProfileBodyCredentialsMax = 4000;
+
+export const updateBusinessProfileBodyOwnerAvailabilityMax = 4000;
+
+export const updateBusinessProfileBodyEmergencyContactInfoMax = 4000;
+
+
+
+export const UpdateBusinessProfileBody = zod.object({
+  "businessName": zod.string().min(1).max(updateBusinessProfileBodyBusinessNameMax).optional(),
+  "agentName": zod.string().max(updateBusinessProfileBodyAgentNameMax).nullish(),
+  "businessType": zod.string().max(updateBusinessProfileBodyBusinessTypeMax).nullish(),
+  "businessWebsiteUrl": zod.string().max(updateBusinessProfileBodyBusinessWebsiteUrlMax).nullish(),
+  "ownerEmail": zod.string().max(updateBusinessProfileBodyOwnerEmailMax).optional(),
+  "serviceArea": zod.string().max(updateBusinessProfileBodyServiceAreaMax).nullish(),
+  "personalityToneDescription": zod.string().max(updateBusinessProfileBodyPersonalityToneDescriptionMax).nullish(),
+  "servicesNotOffered": zod.string().max(updateBusinessProfileBodyServicesNotOfferedMax).nullish(),
+  "majorIssueExamples": zod.string().max(updateBusinessProfileBodyMajorIssueExamplesMax).nullish(),
+  "pricingPolicy": zod.string().max(updateBusinessProfileBodyPricingPolicyMax).nullish(),
+  "financingPolicy": zod.string().max(updateBusinessProfileBodyFinancingPolicyMax).nullish(),
+  "brandsWorkedWith": zod.string().max(updateBusinessProfileBodyBrandsWorkedWithMax).nullish(),
+  "responseTimeCommitment": zod.string().max(updateBusinessProfileBodyResponseTimeCommitmentMax).nullish(),
+  "warrantyInfo": zod.string().max(updateBusinessProfileBodyWarrantyInfoMax).nullish(),
+  "maintenancePlanOfferings": zod.string().max(updateBusinessProfileBodyMaintenancePlanOfferingsMax).nullish(),
+  "credentials": zod.string().max(updateBusinessProfileBodyCredentialsMax).nullish(),
+  "ownerAvailability": zod.string().max(updateBusinessProfileBodyOwnerAvailabilityMax).nullish(),
+  "emergencyContactInfo": zod.string().max(updateBusinessProfileBodyEmergencyContactInfoMax).nullish()
+})
+
+export const UpdateBusinessProfileResponse = zod.object({
+  "businessName": zod.string(),
+  "agentName": zod.string().nullable(),
+  "businessType": zod.string().nullable(),
+  "businessWebsiteUrl": zod.string().nullable(),
+  "ownerEmail": zod.string().nullable(),
+  "serviceArea": zod.string().nullable(),
+  "personalityToneDescription": zod.string().nullable(),
+  "servicesNotOffered": zod.string().nullable(),
+  "majorIssueExamples": zod.string().nullable(),
+  "pricingPolicy": zod.string().nullable(),
+  "financingPolicy": zod.string().nullable(),
+  "brandsWorkedWith": zod.string().nullable(),
+  "responseTimeCommitment": zod.string().nullable(),
+  "warrantyInfo": zod.string().nullable(),
+  "maintenancePlanOfferings": zod.string().nullable(),
+  "credentials": zod.string().nullable(),
+  "ownerAvailability": zod.string().nullable(),
+  "emergencyContactInfo": zod.string().nullable(),
+  "retellPhoneNumber": zod.string().nullable()
+})
+
+
+/**
  * Returns normalized lead rows for the signed-in business owner.
  * @summary List Google Sheet leads
  */

@@ -121,6 +121,24 @@ function Field({
   );
 }
 
+const businessTypeOptions = ['HVAC', 'Electrical', 'Plumbing', 'Roofing', 'Landscaping', 'General contracting', 'Garage doors', 'Pest control', 'Cleaning', 'Appliance repair'];
+
+export function BusinessTypeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const isKnownType = businessTypeOptions.includes(value);
+  const [otherSelected, setOtherSelected] = useState(value !== '' && !isKnownType);
+  const customValue = otherSelected;
+  return <div className="block">
+    <label htmlFor="businessType" className="mb-2 block text-sm font-semibold">Business type</label>
+    <select id="businessType" value={customValue || (!isKnownType && value !== '') ? 'Other' : value} onChange={(event) => { const choice = event.target.value; if (choice === 'Other') { if (!customValue && isKnownType) onChange(''); setOtherSelected(true); } else if (choice !== '') { setOtherSelected(false); onChange(choice); } }} data-testid="select-business-type" className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+      <option value="" disabled>Select your industry</option>
+      {businessTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+      <option value="Other">Other</option>
+    </select>
+    {customValue || (!isKnownType && value !== '') ? <input type="text" value={value} onChange={(event) => { setOtherSelected(true); onChange(event.target.value); }} placeholder="Enter your business type" maxLength={200} data-testid="input-business-type-other" aria-label="Other business type" className="mt-2 min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary" /> : null}
+    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Choose the closest fit, or enter your own. Your answer is saved as written.</p>
+  </div>;
+}
+
 function SectionHeading({
   icon: Icon,
   eyebrow,
@@ -136,9 +154,9 @@ function SectionHeading({
 }) {
   const iconStyles = {
     muted: 'bg-muted text-muted-foreground',
-    warm: 'bg-[#f1e3bb] text-[#8c6418]',
+    warm: 'bg-[#f1e3bb] text-[#8c6418] dark:bg-amber-950 dark:text-amber-200',
     blue: 'bg-primary/12 text-primary',
-    green: 'bg-[#d9eee1] text-[#398660]',
+    green: 'bg-[#d9eee1] text-[#398660] dark:bg-emerald-950 dark:text-emerald-200',
   };
   return (
     <div className="mb-6 flex items-start gap-3">
@@ -252,7 +270,7 @@ function OnboardingPage() {
   };
 
   return (
-    <main className="min-h-[100dvh] bg-background text-foreground">
+    <main data-owner-ui className="min-h-[100dvh] bg-background text-foreground">
       <header className="border-b border-border/80 bg-background/95 px-5 py-4 backdrop-blur-md sm:px-8">
         <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3" data-testid="link-onboarding-brand">
@@ -288,12 +306,12 @@ function OnboardingPage() {
           </div>
           <h1 className="max-w-3xl text-[38px] font-800 leading-[.95] tracking-[-0.06em] sm:text-6xl">Give your receptionist the right starting point.</h1>
           <p className="mt-5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            A few practical details help Corvlio sound like your business, set the right expectations, and send better opportunities your way. Take your time — this setup is designed for real field work.
+            Corvlio’s virtual receptionist answers your customer calls, asks what the caller needs, captures their contact details, and records each lead here for you to follow up. A few details help it represent your business clearly.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
-            <span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-[#398660]" /> Private setup</span>
+            <span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-[#398660] dark:text-emerald-300" /> Private setup</span>
             <span className="inline-flex items-center gap-2"><Clock3 size={14} className="text-primary" /> About 5 minutes</span>
-            <span className="inline-flex items-center gap-2"><Sparkles size={14} className="text-[#8c6418]" /> No commitment today</span>
+            <span className="inline-flex items-center gap-2"><Sparkles size={14} className="text-[#8c6418] dark:text-amber-300" /> No commitment today</span>
           </div>
         </div>
 
@@ -304,7 +322,7 @@ function OnboardingPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
                 <Field id="agentName" label="Receptionist name" value={form.agentName} onChange={(value) => updateField('agentName', value)} placeholder="Aria" maxLength={40} hint="What should your AI receptionist call itself? Leave blank and we'll use Aria." />
-                <Field id="businessType" label="Business type" value={form.businessType} onChange={(value) => updateField('businessType', value)} placeholder="Heating and air conditioning company" />
+                <BusinessTypeField value={form.businessType} onChange={(value) => updateField('businessType', value)} />
                 <Field
                   id="businessWebsiteUrl"
                   label="Business website URL"
@@ -404,7 +422,7 @@ function OnboardingPage() {
               </button>
               {submission ? (
                 <p
-                  className={`mt-3 text-center text-xs leading-relaxed ${submission.kind === 'success' ? 'text-[#398660]' : 'text-[#c84b29]'}`}
+                  className={`mt-3 text-center text-xs leading-relaxed ${submission.kind === 'success' ? 'text-[#398660] dark:text-emerald-300' : 'text-[#c84b29] dark:text-rose-300'}`}
                   data-testid="status-onboarding-submit"
                   role="status"
                 >
