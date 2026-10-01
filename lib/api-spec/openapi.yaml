@@ -626,6 +626,8 @@ components:
       properties:
         businessName:
           type: string
+        agentName:
+          type: [string, "null"]
         serviceArea:
           type: [string, "null"]
         businessType:
@@ -668,6 +670,7 @@ components:
           format: date-time
       required:
         - businessName
+        - agentName
         - serviceArea
         - businessType
         - majorIssueExamples

@@ -14,6 +14,7 @@ const router: IRouter = Router();
 
 const OnboardBusinessBody = z.object({
   businessName: z.string().min(1),
+  agentName: z.string().trim().max(40).optional(),
   businessType: z.string().optional(),
   businessWebsiteUrl: z.string().trim().max(2048).optional().or(z.literal("")),
   ownerEmail: z.string().email(),
@@ -49,6 +50,7 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   const businessInfo = {
     clerkUserId: userId,
     businessName: body.data.businessName,
+    agentName: body.data.agentName?.trim() || null,
     businessType: body.data.businessType,
     ownerEmail: body.data.ownerEmail,
     serviceArea: body.data.serviceArea,

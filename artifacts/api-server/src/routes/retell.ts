@@ -17,6 +17,7 @@ import { runNotificationOutboxNow } from "../lib/notificationService";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
+const DEFAULT_AGENT_NAME = "Aria";
 
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
@@ -86,23 +87,27 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
-function dynamicVariables(business: NonNullable<Awaited<ReturnType<typeof findBusinessByPhoneNumber>>>) {
+function dynamicVariables(
+  business: NonNullable<Awaited<ReturnType<typeof findBusinessByPhoneNumber>>> | null,
+) {
+  const agentName = business?.agentName?.trim();
   return {
-    business_name: business.businessName,
-    business_type: business.businessType ?? "",
-    service_area: business.serviceArea ?? "",
-    major_issue_examples: business.majorIssueExamples ?? "",
-    pricing_policy: business.pricingPolicy ?? "",
-    personality_tone_description: business.personalityToneDescription ?? "",
-    services_not_offered: business.servicesNotOffered ?? "",
-    financing_policy: business.financingPolicy ?? "",
-    brands_worked_with: business.brandsWorkedWith ?? "",
-    response_time_commitment: business.typicalResponseTimeCommitment ?? "",
-    warranty_info: business.warrantyInfo ?? "",
-    maintenance_plan_offerings: business.maintenancePlanOfferings ?? "",
-    credentials: business.credentialsCertifications ?? "",
-    owner_availability: business.ownerAvailability ?? "",
-    emergency_contact_info: business.emergencyContactInfo ?? "",
+    agent_name: agentName || DEFAULT_AGENT_NAME,
+    business_name: business?.businessName ?? "",
+    business_type: business?.businessType ?? "",
+    service_area: business?.serviceArea ?? "",
+    major_issue_examples: business?.majorIssueExamples ?? "",
+    pricing_policy: business?.pricingPolicy ?? "",
+    personality_tone_description: business?.personalityToneDescription ?? "",
+    services_not_offered: business?.servicesNotOffered ?? "",
+    financing_policy: business?.financingPolicy ?? "",
+    brands_worked_with: business?.brandsWorkedWith ?? "",
+    response_time_commitment: business?.typicalResponseTimeCommitment ?? "",
+    warranty_info: business?.warrantyInfo ?? "",
+    maintenance_plan_offerings: business?.maintenancePlanOfferings ?? "",
+    credentials: business?.credentialsCertifications ?? "",
+    owner_availability: business?.ownerAvailability ?? "",
+    emergency_contact_info: business?.emergencyContactInfo ?? "",
   };
 }
 
@@ -119,7 +124,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     body.data.to_number,
   );
   if (!phoneNumber) {
-    res.json({ call_inbound: { dynamic_variables: {} } });
+    res.json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
     return;
   }
 
@@ -127,7 +132,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     const business = await findBusinessByPhoneNumber(phoneNumber);
     res.json({
       call_inbound: {
-        dynamic_variables: business ? dynamicVariables(business) : {},
+        dynamic_variables: dynamicVariables(business ?? null),
       },
     });
   } catch (error) {

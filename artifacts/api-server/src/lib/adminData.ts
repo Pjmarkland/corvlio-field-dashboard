@@ -15,6 +15,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 const ONBOARDING_FIELDS = [
   { key: "businessName", label: "Business name" },
+  { key: "agentName", label: "Receptionist name" },
   { key: "serviceArea", label: "Service area" },
   { key: "businessType", label: "Business type" },
   { key: "majorIssueExamples", label: "Common issues" },
@@ -285,6 +286,7 @@ export async function getAdminBusiness(businessId: number) {
     business: businessSummary,
     onboarding: {
       businessName: business.businessName,
+      agentName: business.agentName,
       serviceArea: business.serviceArea,
       businessType: business.businessType,
       majorIssueExamples: business.majorIssueExamples,

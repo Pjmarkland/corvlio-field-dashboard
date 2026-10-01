@@ -10,6 +10,8 @@ import type { AdminOnboardingAnswersWebsiteEnrichmentSources } from './adminOnbo
 export interface AdminOnboardingAnswers {
   businessName: string;
   /** @nullable */
+  agentName: string | null;
+  /** @nullable */
   serviceArea: string | null;
   /** @nullable */
   businessType: string | null;

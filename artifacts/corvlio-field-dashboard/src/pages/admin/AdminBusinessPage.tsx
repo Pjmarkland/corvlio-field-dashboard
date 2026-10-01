@@ -7,6 +7,7 @@ import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell
 
 const ANSWER_FIELDS: Array<{ key: keyof AdminOnboardingAnswers; label: string }> = [
   { key: 'businessName', label: 'Business name' },
+  { key: 'agentName', label: 'Receptionist name' },
   { key: 'serviceArea', label: 'Service area' },
   { key: 'businessType', label: 'Business type' },
   { key: 'majorIssueExamples', label: 'Major issue examples' },

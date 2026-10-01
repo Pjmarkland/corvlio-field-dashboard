@@ -4,6 +4,7 @@ import { jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-or
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
   businessName: text("business_name").notNull(),
+  agentName: text("agent_name"),
   clerkUserId: text("clerk_user_id"),
   ownerEmail: text("owner_email"),
   retellPhoneNumber: text("retell_phone_number"),

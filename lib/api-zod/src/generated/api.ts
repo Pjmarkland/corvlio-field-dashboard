@@ -308,6 +308,7 @@ export const GetAdminBusinessResponse = zod.object({
 }),
   "onboarding": zod.object({
   "businessName": zod.string(),
+  "agentName": zod.string().nullable(),
   "serviceArea": zod.string().nullable(),
   "businessType": zod.string().nullable(),
   "majorIssueExamples": zod.string().nullable(),

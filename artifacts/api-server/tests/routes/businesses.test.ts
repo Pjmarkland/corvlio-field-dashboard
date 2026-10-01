@@ -141,6 +141,37 @@ describe("business onboarding website enrichment", () => {
     expect(changes.websiteEnrichmentSources.businessType).toBeUndefined();
   });
 
+  it("trims and saves an optional receptionist name", async () => {
+    const response = await onboard({
+      ...validBody,
+      agentName: "  Aria  ",
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateBusiness.mock.calls[0]?.[1].agentName).toBe("Aria");
+  });
+
+  it("allows the receptionist name to be omitted and stores null", async () => {
+    const response = await onboard(validBody);
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateBusiness.mock.calls[0]?.[1].agentName).toBeNull();
+  });
+
+  it("passes a trimmed receptionist name through initial business provisioning", async () => {
+    business = undefined;
+
+    const response = await onboard({
+      ...validBody,
+      agentName: "  Nova  ",
+      businessWebsiteUrl: "https://example.com",
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0]?.[0].agentName).toBe("Nova");
+    expect(mocks.enrichBusinessFromWebsite).toHaveBeenCalled();
+  });
+
   it("saves successfully without a website and does not schedule enrichment", async () => {
     business = undefined;
 

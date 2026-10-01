@@ -11,6 +11,7 @@ import { useSignOut } from '@/hooks/useSignOut';
 
 type OnboardingForm = {
   businessName: string;
+  agentName: string;
   businessType: string;
   businessWebsiteUrl: string;
   ownerEmail: string;
@@ -34,6 +35,7 @@ type OnboardingForm = {
 
 const initialForm: OnboardingForm = {
   businessName: '',
+  agentName: '',
   businessType: '',
   businessWebsiteUrl: '',
   ownerEmail: '',
@@ -66,6 +68,7 @@ function Field({
   multiline = false,
   rows = 4,
   hint,
+  maxLength,
 }: {
   id: keyof OnboardingForm;
   label: string;
@@ -77,6 +80,7 @@ function Field({
   multiline?: boolean;
   rows?: number;
   hint?: string;
+  maxLength?: number;
 }) {
   const commonClassName = 'w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm leading-relaxed outline-none ring-primary transition placeholder:text-muted-foreground/65 focus:ring-2';
   return (
@@ -95,6 +99,7 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
+          maxLength={maxLength}
           data-testid={`input-${id}`}
           className={`${commonClassName} resize-y`}
         />
@@ -107,6 +112,7 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
+          maxLength={maxLength}
           data-testid={`input-${id}`}
           className={`${commonClassName} min-h-12 font-semibold`}
         />
@@ -176,6 +182,7 @@ function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessName: form.businessName,
+          agentName: form.agentName.trim() || undefined,
           businessType: form.businessType,
           businessWebsiteUrl: form.businessWebsiteUrl,
           ownerEmail: form.ownerEmail,
@@ -296,6 +303,7 @@ function OnboardingPage() {
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
+                <Field id="agentName" label="Receptionist name" value={form.agentName} onChange={(value) => updateField('agentName', value)} placeholder="Aria" maxLength={40} hint="What should your AI receptionist call itself? Leave blank and we'll use Aria." />
                 <Field id="businessType" label="Business type" value={form.businessType} onChange={(value) => updateField('businessType', value)} placeholder="Heating and air conditioning company" />
                 <Field
                   id="businessWebsiteUrl"

@@ -207,6 +207,8 @@ export type AdminOnboardingAnswersWebsiteEnrichmentSources = {[key: string]: str
 export interface AdminOnboardingAnswers {
   businessName: string;
   /** @nullable */
+  agentName: string | null;
+  /** @nullable */
   serviceArea: string | null;
   /** @nullable */
   businessType: string | null;
