@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetLeadsQueryKey } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
@@ -33,7 +33,7 @@ type OnboardingForm = {
   serviceAgreementAccepted: boolean;
 };
 
-const initialForm: OnboardingForm = {
+export const initialForm: OnboardingForm = {
   businessName: '',
   agentName: '',
   businessType: '',
@@ -56,6 +56,60 @@ const initialForm: OnboardingForm = {
   termsAccepted: false,
   serviceAgreementAccepted: false,
 };
+
+const toneOptions = [
+  { value: 'Warm, calm, and neighborly. Ask one question at a time, listen carefully, and never guess at prices or arrival times.', label: 'Warm & neighborly' },
+  { value: 'Professional and concise. Be courteous, give clear answers, and avoid making promises that are not in the business details.', label: 'Professional & concise' },
+  { value: 'Friendly and upbeat. Help callers feel welcome while staying accurate and never overselling.', label: 'Friendly & upbeat' },
+];
+
+const responseTimeOptions = [
+  { value: 'We return calls within 15 minutes during business hours.', label: 'Within 15 minutes' },
+  { value: 'We return calls within one hour during business hours.', label: 'Within one hour' },
+  { value: 'We return calls by the end of the same business day.', label: 'Same business day' },
+  { value: 'We return calls by the next business day.', label: 'Next business day' },
+];
+
+export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
+  return {
+    ...current,
+    businessName: 'Demo Pipeworks (Fictional Sample)',
+    businessType: 'Plumbing',
+    businessWebsiteUrl: '',
+    ownerEmail: 'owner@example.com',
+    serviceArea: 'Example City and Example County (fictional sample area)',
+    receptionistTone: toneOptions[0].value,
+    servicesNotOffered: 'Sample only: no commercial plumbing, excavation, or work outside Example City.',
+    majorIssueExamples: 'Fictional sample only: an active leak that cannot be contained, a sewage backup, or a complete loss of water.',
+    pricingPolicy: 'Sample only: do not guess at prices; explain that the business will confirm costs.',
+    financingPolicy: '',
+    brandsWorkedWith: '',
+    responseTime: responseTimeOptions[3].value,
+    warrantyInfo: '',
+    maintenancePlans: '',
+    credentials: '',
+    ownerAvailability: 'Sample hours only: Monday–Friday, 8am–5pm. Replace before using with real callers.',
+    emergencyContact: 'Fictional sample only: this is not an emergency service. For immediate danger, contact local emergency services.',
+  };
+}
+
+export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
+  return (
+    <div className="mt-5 rounded-xl border border-primary/25 bg-primary/[0.06] p-4">
+      <button
+        type="button"
+        onClick={onApply}
+        data-testid="button-fill-sample-business"
+        className="min-h-12 w-full rounded-lg text-left text-sm font-semibold text-primary underline decoration-primary/35 underline-offset-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        Don&apos;t have a business? Use a sample business to try it out.
+      </button>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        Fills editable fictional plumbing details and clears the website. Nothing is submitted until you choose Submit setup.
+      </p>
+    </div>
+  );
+}
 
 function Field({
   id,
@@ -82,7 +136,7 @@ function Field({
   hint?: string;
   maxLength?: number;
 }) {
-  const commonClassName = 'w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm leading-relaxed outline-none ring-primary transition placeholder:text-muted-foreground/65 focus:ring-2';
+  const commonClassName = 'w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm leading-relaxed text-foreground outline-none ring-primary transition placeholder:text-muted-foreground focus:ring-2';
   return (
     <label className="block" htmlFor={id}>
       <span className="mb-2 block text-sm font-semibold">
@@ -123,9 +177,16 @@ function Field({
 
 const businessTypeOptions = ['HVAC', 'Electrical', 'Plumbing', 'Roofing', 'Landscaping', 'General contracting', 'Garage doors', 'Pest control', 'Cleaning', 'Appliance repair'];
 
-export function BusinessTypeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function BusinessTypeField({ value, onChange, resetKey = 0 }: { value: string; onChange: (value: string) => void; resetKey?: number }) {
   const isKnownType = businessTypeOptions.includes(value);
   const [otherSelected, setOtherSelected] = useState(value !== '' && !isKnownType);
+  const lastResetKey = useRef(resetKey);
+  useEffect(() => {
+    if (lastResetKey.current !== resetKey) {
+      lastResetKey.current = resetKey;
+      setOtherSelected(false);
+    }
+  }, [resetKey]);
   const customValue = otherSelected;
   return <div className="block">
     <label htmlFor="businessType" className="mb-2 block text-sm font-semibold">Business type</label>
@@ -137,6 +198,101 @@ export function BusinessTypeField({ value, onChange }: { value: string; onChange
     {customValue || (!isKnownType && value !== '') ? <input type="text" value={value} onChange={(event) => { setOtherSelected(true); onChange(event.target.value); }} placeholder="Enter your business type" maxLength={200} data-testid="input-business-type-other" aria-label="Other business type" className="mt-2 min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary" /> : null}
     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Choose the closest fit, or enter your own. Your answer is saved as written.</p>
   </div>;
+}
+
+function PresetChoiceField({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  required = false,
+  multiline = false,
+  hint,
+  resetKey = 0,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  required?: boolean;
+  multiline?: boolean;
+  hint?: string;
+  resetKey?: number;
+}) {
+  const getSelection = (currentValue: string) => options.find((option) => option.value === currentValue)?.value ?? (currentValue ? 'other' : '');
+  const [selection, setSelection] = useState(() => getSelection(value));
+  useEffect(() => {
+    setSelection(getSelection(value));
+  }, [resetKey]);
+
+  const selectOther = () => {
+    if (selection !== 'other') onChange('');
+    setSelection('other');
+  };
+  const customId = `${id}-other`;
+
+  return (
+    <fieldset className="min-w-0">
+      <legend className="mb-2 text-sm font-semibold">
+        {label}
+        {required ? <span className="ml-1 text-primary" aria-hidden="true">*</span> : null}
+      </legend>
+      {hint ? <p className="mb-2 text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2" role="group" aria-label={label} aria-required={required}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selection === option.value}
+            onClick={() => {
+              setSelection(option.value);
+              onChange(option.value);
+            }}
+            className={`min-h-12 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selection === option.value ? 'border-primary bg-primary/10 text-foreground' : 'border-input bg-background text-foreground hover:bg-muted'}`}
+            data-testid={`choice-${id}-${options.indexOf(option)}`}
+          >
+            {option.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-pressed={selection === 'other'}
+          onClick={selectOther}
+          className={`min-h-12 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selection === 'other' ? 'border-primary bg-primary/10 text-foreground' : 'border-input bg-background text-foreground hover:bg-muted'}`}
+          data-testid={`choice-${id}-other`}
+        >
+          Other
+        </button>
+      </div>
+      {selection === 'other' ? (
+        <label className="mt-2 block">
+          <span className="sr-only">Other {label.toLowerCase()}</span>
+          {multiline ? (
+            <textarea
+              id={customId}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              rows={3}
+              required={required}
+              data-testid={`input-${id}-other`}
+              className="min-h-24 w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          ) : (
+            <input
+              id={customId}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              required={required}
+              data-testid={`input-${id}-other`}
+              className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          )}
+        </label>
+      ) : null}
+    </fieldset>
+  );
 }
 
 function SectionHeading({
@@ -179,6 +335,7 @@ function OnboardingPage() {
   const { revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
+  const [sampleResetKey, setSampleResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submission, setSubmission] = useState<
     { kind: 'success' | 'error'; message: string } | null
@@ -189,6 +346,10 @@ function OnboardingPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting) return;
+    if (!form.receptionistTone.trim()) {
+      setSubmission({ kind: 'error', message: 'Choose or enter a personality and tone for your AI receptionist.' });
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmission(null);
@@ -272,7 +433,7 @@ function OnboardingPage() {
   return (
     <main data-owner-ui className="min-h-[100dvh] bg-background text-foreground">
       <header className="border-b border-border/80 bg-background/95 px-5 py-4 backdrop-blur-md sm:px-8">
-        <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4">
+          <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4 pt-[env(safe-area-inset-top)]">
           <Link href="/" className="flex items-center gap-3" data-testid="link-onboarding-brand">
             <img src={logoUrl} alt="Corvlio" className="h-auto w-[128px]" />
             <span className="hidden border-l border-border pl-3 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground sm:inline">field desk</span>
@@ -322,7 +483,7 @@ function OnboardingPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
                 <Field id="agentName" label="Receptionist name" value={form.agentName} onChange={(value) => updateField('agentName', value)} placeholder="Aria" maxLength={40} hint="What should your AI receptionist call itself? Leave blank and we'll use Aria." />
-                <BusinessTypeField value={form.businessType} onChange={(value) => updateField('businessType', value)} />
+                <BusinessTypeField value={form.businessType} onChange={(value) => updateField('businessType', value)} resetKey={sampleResetKey} />
                 <Field
                   id="businessWebsiteUrl"
                   label="Business website URL"
@@ -334,17 +495,21 @@ function OnboardingPage() {
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required />
               </div>
+              <SampleBusinessHelper onApply={() => {
+                setForm((current) => applySampleBusiness(current));
+                setSampleResetKey((current) => current + 1);
+              }} />
               <div className="mt-5">
-                <Field
+                <PresetChoiceField
                   id="receptionistTone"
                   label="AI receptionist personality and tone"
                   value={form.receptionistTone}
                   onChange={(value) => updateField('receptionistTone', value)}
-                  placeholder="Warm, direct, and neighborly. Keep answers clear, never oversell, and ask one question at a time."
+                  options={toneOptions}
                   multiline
-                  rows={4}
                   required
                   hint="Describe how you want callers to feel, and any words or phrases your team naturally uses."
+                  resetKey={sampleResetKey}
                 />
               </div>
             </section>
@@ -365,7 +530,7 @@ function OnboardingPage() {
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={FileCheck2} eyebrow="03 · Your promise" title="Make the follow-through unmistakable." description="These details turn a captured lead into a conversation that already feels informed." tone="green" />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field id="responseTime" label="Typical response time commitment" value={form.responseTime} onChange={(value) => updateField('responseTime', value)} placeholder="We call back within 15 minutes during business hours." multiline rows={3} />
+                  <PresetChoiceField id="responseTime" label="Typical response time commitment" value={form.responseTime} onChange={(value) => updateField('responseTime', value)} options={responseTimeOptions} multiline hint="Choose the commitment you can meet consistently, or enter a custom one." resetKey={sampleResetKey} />
                 <Field id="warrantyInfo" label="Warranty information" value={form.warrantyInfo} onChange={(value) => updateField('warrantyInfo', value)} placeholder="One-year labor warranty; manufacturer warranties apply." multiline rows={3} />
                 <Field id="maintenancePlans" label="Maintenance plan offerings" value={form.maintenancePlans} onChange={(value) => updateField('maintenancePlans', value)} placeholder="Seasonal tune-up plan with priority scheduling." multiline rows={3} />
                 <Field id="credentials" label="Credentials and certifications" value={form.credentials} onChange={(value) => updateField('credentials', value)} placeholder="Licensed C-20 contractor, EPA certified, NATE certified." multiline rows={3} />
