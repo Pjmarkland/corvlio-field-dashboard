@@ -2,7 +2,8 @@ import {
   type Business as DatabaseBusiness,
   type NewBusiness,
 } from "@workspace/db";
-import { createBusiness } from "./businessDirectory";
+import { guardedProvisioning, type Purchase } from "./provisioningPolicy";
+import { provisioningStore } from "./provisioningStore";
 
 const PRE_CALL_WEBHOOK_PATH = "/api/webhooks/retell/pre-call";
 
@@ -23,11 +24,6 @@ export type BusinessProvisioningResult = {
   phoneProvisioningPending: boolean;
   provisioningError: unknown | null;
 };
-
-type BusinessCreator = (input: NewBusiness) => Promise<DatabaseBusiness>;
-type PhoneProvisioner = (
-  businessInfo: BusinessProvisioningInput,
-) => Promise<DatabaseBusiness>;
 
 type RetellPhoneNumberResponse = {
   phone_number?: unknown;
@@ -84,10 +80,10 @@ function buildCreatePhoneNumberPayload(
   };
 }
 
-export async function provisionBusinessPhoneNumber(
-  businessInfo: BusinessProvisioningInput,
+export async function purchaseBusinessPhoneNumber(
+  businessId: number,
   options: RetellPhoneNumberOptions = {},
-): Promise<DatabaseBusiness> {
+): Promise<Purchase> {
   const {
     apiBaseUrl,
     apiKey,
@@ -104,8 +100,9 @@ export async function provisionBusinessPhoneNumber(
         "content-type": "application/json",
       },
       body: JSON.stringify(
-        buildCreatePhoneNumberPayload(sharedAgentId, inboundWebhookUrl, options),
+        buildCreatePhoneNumberPayload(sharedAgentId, inboundWebhookUrl, { nickname: `Corvlio business ${businessId}`, ...options }),
       ),
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
     throw new Error(
@@ -138,38 +135,11 @@ export async function provisionBusinessPhoneNumber(
     );
   }
 
-  return createBusiness({
-    ...businessInfo,
-    retellPhoneNumber: responseBody.phone_number,
-    retellAgentId: sharedAgentId,
-  });
+  return { phoneNumber: responseBody.phone_number, agentId: sharedAgentId };
 }
 
 export async function saveBusinessWithOptionalPhone(
   businessInfo: BusinessProvisioningInput,
-  dependencies: {
-    provision?: PhoneProvisioner;
-    create?: BusinessCreator;
-  } = {},
 ): Promise<BusinessProvisioningResult> {
-  const provision = dependencies.provision ?? provisionBusinessPhoneNumber;
-  const create = dependencies.create ?? createBusiness;
-
-  try {
-    return {
-      business: await provision(businessInfo),
-      phoneProvisioningPending: false,
-      provisioningError: null,
-    };
-  } catch (error) {
-    return {
-      business: await create({
-        ...businessInfo,
-        retellPhoneNumber: null,
-        retellAgentId: null,
-      }),
-      phoneProvisioningPending: true,
-      provisioningError: error,
-    };
-  }
+  return guardedProvisioning(businessInfo, provisioningStore, purchaseBusinessPhoneNumber);
 }

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
@@ -9,6 +9,8 @@ export const businessesTable = pgTable("businesses", {
   ownerEmail: text("owner_email"),
   retellPhoneNumber: text("retell_phone_number"),
   retellAgentId: text("retell_agent_id"),
+  isSample: boolean("is_sample").notNull().default(false),
+  provisioningState: text("provisioning_state").notNull().default("pending"),
   serviceArea: text("service_area"),
   businessType: text("business_type"),
   majorIssueExamples: text("major_issue_examples"),
@@ -34,6 +36,8 @@ export const businessesTable = pgTable("businesses", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("businesses_clerk_user_id_unique").on(table.clerkUserId),
+  uniqueIndex("businesses_phone_normalized_unique")
+    .on(sql`nullif(regexp_replace(${table.retellPhoneNumber}, '[^0-9]', '', 'g'), '')`),
 ]);
 
 export type Business = typeof businessesTable.$inferSelect;

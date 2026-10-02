@@ -63,6 +63,8 @@ router.get("/leads", async (req, res): Promise<void> => {
 
     res.json(GetLeadsResponse.parse({
       configured: true,
+      isSample: business.isSample,
+      provisioningState: business.isSample ? "sample" : business.retellPhoneNumber ? "ready" : business.provisioningState,
       businessName: business.businessName,
       retellPhoneNumber: business.retellPhoneNumber,
       timeZone: "America/New_York",

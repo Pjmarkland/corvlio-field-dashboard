@@ -67,6 +67,8 @@ export interface LeadStatusResult {
 }
 
 export interface LeadWorkspace {
+  isSample?: boolean;
+  provisioningState?: string;
   configured: boolean;
   /** @nullable */
   businessName: string | null;
@@ -296,6 +298,11 @@ export const AdminBusinessSummaryProvisioningStatus = {
 } as const;
 
 export interface AdminBusinessSummary {
+  isSample?: boolean;
+  provisioningState?: string;
+  unusedNumber7Days?: boolean;
+  /** @nullable */
+  lastCallAt?: string | null;
   id: number;
   businessName: string;
   /** @nullable */

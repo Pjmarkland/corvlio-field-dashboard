@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { createHmac } from "node:crypto";
 import express from "express";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   findBusinessByPhoneNumber: vi.fn(),
   sendLeadNotificationEmail: vi.fn(),
   runNotificationOutboxNow: vi.fn(),
+  persistAnalyzedCall: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
@@ -28,6 +30,9 @@ vi.mock("../../src/lib/gmail", () => ({
 
 vi.mock("../../src/lib/notificationService", () => ({
   runNotificationOutboxNow: mocks.runNotificationOutboxNow,
+}));
+vi.mock("../../src/lib/retellPersistence", () => ({
+  persistAnalyzedCall: mocks.persistAnalyzedCall,
 }));
 
 import retellRouter from "../../src/routes/retell";
@@ -91,7 +96,9 @@ async function requestPreCall(toNumber = "+14155550123") {
 
 beforeAll(async () => {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ verify: (req, _res, body) => {
+    (req as express.Request).rawBody = body;
+  } }));
   app.use((req, _res, next) => {
     (req as typeof req & {
       log: { warn: typeof vi.fn; error: typeof vi.fn; info: typeof vi.fn };
@@ -112,6 +119,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  vi.unstubAllEnvs();
   await new Promise<void>((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
@@ -119,7 +127,56 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("RETELL_API_KEY", "retell-unit-test-key");
+  mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: true });
+  mocks.sendLeadNotificationEmail.mockResolvedValue(undefined);
+  mocks.runNotificationOutboxNow.mockResolvedValue(undefined);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
+});
+
+const signedRequest = (path: string, body: string, timestamp = Date.now(), signedBody = body) => {
+  const digest = createHmac("sha256", "retell-unit-test-key").update(signedBody).update(String(timestamp)).digest("hex");
+  return fetch(`${baseUrl}/webhooks/retell/${path}`, {
+    method: "POST", body,
+    headers: { "content-type": "application/json", "x-retell-signature": `v=${timestamp},d=${digest}` },
+  });
+};
+
+describe("Retell webhook safety", () => {
+  it("allows missing pre-call signatures during the compatibility rollout and logs them", async () => {
+    expect((await requestPreCall()).status).toBe(200);
+    expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("allowing during compatibility"));
+  });
+  it("verifies valid pre-call signatures against the exact raw bytes", async () => {
+    const raw = '{ "call_inbound": { "to_number" : "+14155550123" } }';
+    expect((await signedRequest("pre-call", raw)).status).toBe(200);
+  });
+  it("rejects tampered and expired pre-call signatures before any business lookup", async () => {
+    const raw = '{"call_inbound":{"to_number":"+14155550123"}}';
+    expect((await signedRequest("pre-call", raw, Date.now(), raw + " ")).status).toBe(401);
+    expect((await signedRequest("pre-call", raw, Date.now() - 6 * 60_000)).status).toBe(401);
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+  });
+  it("does not send repeat alerts when an analyzed-call retry is already persisted", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.com" }));
+    mocks.persistAnalyzedCall.mockResolvedValueOnce({ id: 101, notify: true }).mockResolvedValueOnce({ id: 101, notify: false });
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "call-test-1", to_number: "+14155550123", from_number: "+15551234567",
+      call_analysis: { custom_analysis_data: { caller_name: "Test caller", issue_reason: "Test issue" } },
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.persistAnalyzedCall).toHaveBeenCalledTimes(2);
+    expect(mocks.sendLeadNotificationEmail).toHaveBeenCalledOnce();
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+  });
+  it("keeps post-call signature verification mandatory", async () => {
+    const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: '{"event":"call_analyzed"}',
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+  });
 });
 
 describe("Retell pre-call dynamic variables", () => {

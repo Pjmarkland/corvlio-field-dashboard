@@ -1,5 +1,6 @@
 import { index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
+import { leadsTable } from "./leads";
 
 export const retellCallRecordsTable = pgTable(
   "retell_call_records",
@@ -9,6 +10,7 @@ export const retellCallRecordsTable = pgTable(
       .notNull()
       .references(() => businessesTable.id, { onDelete: "cascade" }),
     retellCallId: text("retell_call_id").notNull(),
+    leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "set null" }),
     callStartedAt: timestamp("call_started_at", { withTimezone: true }),
     durationMs: integer("duration_ms"),
     outcome: text("outcome"),

@@ -3,17 +3,12 @@ import {
   RetellPreCallWebhookBody,
 } from "@workspace/api-zod";
 import type { RetellCall } from "@workspace/api-zod";
-import {
-  db,
-  leadsTable,
-  notificationEventsTable,
-  retellCallRecordsTable,
-} from "@workspace/db";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { sendLeadNotificationEmail } from "../lib/gmail";
 import { runNotificationOutboxNow } from "../lib/notificationService";
+import { persistAnalyzedCall } from "../lib/retellPersistence";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -82,8 +77,9 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
     .update(String(timestamp))
     .digest("hex");
   const providedSignature = match[2];
-  const provided = Buffer.from(providedSignature, "utf8");
-  const expected = Buffer.from(expectedSignature, "utf8");
+  if (providedSignature.length !== 64) return false;
+  const provided = Buffer.from(providedSignature, "hex");
+  const expected = Buffer.from(expectedSignature, "hex");
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
@@ -112,6 +108,16 @@ function dynamicVariables(
 }
 
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
+  const signature = req.get("x-retell-signature");
+  if (signature !== undefined) {
+    if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
+      req.log.warn("Rejected Retell pre-call webhook with invalid signature");
+      res.status(401).json({ error: "Invalid Retell signature" });
+      return;
+    }
+  } else {
+    req.log.warn("Retell pre-call signature missing; allowing during compatibility rollout");
+  }
   const body = RetellPreCallWebhookBody.safeParse(req.body);
   if (!body.success) {
     req.log.warn({ error: body.error.flatten() }, "Invalid Retell pre-call webhook payload");
@@ -196,67 +202,21 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       "preferred_time",
     );
 
-    const lead = await db.transaction(async (tx) => {
-      const [createdLead] = await tx
-        .insert(leadsTable)
-        .values({
-          businessId: business.id,
-          callerName,
-          phoneNumber: callerPhoneNumber,
-          issueReason,
-          address,
-          urgencyLevel,
-          availability,
-        })
-        .returning({ id: leadsTable.id });
-
-      if (!createdLead) throw new Error("Lead creation did not return a record");
-
-      const firstName = callerName?.split(/\s+/, 1)[0] || "A new caller";
-      await tx.insert(notificationEventsTable).values({
-        businessId: String(business.id),
-        leadId: String(createdLead.id),
-        title: `New lead from ${firstName}`,
-        body: issueReason || "A new receptionist lead is waiting.",
-        deepLink: `/leads/${encodeURIComponent(String(createdLead.id))}`,
-      }).onConflictDoNothing();
-
-      return createdLead;
+    const retellCallId = firstString(call.call_id)
+      ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
+    if (!call.call_id) req.log.warn("Retell call ID missing; using legacy payload fingerprint");
+    const lead = await persistAnalyzedCall(retellCallId, {
+      businessId: business.id, callerName, phoneNumber: callerPhoneNumber,
+      issueReason, address, urgencyLevel, availability,
+    }, {
+      businessId: business.id, retellCallId,
+      callStartedAt: callStartedAt(call.start_timestamp),
+      durationMs: callDurationMs(call.duration_ms),
+      outcome: callOutcome(call),
     });
 
-    const retellCallId = firstString(call.call_id);
-    if (retellCallId) {
-      try {
-        await db
-          .insert(retellCallRecordsTable)
-          .values({
-            businessId: business.id,
-            retellCallId,
-            callStartedAt: callStartedAt(call.start_timestamp),
-            durationMs: callDurationMs(call.duration_ms),
-            outcome: callOutcome(call),
-          })
-          .onConflictDoNothing({
-            target: retellCallRecordsTable.retellCallId,
-          });
-      } catch (error) {
-        req.log.error(
-          {
-            callId: retellCallId,
-            businessId: business.id,
-            error: error instanceof Error ? error.message : "Unknown call record error",
-          },
-          "Retell call metadata could not be stored; lead processing succeeded",
-        );
-      }
-    } else {
-      req.log.warn(
-        { businessId: business.id },
-        "Retell call record skipped because the webhook did not include a call ID",
-      );
-    }
-
-    void sendLeadNotificationEmail({
+    if (lead.notify) {
+      void sendLeadNotificationEmail({
       ownerEmail: business.ownerEmail,
       callerName,
       phoneNumber: callerPhoneNumber,
@@ -282,6 +242,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         "Immediate Retell notification delivery failed",
       );
     });
+    }
 
     res.sendStatus(204);
   } catch (error) {

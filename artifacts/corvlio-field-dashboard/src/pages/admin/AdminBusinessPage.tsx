@@ -81,6 +81,11 @@ export default function AdminBusinessPage() {
   return <AdminShell title={business.businessName} eyebrow="Business detail" action={<span className="hidden items-center gap-2 text-xs text-[#76837a] sm:flex"><span className="h-2 w-2 rounded-full bg-[#4e8d70]" />Read-only record</span>}>
     <BackLink href="/admin">Back to overview</BackLink>
     <SummaryHero detail={data} />
+    <section className="admin-panel mb-7 rounded-2xl p-4 text-sm text-[#34443b]" aria-label="Number setup state">
+      <p className="font-semibold">{data.business.isSample ? 'Sample / demo — no live number purchased' : `Provisioning state: ${data.business.provisioningState ?? data.business.provisioningStatus}`}</p>
+      {data.business.unusedNumber7Days ? <p className="mt-2 font-semibold text-[#a3432d]">No recorded calls in 7+ days. Review this number in the Retell dashboard; this console does not release or delete numbers.</p> : null}
+      {data.business.lastCallAt ? <p className="mt-2">Last recorded call: {formatAdminDate(data.business.lastCallAt)}</p> : null}
+    </section>
     <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <AdminMetric label="Onboarding" value={`${business.onboardingCompletenessPercent}%`} detail={`${business.completedOnboardingFieldCount} of ${business.onboardingFieldCount} fields`} tone={business.onboardingCompletenessPercent === 100 ? 'moss' : 'neutral'} icon={FileText} />
       <AdminMetric label="Total leads" value={business.totalLeadCount} detail={`${business.contactedLeadCount} contacted`} icon={UserRound} />

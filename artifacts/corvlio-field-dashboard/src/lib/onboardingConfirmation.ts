@@ -4,6 +4,7 @@ export type OnboardingConfirmation = {
   userId: string;
   businessName: string;
   phoneNumber: string | null;
+  isSample?: boolean;
 };
 
 export function saveOnboardingConfirmation(confirmation: OnboardingConfirmation) {

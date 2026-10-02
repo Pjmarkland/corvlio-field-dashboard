@@ -9,6 +9,11 @@ import type { AdminBusinessSummaryProvisioningStatus } from './adminBusinessSumm
 import type { NotificationPlatform } from './notificationPlatform';
 
 export interface AdminBusinessSummary {
+  isSample?: boolean;
+  provisioningState?: string;
+  unusedNumber7Days?: boolean;
+  /** @nullable */
+  lastCallAt?: Date | null;
   id: number;
   businessName: string;
   /** @nullable */

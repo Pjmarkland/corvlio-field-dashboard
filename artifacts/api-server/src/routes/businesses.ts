@@ -226,6 +226,7 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
 });
 
 const OnboardBusinessBody = z.object({
+  isSample: z.boolean().optional(),
   businessName: z.string().min(1),
   agentName: z.string().trim().max(40).optional(),
   businessType: z.string().optional(),
@@ -260,7 +261,11 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     return;
   }
 
+  const isSample = body.data.isSample === true
+    || body.data.businessName.trim().toLowerCase().includes("fictional sample")
+    || body.data.ownerEmail.toLowerCase() === "owner@example.com";
   const businessInfo = {
+    isSample,
     clerkUserId: userId,
     businessName: body.data.businessName,
     agentName: body.data.agentName?.trim() || null,
@@ -282,7 +287,7 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     agreementsAcceptedAt: new Date(),
   };
   const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() || "";
-  const websiteUrl = rawWebsiteUrl.length <= 2048 ? rawWebsiteUrl || null : null;
+  const websiteUrl = !isSample && rawWebsiteUrl.length <= 2048 ? rawWebsiteUrl || null : null;
 
   const scheduleWebsiteEnrichment = (businessId: number, url: string) => {
     void enrichBusinessFromWebsite(businessId, url)
@@ -299,56 +304,17 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
 
   try {
     const existingBusiness = await findBusinessByClerkUserId(userId);
-    if (existingBusiness) {
-      const websiteEnrichmentSources = {
-        ...(existingBusiness.websiteEnrichmentSources ?? {}),
-      };
-      for (const field of WEBSITE_ENRICHMENT_FIELDS) {
-        if (businessInfo[field] !== undefined) {
-          delete websiteEnrichmentSources[field];
-        }
-      }
-
-      const business = await updateBusiness(existingBusiness.id, {
-        ...businessInfo,
-        websiteEnrichmentSources,
-      });
-      if (!business) {
-        throw new Error("Existing business could not be updated");
-      }
-
-      if (websiteUrl && !existingBusiness.websiteEnrichmentAttemptedAt) {
-        void claimWebsiteEnrichment(existingBusiness.id, websiteUrl)
-          .then((claimedBusiness) => {
-            if (claimedBusiness) {
-              scheduleWebsiteEnrichment(claimedBusiness.id, websiteUrl);
-            }
-          })
-          .catch((error: unknown) => {
-            req.log.warn(
-              {
-                businessId: existingBusiness.id,
-                errorName: error instanceof Error ? error.name : "UnknownError",
-              },
-              "Optional website enrichment could not be scheduled",
-            );
-          });
-      }
-
-      res.status(200).json({
-        phoneNumber: business.retellPhoneNumber,
-        phoneProvisioningPending: !business.retellPhoneNumber,
-      });
-      return;
-    }
-
     const result = await saveBusinessWithOptionalPhone({
       ...businessInfo,
       businessWebsiteUrl: websiteUrl,
-      websiteEnrichmentAttemptedAt: websiteUrl ? new Date() : null,
+      websiteEnrichmentAttemptedAt: null,
     });
-    if (websiteUrl) {
-      scheduleWebsiteEnrichment(result.business.id, websiteUrl);
+    if (websiteUrl && !result.business.isSample) {
+      void claimWebsiteEnrichment(result.business.id, websiteUrl).then((claimed) => {
+        if (claimed) scheduleWebsiteEnrichment(claimed.id, websiteUrl);
+      }).catch((error: unknown) => {
+        req.log.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Optional website enrichment could not be scheduled");
+      });
     }
 
     if (result.phoneProvisioningPending) {
@@ -362,11 +328,17 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
       );
     }
 
-    res.status(201).json({
+    res.status(existingBusiness ? 200 : 201).json({
       phoneNumber: result.business.retellPhoneNumber,
       phoneProvisioningPending: result.phoneProvisioningPending,
+      isSample: result.business.isSample,
+      provisioningState: result.business.provisioningState,
     });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("A live business cannot")) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
     req.log.error(
       { error: error instanceof Error ? error.message : "Unknown business onboarding error" },
       "Business onboarding failed while saving business",

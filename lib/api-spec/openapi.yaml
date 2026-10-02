@@ -402,6 +402,10 @@ components:
     LeadWorkspace:
       type: object
       properties:
+        isSample:
+          type: boolean
+        provisioningState:
+          type: string
         configured:
           type: boolean
         businessName:
@@ -707,6 +711,15 @@ components:
     AdminBusinessSummary:
       type: object
       properties:
+        isSample:
+          type: boolean
+        provisioningState:
+          type: string
+        unusedNumber7Days:
+          type: boolean
+        lastCallAt:
+          type: [string, "null"]
+          format: date-time
         id:
           type: number
           multipleOf: 1

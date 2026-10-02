@@ -10,8 +10,10 @@ import {
   leadsTable,
   notificationDevicesTable,
   retellCallRecordsTable,
+  provisioningAttemptsTable,
 } from "@workspace/db";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { numberActivity } from "./numberActivity";
 
 const ONBOARDING_FIELDS = [
   { key: "businessName", label: "Business name" },
@@ -98,6 +100,8 @@ function summarizeBusiness(
   pushDevices: Array<{ platform: string }>,
   profile: OwnerProfile,
   now: number,
+  calls: Array<typeof retellCallRecordsTable.$inferSelect> = [],
+  assignedAt = business.createdAt,
 ) {
   const missingOnboardingFields = ONBOARDING_FIELDS
     .filter(({ key }) => {
@@ -116,6 +120,7 @@ function summarizeBusiness(
   )];
 
   return {
+    ...numberActivity(business, calls, now, assignedAt),
     id: business.id,
     businessName: business.businessName,
     ownerEmail: business.ownerEmail,
@@ -203,6 +208,10 @@ async function summarizeBusinesses(
   devicesByBusiness: Map<string, Array<{ platform: string }>>,
   now: number,
 ) {
+  const [calls, attempts] = await Promise.all([
+    db.select().from(retellCallRecordsTable),
+    db.select().from(provisioningAttemptsTable),
+  ]);
   const summaries = await Promise.all(businesses.map(async (business) => {
     const profile = await loadOwnerProfile(business.clerkUserId);
     return summarizeBusiness(
@@ -211,6 +220,8 @@ async function summarizeBusinesses(
       devicesByBusiness.get(String(business.id)) ?? [],
       profile,
       now,
+      calls.filter((call) => call.businessId === business.id),
+      attempts.find((attempt) => attempt.businessId === business.id)?.purchasedAt ?? business.createdAt,
     );
   }));
   return summaries;
@@ -274,12 +285,16 @@ export async function getAdminBusiness(businessId: number) {
       )),
   ]);
   const profile = await loadOwnerProfile(business.clerkUserId);
+  const [attempt] = await db.select().from(provisioningAttemptsTable)
+    .where(eq(provisioningAttemptsTable.businessId, businessId));
   const businessSummary = summarizeBusiness(
     business,
     leads,
     pushDevices,
     profile,
     Date.now(),
+    callRecords,
+    attempt?.purchasedAt ?? business.createdAt,
   );
 
   return GetAdminBusinessResponse.parse({

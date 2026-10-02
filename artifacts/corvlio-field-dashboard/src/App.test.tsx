@@ -62,7 +62,9 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null }));
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen } from './App';
+import { UnconfiguredAccountScreen, DetailPage } from './App';
+import { Router as TestRouter, Route } from 'wouter';
+import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
@@ -207,5 +209,18 @@ describe('UnconfiguredAccountScreen sign-out escape hatch', () => {
       description: 'Clerk unavailable',
     })));
     expect(screen.getByRole('heading', { name: 'No business configured' })).toBeTruthy();
+  });
+});
+describe('LeadDetail status actions', () => {
+  const lead = { id: 'L1', name: '', phone: '(415) 555-0123', issue: '', address: '1 Pier', urgency: 'normal' as const, status: 'pending' as const, createdAt: new Date().toISOString(), contactedAt: null };
+  it('never marks contacted from tel/sms, only from the explicit button', () => {
+    const onStatus = vi.fn();
+    const { hook } = memoryLocation({ path: '/leads/L1' });
+    render(<TestRouter hook={hook}><Route path="/leads/:id"><DetailPage leads={[lead]} onStatus={onStatus} savingLeadId={null} /></Route></TestRouter>);
+    fireEvent.click(screen.getByTestId('button-detail-call-L1'));
+    fireEvent.click(screen.getByTestId('button-detail-text-L1'));
+    expect(onStatus).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('button-mark-contacted-L1'));
+    expect(onStatus).toHaveBeenCalledWith('L1', 'contacted');
   });
 });

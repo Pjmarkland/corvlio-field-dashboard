@@ -133,6 +133,8 @@ export const UpdateBusinessProfileResponse = zod.object({
  * @summary List Google Sheet leads
  */
 export const GetLeadsResponse = zod.object({
+  "isSample": zod.boolean().optional(),
+  "provisioningState": zod.string().optional(),
   "configured": zod.boolean(),
   "businessName": zod.string().nullable(),
   "retellPhoneNumber": zod.string().nullable(),
@@ -329,6 +331,10 @@ export const GetAdminOverviewResponse = zod.object({
   "activePushDeviceCount": zod.number().multipleOf(getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf)
 }),
   "businesses": zod.array(zod.object({
+  "isSample": zod.boolean().optional(),
+  "provisioningState": zod.string().optional(),
+  "unusedNumber7Days": zod.boolean().optional(),
+  "lastCallAt": zod.coerce.date().nullish(),
   "id": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemIdMultipleOf),
   "businessName": zod.string(),
   "ownerEmail": zod.string().nullable(),
@@ -394,6 +400,10 @@ export const getAdminBusinessResponseCallsItemDurationMsMultipleOf = 1;
 
 export const GetAdminBusinessResponse = zod.object({
   "business": zod.object({
+  "isSample": zod.boolean().optional(),
+  "provisioningState": zod.string().optional(),
+  "unusedNumber7Days": zod.boolean().optional(),
+  "lastCallAt": zod.coerce.date().nullish(),
   "id": zod.number().multipleOf(getAdminBusinessResponseBusinessIdMultipleOf),
   "businessName": zod.string(),
   "ownerEmail": zod.string().nullable(),

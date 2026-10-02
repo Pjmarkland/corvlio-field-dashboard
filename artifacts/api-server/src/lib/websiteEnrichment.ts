@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { load } from "cheerio";
 import { getOpenAIClient } from "@workspace/integrations-openai-ai-server";
 import {
+  findBusinessById,
   applyWebsiteEnrichment,
   WEBSITE_ENRICHMENT_FIELDS,
   type WebsiteEnrichmentField,
@@ -338,6 +339,8 @@ export async function enrichBusinessFromWebsite(
   businessId: number,
   websiteUrl: string,
 ): Promise<void> {
+  const business = await findBusinessById(businessId);
+  if (!business || business.isSample) return;
   const homepage = await fetchWebsitePage(websiteUrl);
   if (!homepage.text) throw new Error("The website homepage did not contain readable text");
 

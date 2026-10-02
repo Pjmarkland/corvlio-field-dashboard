@@ -4,7 +4,7 @@ import {
   type Business as DatabaseBusiness,
   type NewBusiness,
 } from "@workspace/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 export const WEBSITE_ENRICHMENT_FIELDS = [
   "businessType",
@@ -25,9 +25,7 @@ export type WebsiteEnrichmentField = (typeof WEBSITE_ENRICHMENT_FIELDS)[number];
 export type WebsiteEnrichmentValues = Partial<Record<WebsiteEnrichmentField, string>>;
 export type WebsiteEnrichmentSources = Partial<Record<WebsiteEnrichmentField, string>>;
 
-let businessesByPhone = new Map<string, DatabaseBusiness>();
 let cacheRefresh: Promise<void> | null = null;
-let cacheInitialized = false;
 
 function normalizePhoneNumber(phoneNumber: string | null | undefined): string {
   return phoneNumber?.replace(/\D/g, "") ?? "";
@@ -44,11 +42,13 @@ export async function refreshBusinessPhoneCache(): Promise<void> {
       for (const business of businesses) {
         const normalizedPhoneNumber = normalizePhoneNumber(business.retellPhoneNumber);
         if (normalizedPhoneNumber) {
+          if (nextBusinessesByPhone.has(normalizedPhoneNumber)) {
+            console.error("Duplicate business phone mapping", { normalizedPhoneNumber });
+            throw new Error("Duplicate assigned phone number; refusing ambiguous business routing");
+          }
           nextBusinessesByPhone.set(normalizedPhoneNumber, business);
         }
       }
-      businessesByPhone = nextBusinessesByPhone;
-      cacheInitialized = true;
     })
     .finally(() => {
       cacheRefresh = null;
@@ -60,8 +60,17 @@ export async function refreshBusinessPhoneCache(): Promise<void> {
 export async function findBusinessByPhoneNumber(
   phoneNumber: string,
 ): Promise<DatabaseBusiness | undefined> {
-  if (!cacheInitialized) await refreshBusinessPhoneCache();
-  return businessesByPhone.get(normalizePhoneNumber(phoneNumber));
+  // Read fresh on every call: edits are visible across all server instances.
+  const normalized = normalizePhoneNumber(phoneNumber);
+  if (!normalized) return undefined;
+  const matches = await db.select().from(businessesTable)
+    .where(sql`regexp_replace(${businessesTable.retellPhoneNumber}, '[^0-9]', '', 'g') = ${normalized}`)
+    .limit(2);
+  if (matches.length > 1) {
+    console.error("Duplicate business phone mapping", { normalizedPhoneNumber: normalized });
+    throw new Error("Duplicate assigned phone number; refusing ambiguous business routing");
+  }
+  return matches[0];
 }
 
 export async function findBusinessByClerkUserId(
@@ -83,7 +92,6 @@ export async function findBusinessByClerkUserId(
 export async function createBusiness(input: NewBusiness): Promise<DatabaseBusiness> {
   const [business] = await db.insert(businessesTable).values(input).returning();
   if (!business) throw new Error("Business creation did not return a record");
-  await refreshBusinessPhoneCache();
   return business;
 }
 
@@ -97,7 +105,6 @@ export async function updateBusiness(
     .where(eq(businessesTable.id, id))
     .returning();
 
-  if (business) await refreshBusinessPhoneCache();
   return business;
 }
 
@@ -115,7 +122,6 @@ export async function updateOwnedBusiness(
     ))
     .returning();
 
-  if (business) await refreshBusinessPhoneCache();
   return business;
 }
 
@@ -133,6 +139,7 @@ export async function claimWebsiteEnrichment(
     .where(and(
       eq(businessesTable.id, id),
       isNull(businessesTable.websiteEnrichmentAttemptedAt),
+      eq(businessesTable.isSample, false),
     ))
     .returning();
 
@@ -152,6 +159,7 @@ export async function applyWebsiteEnrichment(
       .for("update");
 
     if (!current) return undefined;
+    if (current.isSample) return current;
 
     const changes: Partial<Pick<NewBusiness, WebsiteEnrichmentField>> = {};
     const nextSources: Record<string, string> = {
@@ -190,6 +198,10 @@ export async function applyWebsiteEnrichment(
     return updated;
   });
 
-  if (business) await refreshBusinessPhoneCache();
+  return business;
+}
+
+export async function findBusinessById(id: number) {
+  const [business] = await db.select().from(businessesTable).where(eq(businessesTable.id, id)).limit(1);
   return business;
 }

@@ -8,6 +8,8 @@
 import type { Lead } from './lead';
 
 export interface LeadWorkspace {
+  isSample?: boolean;
+  provisioningState?: string;
   configured: boolean;
   /** @nullable */
   businessName: string | null;

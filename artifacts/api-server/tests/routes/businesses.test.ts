@@ -54,7 +54,7 @@ let business: Record<string, any> | undefined;
 
 const validBody = {
   businessName: "Example Heating",
-  ownerEmail: "owner@example.com",
+  ownerEmail: "business-owner@example.test",
 };
 
 beforeAll(async () => {
@@ -129,15 +129,20 @@ beforeEach(() => {
     return business;
   });
   mocks.enrichBusinessFromWebsite.mockResolvedValue(undefined);
-  mocks.saveBusinessWithOptionalPhone.mockImplementation(async (input: Record<string, unknown>) => ({
-    business: {
-      ...input,
-      id: 45,
-      retellPhoneNumber: null,
-    },
-    phoneProvisioningPending: true,
-    provisioningError: null,
-  }));
+  mocks.saveBusinessWithOptionalPhone.mockImplementation(async (input: Record<string, unknown>) => {
+    const old = business;
+    business = {
+      ...old, ...input, id: old?.id ?? 45,
+      retellPhoneNumber: old?.retellPhoneNumber ?? null,
+      isSample: Boolean(old?.isSample || input.isSample),
+      websiteEnrichmentAttemptedAt: old?.websiteEnrichmentAttemptedAt ?? null,
+    };
+    return {
+      business,
+      phoneProvisioningPending: !business.isSample && !business.retellPhoneNumber,
+      provisioningError: null,
+    };
+  });
 });
 
 async function onboard(body: Record<string, unknown>) {
@@ -265,7 +270,7 @@ describe("owner business profile API", () => {
 });
 
 describe("business onboarding website enrichment", () => {
-  it("keeps owner-entered details and clears their website source marker", async () => {
+  it("passes owner-entered details to the account-locked setup service", async () => {
     business = {
       ...business,
       businessType: "Website-suggested plumber",
@@ -281,9 +286,9 @@ describe("business onboarding website enrichment", () => {
     });
 
     expect(response.status).toBe(200);
-    const [, changes] = mocks.updateBusiness.mock.calls[0];
+    const [changes] = mocks.saveBusinessWithOptionalPhone.mock.calls[0];
     expect(changes.businessType).toBe("Owner-entered HVAC contractor");
-    expect(changes.websiteEnrichmentSources.businessType).toBeUndefined();
+    expect(mocks.updateBusiness).not.toHaveBeenCalled();
   });
 
   it("trims and saves an optional receptionist name", async () => {
@@ -293,14 +298,14 @@ describe("business onboarding website enrichment", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(mocks.updateBusiness.mock.calls[0]?.[1].agentName).toBe("Aria");
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0]?.[0].agentName).toBe("Aria");
   });
 
   it("allows the receptionist name to be omitted and stores null", async () => {
     const response = await onboard(validBody);
 
     expect(response.status).toBe(200);
-    expect(mocks.updateBusiness.mock.calls[0]?.[1].agentName).toBeNull();
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0]?.[0].agentName).toBeNull();
   });
 
   it("passes a trimmed receptionist name through initial business provisioning", async () => {
@@ -326,6 +331,19 @@ describe("business onboarding website enrichment", () => {
     expect(mocks.saveBusinessWithOptionalPhone).toHaveBeenCalledOnce();
     expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0].websiteEnrichmentAttemptedAt)
       .toBeNull();
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+  });
+  it.each([
+    { isSample: true, businessName: "Edited demo" },
+    { businessName: "Demo Pipeworks (Fictional Sample)" },
+    { ownerEmail: "owner@example.com" },
+  ])("saves sample inputs as demos and never schedules website scraping: %j", async (sample) => {
+    business = undefined;
+    const response = await onboard({ ...validBody, ...sample, businessWebsiteUrl: "https://example.com" });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ isSample: true, phoneNumber: null, phoneProvisioningPending: false });
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({ isSample: true, businessWebsiteUrl: null });
+    expect(mocks.claimWebsiteEnrichment).not.toHaveBeenCalled();
     expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
   });
 

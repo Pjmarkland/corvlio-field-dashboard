@@ -1,4 +1,5 @@
 export type OnboardingForm = {
+  isSample: boolean;
   businessName: string;
   agentName: string;
   businessType: string;
@@ -23,6 +24,7 @@ export type OnboardingForm = {
 };
 
 export const initialForm: OnboardingForm = {
+  isSample: false,
   businessName: '',
   agentName: '',
   businessType: '',
@@ -94,6 +96,7 @@ export const sampleCallPreview = {
 export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
   return {
     ...current,
+    isSample: true,
     businessName: sampleCallPreview.businessName,
     businessType: 'Plumbing',
     businessWebsiteUrl: '',

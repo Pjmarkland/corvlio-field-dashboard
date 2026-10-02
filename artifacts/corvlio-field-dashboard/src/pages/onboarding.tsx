@@ -365,6 +365,7 @@ function OnboardingPage() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          isSample: form.isSample,
           businessName: form.businessName,
           agentName: form.agentName.trim() || undefined,
           businessType: form.businessType,
@@ -407,14 +408,17 @@ function OnboardingPage() {
 
       setSubmission({
         kind: 'success',
-        message: payload.phoneProvisioningPending
-          ? "Business setup saved. Phone number setup is pending — we'll notify you once it's ready."
+        message: payload.isSample
+          ? "Sample business saved. No live phone number was purchased."
+          : payload.phoneProvisioningPending
+          ? "Your business is setting up. We'll finish shortly."
           : `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
       });
       if (user?.id) {
         saveOnboardingConfirmation({
           userId: user.id,
           businessName: form.businessName.trim(),
+          isSample: payload.isSample === true,
           phoneNumber: typeof payload.phoneNumber === 'string' && payload.phoneNumber.trim()
             ? payload.phoneNumber.trim()
             : null,
@@ -504,6 +508,14 @@ function OnboardingPage() {
                 setForm((current) => applySampleBusiness(current));
                 setSampleResetKey((current) => current + 1);
               }} />
+              {form.isSample ? <div role="status" className="mt-3 rounded-xl border border-border bg-muted p-4 text-sm">
+                <p className="font-semibold">Sample business — no real phone number or website scraping.</p>
+                <p className="mt-1 text-muted-foreground">Submitting saves a demo profile only. Edit these details freely; it stays a sample.</p>
+                <button type="button" className="mt-2 min-h-11 font-semibold text-primary underline" onClick={() => {
+                  setForm((current) => ({ ...initialForm, agentName: current.agentName, privacyAccepted: current.privacyAccepted, termsAccepted: current.termsAccepted, serviceAgreementAccepted: current.serviceAgreementAccepted }));
+                  setSampleResetKey((current) => current + 1);
+                }}>Start with my real business instead</button>
+              </div> : null}
               <div className="mt-5">
                 <PresetChoiceField
                   id="receptionistTone"

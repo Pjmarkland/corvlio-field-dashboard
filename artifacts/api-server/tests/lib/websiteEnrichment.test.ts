@@ -1,6 +1,7 @@
 const fixture = vi.hoisted(() => ({
   applyWebsiteEnrichment: vi.fn(),
   createExtraction: vi.fn(),
+  findBusinessById: vi.fn(),
 }));
 
 vi.mock("node:dns/promises", () => ({
@@ -18,6 +19,7 @@ vi.mock("@workspace/integrations-openai-ai-server", () => ({
 }));
 
 vi.mock("../../src/lib/businessDirectory", () => ({
+  findBusinessById: fixture.findBusinessById,
   applyWebsiteEnrichment: fixture.applyWebsiteEnrichment,
   WEBSITE_ENRICHMENT_FIELDS: [
     "businessType",
@@ -39,6 +41,7 @@ import { enrichBusinessFromWebsite } from "../../src/lib/websiteEnrichment";
 
 describe("website detail extraction", () => {
   beforeEach(() => {
+    fixture.findBusinessById.mockResolvedValue({ id: 12, isSample: false });
     fixture.applyWebsiteEnrichment.mockResolvedValue(undefined);
     fixture.createExtraction.mockResolvedValue({
       choices: [{
@@ -90,5 +93,12 @@ describe("website detail extraction", () => {
         warrantyInfo: "https://example.com/about",
       },
     );
+  });
+  it("never scrapes or extracts a sample business website", async () => {
+    fixture.findBusinessById.mockResolvedValue({ id: 12, isSample: true });
+    await enrichBusinessFromWebsite(12, "https://example.com");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(fixture.createExtraction).not.toHaveBeenCalled();
+    expect(fixture.applyWebsiteEnrichment).not.toHaveBeenCalled();
   });
 });

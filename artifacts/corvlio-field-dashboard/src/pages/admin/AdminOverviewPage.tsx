@@ -27,7 +27,13 @@ function BusinessRow({ business }: { business: AdminBusinessSummary }) {
         <span className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#dcebe1] text-xs font-800 text-[#2c6b56]">{business.businessName.slice(0, 1).toUpperCase()}</span><span><strong className="block text-sm font-800 text-[#25362e]">{business.businessName}</strong><span className="mt-0.5 block max-w-[190px] truncate text-xs text-[#647168]">{business.ownerName ?? 'Owner details unavailable'}</span><span className="block max-w-[190px] truncate text-xs text-[#7b877f]">{business.ownerEmail ?? 'Owner email not recorded'}</span></span></span>
       </Link>
     </td>
-    <td className="px-4 py-4 sm:px-5"><AdminStatus status={business.provisioningStatus} /><p className="mt-2 text-xs text-[#718078]">{business.retellPhoneNumber ?? 'No Retell number'}</p></td>
+    <td className="px-4 py-4 sm:px-5">
+      {business.isSample ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Sample / demo</span> : <AdminStatus status={business.provisioningStatus} />}
+      <p className="mt-2 text-xs text-[#536258]">{business.retellPhoneNumber ?? 'No assigned number'}</p>
+      <p className="mt-1 text-xs text-[#536258]">State: {business.provisioningState ?? business.provisioningStatus}</p>
+      {business.unusedNumber7Days ? <p className="mt-2 text-xs font-semibold text-[#a3432d]" data-testid={`unused-number-${business.id}`}>No recorded calls in 7+ days — review in provider dashboard</p> : null}
+      {business.lastCallAt ? <p className="mt-1 text-xs text-[#536258]">Last call: {new Date(business.lastCallAt).toLocaleDateString()}</p> : null}
+    </td>
     <td className="px-4 py-4 sm:px-5"><div className="flex min-w-[110px] items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-[#e4e9e2]"><div className="h-full rounded-full bg-[#4e8d70]" style={{ width: `${Math.min(100, Math.max(0, business.onboardingCompletenessPercent))}%` }} /></div><span className="font-mono text-xs text-[#526158]">{business.onboardingCompletenessPercent}%</span></div><p className="mt-2 text-xs text-[#7b877f]">{business.completedOnboardingFieldCount}/{business.onboardingFieldCount} fields</p></td>
     <td className="px-4 py-4 sm:px-5"><p className="font-mono text-sm font-medium text-[#25362e]">{business.totalLeadCount}</p><p className="mt-1 text-xs text-[#7b877f]">{business.contactedLeadCount} contacted</p></td>
     <td className="px-4 py-4 sm:px-5"><p className={`font-mono text-sm font-medium ${business.uncontactedLeadCount ? 'text-[#b2553e]' : 'text-[#6f7b73]'}`}>{business.uncontactedLeadCount}</p>{business.hasUncontactedOver24Hours ? <AdminAge value={business.oldestUncontactedAt} /> : <p className="mt-1 text-xs text-[#7b877f]">No overdue leads</p>}</td>
