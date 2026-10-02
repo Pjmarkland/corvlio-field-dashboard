@@ -35,7 +35,7 @@ export const initialForm: OnboardingForm = {
   businessWebsiteUrl: '',
   ownerEmail: '',
   serviceArea: '',
-  receptionistTone: '',
+  receptionistTone: 'Friendly and professional',
   servicesNotOffered: '',
   majorIssueExamples: '',
   pricingPolicy: '',
@@ -55,6 +55,8 @@ export const initialForm: OnboardingForm = {
 };
 
 export const toneOptions = [
+  { value: 'Friendly and professional', label: 'Friendly & professional (default)' },
+  { value: 'No-nonsense: direct, calm and efficient, never curt.', label: 'No-nonsense' },
   { value: 'Warm, calm, and neighborly. Ask one question at a time, listen carefully, and never guess at prices or arrival times.', label: 'Warm & neighborly' },
   { value: 'Professional and concise. Be courteous, give clear answers, and avoid making promises that are not in the business details.', label: 'Professional & concise' },
   { value: 'Friendly and upbeat. Help callers feel welcome while staying accurate and never overselling.', label: 'Friendly & upbeat' },

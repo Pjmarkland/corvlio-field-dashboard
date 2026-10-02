@@ -17,6 +17,7 @@ export const leadsTable = pgTable("leads", {
   address: text("address"),
   urgencyLevel: text("urgency_level"),
   availability: text("availability"),
+  tradeIntakeAnswers: text("trade_intake_answers"),
   status: text("status").notNull().default("new"),
   contactedAt: timestamp("contacted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

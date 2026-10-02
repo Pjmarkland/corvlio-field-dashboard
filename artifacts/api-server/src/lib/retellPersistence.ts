@@ -67,7 +67,17 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
         await tx.insert(retellCallRecordsTable).values({ ...recordInput, retellCallId: id, leadId })
           .onConflictDoUpdate({
             target: retellCallRecordsTable.retellCallId,
-            set: { leadId, callStartedAt: recordInput.callStartedAt, durationMs: recordInput.durationMs, outcome: recordInput.outcome },
+            set: {
+              leadId,
+              callStartedAt: sql`COALESCE(${recordInput.callStartedAt ?? null}, ${retellCallRecordsTable.callStartedAt})`,
+              durationMs: sql`COALESCE(${recordInput.durationMs ?? null}, ${retellCallRecordsTable.durationMs})`,
+              outcome: sql`COALESCE(${recordInput.outcome ?? null}, ${retellCallRecordsTable.outcome})`,
+              analysisComplete: sql`${retellCallRecordsTable.analysisComplete} OR ${analysisComplete}`,
+              ...Object.fromEntries((["nameCaptured", "callbackCaptured", "issueCaptured", "addressCaptured"] as const).map(field => [
+                field, sql`CASE WHEN ${analysisComplete} OR NOT ${retellCallRecordsTable.analysisComplete}
+                  THEN COALESCE(${recordInput[field] ?? null}, ${retellCallRecordsTable[field]}) ELSE ${retellCallRecordsTable[field]} END`,
+              ])),
+            },
           });
       },
       async ensureNotification(leadId) {

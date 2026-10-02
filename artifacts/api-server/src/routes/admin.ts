@@ -8,10 +8,20 @@ import {
   getAdminOverview,
 } from "../lib/adminData";
 import { requireAdmin } from "../middlewares/requireAdmin";
+import { getAdminCallQuality } from "../lib/callQuality";
 
 const router: IRouter = Router();
 
 router.use("/admin", requireAdmin);
+
+router.get("/admin/call-quality", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await getAdminCallQuality()); }
+  catch (error) {
+    req.log.error({ error: error instanceof Error ? error.message : "Unknown quality error" }, "Call quality request failed");
+    res.status(502).json({ error: "Unable to load call quality" });
+  }
+});
 
 router.get("/admin/overview", async (req, res): Promise<void> => {
   try {

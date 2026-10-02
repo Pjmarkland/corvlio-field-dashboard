@@ -3,6 +3,7 @@ import { ArrowUpRight, Building2, ChevronDown, ChevronUp, CircleAlert, Smartphon
 import { Link } from 'wouter';
 import { getGetAdminOverviewQueryKey, useGetAdminOverview, type AdminBusinessSummary } from '@workspace/api-client-react';
 
+import AdminCallQuality from './AdminCallQuality';
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, SectionHeading, formatAdminResponse, formatAdminShortDate } from './AdminShared';
 
 type SortKey = 'createdAt' | 'businessName' | 'onboardingCompletenessPercent' | 'totalLeadCount' | 'uncontactedLeadCount' | 'provisioningStatus';
@@ -99,5 +100,6 @@ export default function AdminOverviewPage() {
         </div>
       </div>}
     </section>
+    <AdminCallQuality />
   </AdminShell>;
 }

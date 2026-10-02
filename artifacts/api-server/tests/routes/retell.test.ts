@@ -41,6 +41,7 @@ let server: Server;
 let baseUrl: string;
 
 const OTHER_DYNAMIC_VARIABLE_KEYS = [
+  "receptionist_tone_style", "receptionist_tone_guidance", "intake_trade", "trade_question_1", "trade_question_2",
   "business_hours", "time_zone", "current_local_time", "business_is_open", "next_opening", "transfer_available",
   "business_name",
   "business_type",
@@ -276,7 +277,7 @@ describe("Retell pre-call dynamic variables", () => {
       service_area: "",
       major_issue_examples: "",
       pricing_policy: "",
-      personality_tone_description: "",
+      personality_tone_description: "Friendly and professional",
       services_not_offered: "",
       financing_policy: "",
       brands_worked_with: "",

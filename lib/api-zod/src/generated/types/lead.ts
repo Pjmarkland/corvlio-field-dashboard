@@ -10,6 +10,8 @@ import type { LeadUrgency } from './leadUrgency';
 
 export interface Lead {
   /** @nullable */
+  tradeIntakeAnswers?: string | null;
+  /** @nullable */
   callerId?: string | null;
   /** @nullable */
   callbackNumber?: string | null;

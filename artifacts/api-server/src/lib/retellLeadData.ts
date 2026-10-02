@@ -2,7 +2,7 @@ import type { RetellCall } from "@workspace/api-zod";
 const key = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, "");
 function text(value: unknown): string | null {
   const result = typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
-  return !result || /^(unknown|n\/a|none|null|not (provided|captured|available))$/i.test(result) ? null : result;
+  return !result || /^(unknown|n\/a|none|null|declined|refused|not (provided|captured|available|given|shared))$/i.test(result) ? null : result;
 }
 export function analysisValue(analysis: Record<string, unknown> | null | undefined, ...aliases: string[]) {
   if (!analysis) return null;
@@ -37,6 +37,28 @@ export function extractRetellLead(call: RetellCall) {
     address: analysisValue(data, "address", "service_address"),
     urgencyLevel: analysisValue(data, "urgency_level", "urgency"),
     availability: analysisValue(data, "availability", "preferred_availability", "preferred_time"),
+    tradeIntakeAnswers: analysisValue(data, "trade_intake_answers", "trade_questions", "intake_answers")
+      ?.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 2).join("\n").slice(0, 2000) || null,
     transcript, summary,
+  };
+}
+
+export function capturedInfo(call: RetellCall, analysisComplete: boolean) {
+  const data = call.call_analysis?.custom_analysis_data;
+  // A transcript summary and automatic caller ID are not proof of captured fields.
+  if (!data && !analysisComplete) return {
+    nameCaptured: null, callbackCaptured: null, issueCaptured: null, addressCaptured: null,
+  };
+  const lead = extractRetellLead(call);
+  const explicitCallback = analysisValue(data, "callback_number");
+  const legacyPhone = analysisValue(data, "phone_number", "caller_phone_number", "User_phone");
+  return {
+    nameCaptured: !!lead.callerName,
+    // Legacy "phone" fields may simply repeat caller ID; keep their capture unknown.
+    callbackCaptured: explicitCallback
+      ? !!lead.callbackNumber && lead.callbackNumber.replace(/\D/g, "").length >= 7
+      : legacyPhone ? null : false,
+    issueCaptured: !!analysisValue(data, "issue_reason", "issue", "reason", "call_reason"),
+    addressCaptured: !!lead.address,
   };
 }

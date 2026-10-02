@@ -83,6 +83,7 @@ router.get("/leads", async (req, res): Promise<void> => {
         availability: lead.availability,
         transcript: lead.transcript,
         summary: lead.summary,
+        tradeIntakeAnswers: lead.tradeIntakeAnswers,
       })),
     }));
   } catch (error) {

@@ -1,4 +1,4 @@
-import { index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 import { leadsTable } from "./leads";
 
@@ -14,6 +14,11 @@ export const retellCallRecordsTable = pgTable(
     callStartedAt: timestamp("call_started_at", { withTimezone: true }),
     durationMs: integer("duration_ms"),
     outcome: text("outcome"),
+    nameCaptured: boolean("name_captured"),
+    callbackCaptured: boolean("callback_captured"),
+    issueCaptured: boolean("issue_captured"),
+    addressCaptured: boolean("address_captured"),
+    analysisComplete: boolean("analysis_complete").notNull().default(false),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

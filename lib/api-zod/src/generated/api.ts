@@ -156,6 +156,31 @@ export const UpdateBusinessProfileResponse = zod.object({
 
 
 /**
+ * @summary Read-only scorecard for the latest 100 recorded inbound calls
+ */
+export const GetAdminCallQualityResponse = zod.object({
+  "totalCalls": zod.number(),
+  "completeCalls": zod.number(),
+  "completePercent": zod.number().nullable(),
+  "calls": zod.array(zod.object({
+  "id": zod.string(),
+  "businessName": zod.string(),
+  "startedAt": zod.string(),
+  "durationMs": zod.number().nullable(),
+  "nameCaptured": zod.boolean().nullable(),
+  "callbackCaptured": zod.boolean().nullable(),
+  "issueCaptured": zod.boolean().nullable(),
+  "addressCaptured": zod.boolean().nullable(),
+  "ending": zod.string(),
+  "leadCreated": zod.boolean(),
+  "needsReview": zod.boolean(),
+  "reviewReasons": zod.array(zod.string()),
+  "analysisComplete": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Place one development-only test call to the owner's confirmed saved number
  */
 export const CreateOwnerDemoCallBody = zod.object({
@@ -218,6 +243,7 @@ export const GetLeadsResponse = zod.object({
   "retellPhoneNumber": zod.string().nullable(),
   "timeZone": zod.string().nullable(),
   "leads": zod.array(zod.object({
+  "tradeIntakeAnswers": zod.string().nullish(),
   "callerId": zod.string().nullish(),
   "callbackNumber": zod.string().nullish(),
   "availability": zod.string().nullish(),

@@ -22,6 +22,7 @@ import type {
 import type {
   AdminActivity,
   AdminBusinessDetail,
+  AdminCallQuality,
   AdminOverview,
   AlertReadReceipt,
   BusinessProfile,
@@ -364,6 +365,83 @@ export const useUpdateBusinessProfile = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateBusinessProfileMutationOptions(options));
     }
+
+export const getGetAdminCallQualityUrl = () => {
+
+
+
+
+  return `/api/admin/call-quality`
+}
+
+/**
+ * @summary Read-only scorecard for the latest 100 recorded inbound calls
+ */
+export const getAdminCallQuality = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminCallQuality> => {
+
+  return customFetch<AdminCallQuality>(getGetAdminCallQualityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminCallQualityQueryKey = () => {
+    return [
+    `/api/admin/call-quality`
+    ] as const;
+    }
+
+
+export const getGetAdminCallQualityQueryOptions = <TData = Awaited<ReturnType<typeof getAdminCallQuality>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminCallQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminCallQualityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminCallQuality>>> = ({ signal }) => getAdminCallQuality({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminCallQuality>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminCallQualityQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminCallQuality>>>
+export type GetAdminCallQualityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read-only scorecard for the latest 100 recorded inbound calls
+ */
+
+export function useGetAdminCallQuality<TData = Awaited<ReturnType<typeof getAdminCallQuality>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminCallQuality>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminCallQualityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCreateOwnerDemoCallUrl = () => {
 

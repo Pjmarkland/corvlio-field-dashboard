@@ -9,6 +9,35 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface CallQualityRow {
+  id: string;
+  businessName: string;
+  startedAt: string;
+  /** @nullable */
+  durationMs: number | null;
+  /** @nullable */
+  nameCaptured: boolean | null;
+  /** @nullable */
+  callbackCaptured: boolean | null;
+  /** @nullable */
+  issueCaptured: boolean | null;
+  /** @nullable */
+  addressCaptured: boolean | null;
+  ending: string;
+  leadCreated: boolean;
+  needsReview: boolean;
+  reviewReasons: string[];
+  analysisComplete: boolean;
+}
+
+export interface AdminCallQuality {
+  totalCalls: number;
+  completeCalls: number;
+  /** @nullable */
+  completePercent: number | null;
+  calls: CallQualityRow[];
+}
+
 export type LeadUrgency = typeof LeadUrgency[keyof typeof LeadUrgency];
 
 
@@ -27,6 +56,8 @@ export const LeadStatus = {
 } as const;
 
 export interface Lead {
+  /** @nullable */
+  tradeIntakeAnswers?: string | null;
   /** @nullable */
   callerId?: string | null;
   /** @nullable */

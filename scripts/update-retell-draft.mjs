@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 
 // No publish endpoint, phone-number mutations, or calls are used by this script.
+if (!process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT || process.env.NODE_ENV === "production") {
+  throw new Error("Development workspace only; refusing to update Retell from production");
+}
 const source = await readFile("artifacts/api-server/src/lib/retellDraftConfig.ts", "utf8");
 const { agentDraftPatch: agentSettings, llmDraftPatch } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 if (!process.env.REPLIT_DEV_DOMAIN) throw new Error("Development domain is required; refusing to leave draft results pointed at production");

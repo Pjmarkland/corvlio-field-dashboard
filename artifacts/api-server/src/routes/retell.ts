@@ -8,12 +8,11 @@ import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { persistAnalyzedCall } from "../lib/retellPersistence";
-import { extractRetellLead } from "../lib/retellLeadData";
-import { businessClock, DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE } from "../lib/businessHours";
+import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
+import { dynamicVariables } from "../lib/retellVariables";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
-const DEFAULT_AGENT_NAME = "Aria";
 
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
@@ -74,37 +73,6 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
   const provided = Buffer.from(providedSignature, "hex");
   const expected = Buffer.from(expectedSignature, "hex");
   return provided.length === expected.length && timingSafeEqual(provided, expected);
-}
-
-function dynamicVariables(
-  business: NonNullable<Awaited<ReturnType<typeof findBusinessByPhoneNumber>>> | null,
-) {
-  const savedName = business?.agentName?.trim();
-  const agentName = savedName && !/^(agent_name|\{\{.*\}\})$/i.test(savedName) ? savedName : null;
-  const hours = business?.businessHours ?? DEFAULT_BUSINESS_HOURS;
-  const timeZone = business?.timeZone ?? DEFAULT_TIME_ZONE;
-  return {
-    business_hours: business ? hours : "",
-    time_zone: business ? timeZone : "",
-    ...(business ? businessClock(hours, timeZone) : { current_local_time: "", business_is_open: "unknown", next_opening: "" }),
-    transfer_available: "false",
-    agent_name: agentName || DEFAULT_AGENT_NAME,
-    business_name: business?.businessName ?? "",
-    business_type: business?.businessType ?? "",
-    service_area: business?.serviceArea ?? "",
-    major_issue_examples: business?.majorIssueExamples ?? "",
-    pricing_policy: business?.pricingPolicy ?? "",
-    personality_tone_description: business?.personalityToneDescription ?? "",
-    services_not_offered: business?.servicesNotOffered ?? "",
-    financing_policy: business?.financingPolicy ?? "",
-    brands_worked_with: business?.brandsWorkedWith ?? "",
-    response_time_commitment: business?.typicalResponseTimeCommitment ?? "",
-    warranty_info: business?.warrantyInfo ?? "",
-    maintenance_plan_offerings: business?.maintenancePlanOfferings ?? "",
-    credentials: business?.credentialsCertifications ?? "",
-    owner_availability: business?.ownerAvailability ?? "",
-    emergency_contact_info: business?.emergencyContactInfo ?? "",
-  };
 }
 
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
@@ -210,6 +178,8 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       callStartedAt: callStartedAt(call.start_timestamp),
       durationMs: callDurationMs(call.duration_ms),
       outcome: callOutcome(call),
+      ...capturedInfo(call, body.data.event === "call_analyzed"),
+      analysisComplete: body.data.event === "call_analyzed",
     }, body.data.event === "call_analyzed", business.leadAlertsEnabled !== false && !business.isSample);
 
     if (lead.notify) {

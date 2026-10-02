@@ -63,7 +63,7 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null }));
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage } from './App';
+import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
@@ -120,6 +120,13 @@ describe('Business profile settings', () => {
     mockUpdateBusinessProfile.mockReset();
   });
 
+  it('saves a selected no-nonsense tone using the existing profile API', async () => {
+    renderProfileEditor();
+    fireEvent.change(screen.getByTestId('select-profile-tone'), { target: { value: 'No-nonsense' } });
+    fireEvent.submit(screen.getByTestId('form-business-profile'));
+    await waitFor(() => expect(mockUpdateBusinessProfile.mock.calls[0][0].data.personalityToneDescription).toBe('No-nonsense'));
+  });
+
   it('validates http/https website URLs and saves profile values with feedback', async () => {
     mockUpdateBusinessProfile.mockImplementation((variables, options) => {
       options.onSuccess({ ...sampleProfile, ...variables.data });
@@ -156,6 +163,27 @@ describe('Business profile settings', () => {
 
     fireEvent.change(theme, { target: { value: 'dark' } });
     await waitFor(() => expect(localStorage.getItem('corvlio-theme')).toBe('dark'));
+  });
+});
+
+describe('trade notes and the manual post-onboarding call link', () => {
+  it('shows readable saved answers on a lead card', () => {
+    render(<LeadCard saving={false} onStatus={vi.fn()} lead={{
+      id: 'trade', name: 'Sam', phone: '+15551230001', issue: 'No cooling', address: '14 Oak St',
+      urgency: 'normal', status: 'pending', createdAt: new Date().toISOString(), contactedAt: null,
+      tradeIntakeAnswers: 'System: Heat pump, 10 years old\nProblem: No cooling',
+    }} />);
+    expect(screen.getByTestId('trade-intake-trade').textContent).toContain('Heat pump, 10 years old');
+  });
+  it('only exposes a tel link for an assigned non-sample number, never auto-calls', () => {
+    const confirmation = { userId: 'owner', businessName: 'Plumbing', isSample: false, phoneNumber: '+15551230002', submittedAt: new Date().toISOString() };
+    const { rerender } = render(<BusinessWelcomeCard businessName="Plumbing" confirmation={confirmation} />);
+    expect(screen.getByTestId('button-call-new-number').getAttribute('href')).toBe('tel:+15551230002');
+    expect(screen.getByText(/This is your AI receptionist/)).toBeTruthy();
+    rerender(<BusinessWelcomeCard businessName="Plumbing" confirmation={{ ...confirmation, isSample: true }} />);
+    expect(screen.queryByTestId('button-call-new-number')).toBeNull();
+    rerender(<BusinessWelcomeCard businessName="Plumbing" confirmation={{ ...confirmation, phoneNumber: null }} />);
+    expect(screen.queryByTestId('button-call-new-number')).toBeNull();
   });
 });
 

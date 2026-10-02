@@ -99,6 +99,24 @@ paths:
           description: No business is configured for this account
         "502":
           description: Business profile could not be updated
+  /admin/call-quality:
+    get:
+      operationId: getAdminCallQuality
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Read-only scorecard for the latest 100 recorded inbound calls
+      responses:
+        "200":
+          description: Call quality scorecard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCallQuality"
+        "404":
+          description: Not found or not authorized
+        "502":
+          description: Unable to load scorecard
   /businesses/me/demo-call:
     post:
       operationId: createOwnerDemoCall
@@ -429,9 +447,57 @@ components:
           type: string
       required:
         - status
+    AdminCallQuality:
+      type: object
+      required: [totalCalls, completeCalls, completePercent, calls]
+      properties:
+        totalCalls:
+          type: number
+        completeCalls:
+          type: number
+        completePercent:
+          type: [number, "null"]
+        calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/CallQualityRow"
+    CallQualityRow:
+      type: object
+      required: [id, businessName, startedAt, durationMs, nameCaptured, callbackCaptured, issueCaptured, addressCaptured, ending, leadCreated, needsReview, reviewReasons, analysisComplete]
+      properties:
+        id:
+          type: string
+        businessName:
+          type: string
+        startedAt:
+          type: string
+        durationMs:
+          type: [number, "null"]
+        nameCaptured:
+          type: [boolean, "null"]
+        callbackCaptured:
+          type: [boolean, "null"]
+        issueCaptured:
+          type: [boolean, "null"]
+        addressCaptured:
+          type: [boolean, "null"]
+        ending:
+          type: string
+        leadCreated:
+          type: boolean
+        needsReview:
+          type: boolean
+        reviewReasons:
+          type: array
+          items:
+            type: string
+        analysisComplete:
+          type: boolean
     Lead:
       type: object
       properties:
+        tradeIntakeAnswers:
+          type: [string, "null"]
         callerId:
           type: [string, "null"]
         callbackNumber:

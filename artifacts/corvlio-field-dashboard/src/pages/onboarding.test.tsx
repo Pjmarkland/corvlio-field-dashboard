@@ -5,6 +5,7 @@ import { BusinessTypeField, PresetChoiceField, SampleBusinessHelper } from './on
 import { applySampleBusiness, initialForm } from './onboardingSample';
 
 const toneChoices = [
+  { value: 'Friendly and professional', label: 'Friendly & professional (default)' },
   { value: 'Warm, calm, and neighborly. Ask one question at a time, listen carefully, and never guess at prices or arrival times.', label: 'Warm & neighborly' },
   { value: 'Professional and concise.', label: 'Professional & concise' },
 ];

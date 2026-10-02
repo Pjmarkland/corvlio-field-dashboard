@@ -90,6 +90,7 @@ type Lead = {
   availability?: string | null;
   transcript?: string | null;
   summary?: string | null;
+  tradeIntakeAnswers?: string | null;
 };
 type StatusHandler = (id: string, status: LeadStatus) => void;
 
@@ -317,7 +318,7 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
   return <div className="mb-7 flex items-end justify-between gap-4 animate-rise-in"><div><div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{eyebrow}</div><h1 className="text-[32px] font-800 leading-[.98] tracking-[-0.055em] sm:text-[40px]">{title}</h1>{description ? <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p> : null}</div>{action}</div>;
 }
 
-function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHandler; saving: boolean }) {
+export function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHandler; saving: boolean }) {
   return <article className="group rounded-2xl border border-border bg-card p-4 shadow-[0_1px_0_hsl(214_32%_85%)] transition-transform hover:-translate-y-0.5 sm:p-5" data-testid={`card-lead-${lead.id}`}>
     <div className="flex items-start gap-3">
       <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] text-xs font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`} data-testid={`avatar-lead-${lead.id}`}>{initials(lead.name)}</div>
@@ -327,6 +328,7 @@ function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHand
       </div>
       <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span>
     </div>
+    {lead.tradeIntakeAnswers?.trim() ? <section className="mt-3 rounded-xl bg-muted/60 p-3" data-testid={`trade-intake-${lead.id}`}><p className="text-xs font-semibold">Trade intake</p><p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">{lead.tradeIntakeAnswers}</p></section> : null}
     <div className="mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground"><MapPin size={13} className="text-primary" /><span className="truncate">{lead.address}</span></div>
     <div className="mt-4 grid grid-cols-2 gap-2">
       <LeadContactActions leadId={lead.id} phone={lead.phone} />
@@ -335,7 +337,7 @@ function LeadCard({ lead, onStatus, saving }: { lead: Lead; onStatus: StatusHand
   </article>;
 }
 
-function BusinessWelcomeCard({
+export function BusinessWelcomeCard({
   businessName,
   confirmation,
 }: {
@@ -346,7 +348,7 @@ function BusinessWelcomeCard({
   const phoneNumber = confirmation.phoneNumber?.trim() || null;
 
   return (
-    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-[#b9dfc8] bg-[#edf8f0] p-4 text-[#285f3d] sm:items-center sm:justify-between sm:p-5" data-testid="banner-onboarding-complete">
+    <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-4 text-card-foreground sm:flex-row sm:items-center sm:justify-between sm:p-5" data-testid="banner-onboarding-complete">
       <div className="flex min-w-0 items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d9eee1] text-[#398660]">
           <CheckCircle2 size={20} />
@@ -354,18 +356,19 @@ function BusinessWelcomeCard({
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#398660]">Setup complete</p>
           <h2 className="mt-1 text-base font-800 tracking-[-0.02em]">Welcome to {businessName}</h2>
-          <p className="mt-1 text-sm text-[#427652]">
+          <p className="mt-1 text-sm text-muted-foreground">
             {confirmation.isSample
               ? 'This is a sample business. No live phone number was purchased.'
               : phoneNumber
-              ? 'Your Corvlio receptionist is ready to receive calls.'
+              ? 'This is your AI receptionist. Call the number to hear how it answers.'
               : 'Your business setup is saved. Phone number provisioning is still pending.'}
           </p>
         </div>
       </div>
-      <div className="shrink-0 rounded-xl border border-[#b9dfc8] bg-white/70 px-3 py-2 sm:text-right">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#398660]">{phoneNumber ? 'Assigned phone' : 'Phone setup'}</p>
+      <div className="w-full shrink-0 rounded-xl border border-border bg-background px-3 py-3 sm:w-auto sm:text-right">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">{phoneNumber ? 'Your new business number' : 'Phone setup'}</p>
         <p className="mt-0.5 text-sm font-800">{confirmation.isSample ? 'Sample / demo' : phoneNumber ?? 'Pending'}</p>
+        {!confirmation.isSample && usablePhone(phoneNumber || '') ? <a href={`tel:${usablePhone(phoneNumber || '')}`} data-testid="button-call-new-number" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"><Phone size={16} /> Call your new number now</a> : null}
       </div>
     </div>
   );
@@ -561,6 +564,11 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="mb-5"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Business profile</p><h2 className="mt-1 text-lg font-bold">Details your receptionist needs</h2><p className="mt-1 text-sm text-muted-foreground">Update these anytime. Changes are saved to your business profile.</p></div>
       {query.isLoading ? <div className="space-y-3" aria-label="Loading business profile"><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div> : query.isError ? <div role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm">Could not load your business details. <button type="button" onClick={() => void query.refetch()} className="font-semibold text-primary underline">Try again</button></div> : draft ? <form onSubmit={submit} data-testid="form-business-profile">
+        <label className="mb-4 block text-xs font-semibold">Quick tone choice
+          <select data-testid="select-profile-tone" value={['Friendly and professional', 'Friendly', 'Professional', 'No-nonsense'].includes(draft.personalityToneDescription || 'Friendly and professional') ? draft.personalityToneDescription || 'Friendly and professional' : 'custom'} onChange={event => { if (event.target.value !== 'custom') change('personalityToneDescription', event.target.value); }} className="mt-1.5 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground">
+            <option value="Friendly and professional">Friendly &amp; professional (default)</option><option value="Friendly">Friendly</option><option value="Professional">Professional</option><option value="No-nonsense">No-nonsense</option><option value="custom">Custom / existing tone below</option>
+          </select>
+        </label>
         <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, multiline, type }) => { const value = draft[key as keyof BusinessProfile]; return <label key={key} className={`block ${multiline ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-xs font-semibold">{label}{key === 'businessName' || key === 'ownerEmail' ? <span className="ml-1 text-primary">*</span> : null}</span>{multiline ? <textarea rows={3} maxLength={4000} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} /> : <input type={type ?? 'text'} required={key === 'businessName' || key === 'ownerEmail'} pattern={key === 'businessWebsiteUrl' ? 'https?://.+' : undefined} title={key === 'businessWebsiteUrl' ? 'Enter a URL beginning with http:// or https://' : undefined} maxLength={key === 'businessName' ? 160 : key === 'ownerEmail' ? 320 : key === 'agentName' ? 40 : key === 'businessType' ? 200 : 2048} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} placeholder={key === 'agentName' ? 'Aria' : key === 'businessWebsiteUrl' ? 'https://yourbusiness.com' : ''} className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} />}</label>; })}<BusinessCoverageFields prefix="profile" values={coverage} onChange={changeCoverage} /></div>
         <label className="mt-4 block"><span className="mb-1.5 block text-xs font-semibold">Corvlio phone number</span><input readOnly value={draft.retellPhoneNumber ?? retellPhoneNumber ?? 'Pending'} data-testid="input-profile-retellPhoneNumber" className="min-h-12 w-full rounded-xl border border-input bg-muted/50 px-3.5 text-sm text-muted-foreground" /><span className="mt-1.5 block text-xs text-muted-foreground">Assigned and managed by Corvlio.</span></label>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="text-xs text-muted-foreground">Receptionist name is optional. Blank uses Aria.</p><button type="submit" disabled={mutation.isPending} data-testid="button-save-business-profile" className="min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-60">{mutation.isPending ? 'Saving details…' : 'Save business details'}</button></div>
