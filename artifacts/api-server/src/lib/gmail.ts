@@ -35,6 +35,7 @@ async function getAccessToken(): Promise<string | null> {
   if (!config) return null;
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
+    signal: AbortSignal.timeout(15_000),
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -82,17 +83,17 @@ export async function sendLeadNotificationEmail(input: {
   callerName: string | null;
   phoneNumber: string | null;
   issue: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
   const recipient = normalizedRecipient(input.ownerEmail);
   if (!recipient) {
     logger.info(
       "Skipping Gmail lead notification: business ownerEmail is empty",
     );
-    return;
+    return false;
   }
 
   const accessToken = await getAccessToken();
-  if (!accessToken) return;
+  if (!accessToken) return false;
 
   const messageBody = [
     "A new lead came in.",
@@ -114,6 +115,7 @@ export async function sendLeadNotificationEmail(input: {
   const response = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
     {
+      signal: AbortSignal.timeout(15_000),
       method: "POST",
       headers: {
         authorization: `Bearer ${accessToken}`,
@@ -128,4 +130,5 @@ export async function sendLeadNotificationEmail(input: {
       `Gmail API send failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`,
     );
   }
+  return true;
 }

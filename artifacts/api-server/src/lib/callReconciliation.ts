@@ -22,10 +22,11 @@ export async function reconcileCall(callId: string, businessId: number, tx: Call
   if (lead && (lead.businessId !== businessId || (lead.retellCallId && lead.retellCallId !== callId))) {
     throw new Error("Call/lead ownership mismatch; refusing cross-business reconciliation");
   }
+  const isNew = !lead;
   if (!lead) lead = await tx.createLead(callId);
   else if (!lead.retellCallId) await tx.linkLead(lead.id, callId);
   await tx.enrichLead?.(lead.id);
   await tx.saveRecord(callId, lead.id);
-  const notify = await tx.ensureNotification(lead.id);
+  const notify = isNew ? await tx.ensureNotification(lead.id) : false;
   return { id: lead.id, notify };
 }

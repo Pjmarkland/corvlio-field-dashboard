@@ -5,7 +5,7 @@ import { reconcileCall } from "./callReconciliation";
 type LeadInput = typeof leadsTable.$inferInsert;
 type RecordInput = typeof retellCallRecordsTable.$inferInsert;
 
-export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, recordInput: RecordInput, analysisComplete = true) {
+export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, recordInput: RecordInput, analysisComplete = true, alertsEnabled = true) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(542312, hashtext(${callId}))`);
     return reconcileCall(callId, leadInput.businessId, {
@@ -71,10 +71,13 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
           });
       },
       async ensureNotification(leadId) {
-        const name = leadInput.callerName?.split(/\s+/, 1)[0] || "Unknown caller";
+        if (!alertsEnabled) return false;
+        const name = leadInput.callerName || "Unknown caller";
         const inserted = await tx.insert(notificationEventsTable).values({
           businessId: String(leadInput.businessId), leadId: String(leadId),
-          title: `New lead from ${name}`, body: leadInput.issueReason || "No details captured",
+          title: `New lead from ${name}`,
+          body: `${leadInput.issueReason || "No details captured"} · Callback: ${leadInput.callbackNumber || leadInput.phoneNumber || "Not provided"}`,
+          emailStatus: "queued",
           deepLink: `/leads/${leadId}`,
         }).onConflictDoNothing().returning();
         return inserted.length === 1;

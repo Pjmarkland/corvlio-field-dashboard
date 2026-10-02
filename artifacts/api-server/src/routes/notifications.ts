@@ -5,15 +5,12 @@ import {
   RegisterNotificationDeviceBody,
   RegisterNotificationDeviceResponse,
   RevokeNotificationDeviceParams,
-  RunNotificationPollResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
-import { findBusinessForClerkUser } from "../lib/businessRegistry";
-import { GoogleSheetStatusError } from "../lib/googleSheets";
+import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import {
   getNotificationStatus,
   listNotificationOutbox,
-  pollBusinessForNewLeads,
   registerNotificationDevice,
   revokeNotificationDevice,
 } from "../lib/notificationService";
@@ -32,12 +29,12 @@ router.get("/notifications/status", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const business = findBusinessForClerkUser(userId);
+  const business = await findBusinessByClerkUserId(userId);
   if (!business) {
     res.status(403).json({ error: "No business is configured for this account" });
     return;
   }
-  const status = await getNotificationStatus(userId, business.id);
+  const status = await getNotificationStatus(userId, String(business.id));
   res.json(GetNotificationStatusResponse.parse(status));
 });
 
@@ -52,14 +49,14 @@ router.post("/notification-devices", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A valid native notification registration is required" });
     return;
   }
-  const business = findBusinessForClerkUser(userId);
+  const business = await findBusinessByClerkUserId(userId);
   if (!business) {
     res.status(403).json({ error: "No business is configured for this account" });
     return;
   }
   const device = await registerNotificationDevice({
     clerkUserId: userId,
-    businessId: business.id,
+    businessId: String(business.id),
     ...body.data,
   });
   res.json(RegisterNotificationDeviceResponse.parse(device));
@@ -76,7 +73,7 @@ router.delete("/notification-devices/:deviceId", async (req, res): Promise<void>
     res.status(400).json({ error: "A valid device ID is required" });
     return;
   }
-  const business = findBusinessForClerkUser(userId);
+  const business = await findBusinessByClerkUserId(userId);
   if (!business) {
     res.status(404).json({ error: "Device not found" });
     return;
@@ -84,7 +81,7 @@ router.delete("/notification-devices/:deviceId", async (req, res): Promise<void>
   const revoked = await revokeNotificationDevice({
     deviceId: params.data.deviceId,
     clerkUserId: userId,
-    businessId: business.id,
+    businessId: String(business.id),
   });
   if (!revoked) {
     res.status(404).json({ error: "Device not found" });
@@ -100,26 +97,7 @@ router.post("/notifications/poll/run", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const business = findBusinessForClerkUser(userId);
-  if (!business) {
-    res.status(403).json({ error: "No business is configured for this account" });
-    return;
-  }
-  try {
-    const result = await pollBusinessForNewLeads(business);
-    res.json(RunNotificationPollResponse.parse(result));
-  } catch (error) {
-    const status = error instanceof GoogleSheetStatusError ? error.status : 502;
-    req.log.error(
-      {
-        businessId: business.id,
-        status,
-        error: error instanceof Error ? error.message : "Unknown polling error",
-      },
-      "Manual notification poll failed",
-    );
-    res.status(status).json({ error: "Unable to poll the connected Google Sheet" });
-  }
+  res.status(410).json({ error: "Leads now arrive through the signed Retell webhook. Legacy Sheets alert polling is disabled to avoid duplicate alerts." });
 });
 
 router.get("/notifications/outbox", async (req, res): Promise<void> => {
@@ -129,12 +107,12 @@ router.get("/notifications/outbox", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const business = findBusinessForClerkUser(userId);
+  const business = await findBusinessByClerkUserId(userId);
   if (!business) {
     res.status(403).json({ error: "No business is configured for this account" });
     return;
   }
-  const events = await listNotificationOutbox(business.id);
+  const events = await listNotificationOutbox(String(business.id));
   res.json(ListNotificationOutboxResponse.parse(events));
 });
 

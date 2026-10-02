@@ -6,6 +6,8 @@ import leadsRouter from "./leads";
 import notificationsRouter from "./notifications";
 import retellRouter from "./retell";
 import welcomeRouter from "./welcome";
+import ownerDemoRouter from "./ownerDemo";
+import leadAlertsRouter from "./leadAlerts";
 
 const router: IRouter = Router();
 
@@ -16,5 +18,7 @@ router.use(leadsRouter);
 router.use(notificationsRouter);
 router.use(retellRouter);
 router.use(welcomeRouter);
+router.use(ownerDemoRouter);
+router.use(leadAlertsRouter);
 
 export default router;

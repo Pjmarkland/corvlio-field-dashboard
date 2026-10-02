@@ -8,6 +8,12 @@
 
 export interface BusinessProfileUpdate {
   /**
+     * @maxLength 16
+     * @nullable
+     */
+  ownerPhone?: string | null;
+  leadAlertsEnabled?: boolean;
+  /**
      * @minLength 1
      * @maxLength 500
      */

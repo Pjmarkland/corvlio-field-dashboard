@@ -104,6 +104,9 @@ export interface LeadWorkspace {
 
 export interface BusinessProfile {
   /** @nullable */
+  ownerPhone?: string | null;
+  leadAlertsEnabled?: boolean;
+  /** @nullable */
   businessHours?: string | null;
   /** @nullable */
   timeZone?: string | null;
@@ -147,6 +150,12 @@ export interface BusinessProfile {
 }
 
 export interface BusinessProfileUpdate {
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  ownerPhone?: string | null;
+  leadAlertsEnabled?: boolean;
   /**
      * @minLength 1
      * @maxLength 500
@@ -262,6 +271,39 @@ export interface NotificationDeviceRegistration {
   token: string;
   platform: NotificationPlatform;
   enabled?: boolean;
+}
+
+export type OwnerDemoConfirmationScenario = typeof OwnerDemoConfirmationScenario[keyof typeof OwnerDemoConfirmationScenario];
+
+
+export const OwnerDemoConfirmationScenario = {
+  current: 'current',
+  after_hours: 'after_hours',
+} as const;
+
+export interface OwnerDemoConfirmation {
+  scenario?: OwnerDemoConfirmationScenario;
+  confirmedNumber: string;
+  confirmed: boolean;
+}
+
+export interface AlertReadReceipt {
+  /** @minimum 1 */
+  throughId: number;
+}
+
+export type LeadAlertInboxAlertsItem = {
+  id: number;
+  title: string;
+  body: string;
+  deepLink: string;
+  createdAt: string;
+};
+
+export interface LeadAlertInbox {
+  enabled: boolean;
+  unreadCount: number;
+  alerts: LeadAlertInboxAlertsItem[];
 }
 
 export interface NotificationDevice {
@@ -467,4 +509,9 @@ export interface AdminActivity {
   uncontactedOver24HoursCount: number;
   recentLeads: AdminLeadActivity[];
 }
+
+export type CreateOwnerDemoCall200 = {
+  callId: string;
+  message: string;
+};
 

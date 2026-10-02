@@ -56,3 +56,17 @@ mtime_ms = 1789155952094
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/8eeadb2f-3207-4830-a5bd-c5c762512744/f4ad469e-59c2-4bc9-ba3c-147230620415"
 storage_version_token = "1789155957568965"
 content_type = "image/png"
+
+[[outputs]]
+id = "rIwWQd_LJ2WjQpALV3jN6"
+uri = "file://docs/retell-production-rollout.md"
+type = "text"
+title = "Retell production rollout plan — not executed"
+description = "Production webhook transition, version pinning, knowledge-base dependency review, pilot checks, and rollback steps."
+logical_id = "8bceee20-8227-41ee-8964-9a3840b6870b"
+content_hash = "sha256:45a074b94b82430256c5896829eca7352436334fc415f2d73033e17764c14933"
+size = 7202
+mtime_ms = 1790969762416
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/8bceee20-8227-41ee-8964-9a3840b6870b/8b0e49c5-e7bd-4bec-bdff-9c416368a8c1"
+storage_version_token = "1790970401714429"
+content_type = "text/markdown"

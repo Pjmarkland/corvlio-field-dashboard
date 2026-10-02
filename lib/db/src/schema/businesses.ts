@@ -9,6 +9,8 @@ export const businessesTable = pgTable("businesses", {
   agentName: text("agent_name"),
   clerkUserId: text("clerk_user_id"),
   ownerEmail: text("owner_email"),
+  ownerPhone: text("owner_phone"),
+  leadAlertsEnabled: boolean("lead_alerts_enabled").notNull().default(true),
   retellPhoneNumber: text("retell_phone_number"),
   retellAgentId: text("retell_agent_id"),
   isSample: boolean("is_sample").notNull().default(false),

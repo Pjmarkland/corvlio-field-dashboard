@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   db,
+  businessesTable,
   notificationDeliveryAttemptsTable,
   notificationDevicesTable,
   notificationEventsTable,
@@ -10,10 +11,10 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import type { Business } from "./businessRegistry";
-import { listBusinesses } from "./businessRegistry";
 import { sendApnsNotification, isApnsConfigured } from "./apnsAdapter";
 import { readGoogleSheetLeads } from "./googleSheets";
 import { logger } from "./logger";
+import { deliverLeadAlertEmails } from "./leadAlertEmail";
 
 const POLL_INTERVAL_MS = 60_000;
 const SHEETS_READ_TIMEOUT_MS = 55_000; // must be < POLLER_LEASE_MS
@@ -254,7 +255,19 @@ async function processNotificationOutbox(): Promise<void> {
 
   logger.info({ count: events.length }, "Processing notification outbox");
 
-  for (const event of events) {
+  for (const queuedEvent of events) {
+    await db.transaction(async (tx) => {
+    const lock = await tx.execute(sql`SELECT pg_try_advisory_xact_lock(542317, ${queuedEvent.id}) AS locked`);
+    if (!lock.rows[0]?.locked) return;
+    const [event] = await tx.select().from(notificationEventsTable).where(eq(notificationEventsTable.id, queuedEvent.id));
+    if (!event || event.status !== "queued" || event.nextAttemptAt > new Date() || event.attempts >= MAX_DELIVERY_ATTEMPTS) return;
+    const [business] = await db.select().from(businessesTable)
+      .where(sql`${businessesTable.id}::text = ${event.businessId}`);
+    if (!business || !business.leadAlertsEnabled || business.isSample) {
+      await db.update(notificationEventsTable).set({ status: "failed", lastError: "Business alerts disabled", attempts: MAX_DELIVERY_ATTEMPTS })
+        .where(eq(notificationEventsTable.id, event.id));
+      return;
+    }
     // Fetch active iOS devices for this business.
     const devices = await db
       .select()
@@ -279,7 +292,7 @@ async function processNotificationOutbox(): Promise<void> {
         .update(notificationEventsTable)
         .set({ attempts: newAttempts, lastError: "No active iOS devices", nextAttemptAt })
         .where(eq(notificationEventsTable.id, event.id));
-      continue;
+      return;
     }
 
     let anyDelivered = false;
@@ -353,6 +366,7 @@ async function processNotificationOutbox(): Promise<void> {
         .where(eq(notificationEventsTable.id, event.id));
       logger.debug({ eventId: event.id, nextAttemptAt }, "Notification event scheduled for retry");
     }
+    });
   }
 }
 
@@ -374,22 +388,8 @@ export async function runNotificationPollCycle(): Promise<void> {
   heartbeat.unref();
 
   try {
-    for (const business of listBusinesses()) {
-      try {
-        const result = await pollBusinessForNewLeads(business);
-        logger.info(result, "Completed lead notification poll");
-      } catch (error) {
-        logger.error(
-          {
-            businessId: business.id,
-            error: error instanceof Error ? error.message : "Unknown polling error",
-          },
-          "Lead notification poll failed for business",
-        );
-      }
-    }
-
-    // After polling all businesses, deliver any queued notification events.
+    // The owner workspace now reads PostgreSQL leads. Do not also poll legacy
+    // Make/Sheets logs: that would generate duplicate or historical alerts.
     try {
       await runNotificationOutboxNow();
     } catch (error) {
@@ -405,10 +405,16 @@ export async function runNotificationPollCycle(): Promise<void> {
 }
 
 let outboxPromise: Promise<void> | null = null;
+let outboxRequested = false;
 
 export function runNotificationOutboxNow(): Promise<void> {
-  if (outboxPromise) return outboxPromise;
-  outboxPromise = processNotificationOutbox().finally(() => {
+  if (outboxPromise) { outboxRequested = true; return outboxPromise; }
+  outboxPromise = (async () => {
+    do {
+      outboxRequested = false;
+      await Promise.all([deliverLeadAlertEmails(), processNotificationOutbox()]);
+    } while (outboxRequested);
+  })().finally(() => {
     outboxPromise = null;
   });
   return outboxPromise;
@@ -448,7 +454,7 @@ export function startLeadNotificationPoller(): void {
   runOnce();
   pollTimer = setInterval(runOnce, POLL_INTERVAL_MS);
   pollTimer.unref();
-  logger.info({ intervalMs: POLL_INTERVAL_MS }, "Lead notification poller started");
+  logger.info({ intervalMs: POLL_INTERVAL_MS }, "Lead notification retry worker started (new events deliver immediately)");
 }
 
 /** Stop scheduling new cycles and wait for any in-progress cycle to finish. */

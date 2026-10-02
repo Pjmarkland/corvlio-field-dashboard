@@ -25,6 +25,8 @@ type BusinessProfileUpdate = z.infer<typeof UpdateBusinessProfileBody>;
 type BusinessProfileField = keyof BusinessProfileUpdate;
 
 const BUSINESS_PROFILE_COLUMN_BY_FIELD: Record<BusinessProfileField, string> = {
+  ownerPhone: "ownerPhone",
+  leadAlertsEnabled: "leadAlertsEnabled",
   businessHours: "businessHours",
   timeZone: "timeZone",
   businessName: "businessName",
@@ -66,6 +68,8 @@ const ENRICHMENT_FIELD_BY_PROFILE_FIELD: Partial<
 
 function toBusinessProfile(business: OwnedBusiness) {
   return {
+    ownerPhone: business.ownerPhone ?? null,
+    leadAlertsEnabled: business.leadAlertsEnabled ?? true,
     businessHours: business.businessHours ?? DEFAULT_BUSINESS_HOURS,
     timeZone: business.timeZone ?? DEFAULT_TIME_ZONE,
     businessName: business.businessName,
@@ -145,6 +149,10 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
   }
 
   const businessName = body.data.businessName?.trim();
+  if (body.data.ownerPhone && !/^\+[1-9]\d{7,14}$/.test(body.data.ownerPhone.trim())) {
+    res.status(400).json({ error: "Owner phone must include a country code, for example +14155550123" });
+    return;
+  }
   if ((body.data.businessHours !== undefined && !parseBusinessHours(body.data.businessHours))
     || (body.data.timeZone !== undefined && !validTimeZone(body.data.timeZone.trim()))) {
     res.status(400).json({ error: "Use valid business hours (Mon-Fri 09:00-17:00; Sat 10:00-14:00, or 24/7) and an IANA time zone" });
@@ -187,10 +195,10 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
       if (!Object.prototype.hasOwnProperty.call(body.data, profileField)) continue;
 
       const value = body.data[profileField];
-      const normalizedValue = typeof value === "string" ? value.trim() : null;
+      const normalizedValue = typeof value === "boolean" ? value : typeof value === "string" ? value.trim() : null;
       const requiredValue = profileField === "businessName" || profileField === "ownerEmail";
       Object.assign(changes, {
-        [databaseField]: requiredValue ? normalizedValue : normalizedValue || null,
+        [databaseField]: typeof normalizedValue === "boolean" || requiredValue ? normalizedValue : normalizedValue || null,
       });
     }
 

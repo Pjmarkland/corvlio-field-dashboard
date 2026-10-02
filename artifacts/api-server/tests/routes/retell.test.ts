@@ -153,7 +153,7 @@ describe("Retell webhook safety", () => {
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
     expect(mocks.persistAnalyzedCall.mock.calls[0]).toEqual([
       "call-partial", expect.objectContaining({ transcript: call.transcript, callerId: call.from_number, phoneNumber: call.from_number, summary: expect.stringContaining("My pipe is leaking") }),
-      expect.any(Object), false,
+      expect.any(Object), false, true,
     ]);
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
       ...call, call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
@@ -165,8 +165,30 @@ describe("Retell webhook safety", () => {
       "call-partial", expect.objectContaining({ callerName: "Sam", issueReason: "Leaking pipe", address: "12 Test St",
         urgencyLevel: "today", availability: "afternoon", callerId: "+15559990000", callbackNumber: "+15551230000",
         phoneNumber: "+15551230000", transcript: call.transcript, summary: "Sam has a leaking pipe." }),
-      expect.any(Object), true,
+      expect.any(Object), true, true,
     ]);
+  });
+  it.each([
+    { direction: "outbound" },
+    { metadata: { corvlio_call_type: "owner_test" } },
+  ])("never creates leads, call counts or alerts for signed test/outbound calls", async extra => {
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "test", to_number: "+15551230000", from_number: "+14155550123", ...extra,
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.runNotificationOutboxNow).not.toHaveBeenCalled();
+  });
+  it("passes the saved disabled alert preference into persistence", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, leadAlertsEnabled: false }));
+    mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "real", to_number: "+14155550123", from_number: "+15551230000",
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.persistAnalyzedCall.mock.calls[0][4]).toBe(false);
+    expect(mocks.runNotificationOutboxNow).not.toHaveBeenCalled();
   });
   it("allows missing pre-call signatures during the compatibility rollout and logs them", async () => {
     expect((await requestPreCall()).status).toBe(200);
@@ -192,7 +214,7 @@ describe("Retell webhook safety", () => {
     expect((await signedRequest("post-call", raw)).status).toBe(204);
     expect((await signedRequest("post-call", raw)).status).toBe(204);
     expect(mocks.persistAnalyzedCall).toHaveBeenCalledTimes(2);
-    expect(mocks.sendLeadNotificationEmail).toHaveBeenCalledOnce();
+    expect(mocks.sendLeadNotificationEmail).not.toHaveBeenCalled();
     expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
   });
   it("keeps post-call signature verification mandatory", async () => {

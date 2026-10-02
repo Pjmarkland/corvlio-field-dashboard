@@ -99,6 +99,75 @@ paths:
           description: No business is configured for this account
         "502":
           description: Business profile could not be updated
+  /businesses/me/demo-call:
+    post:
+      operationId: createOwnerDemoCall
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Place one development-only test call to the owner's confirmed saved number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerDemoConfirmation"
+      responses:
+        "200":
+          description: Test call requested
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [callId, message]
+                properties:
+                  callId:
+                    type: string
+                  message:
+                    type: string
+        "400":
+          description: Missing existing number or unconfirmed owner number
+        "401":
+          description: Authentication required
+        "404":
+          description: Not available
+        "429":
+          description: Three attempts per business day have been used
+        "502":
+          description: Provider rejected the call or its outcome is uncertain
+  /notifications/inbox:
+    get:
+      operationId: getLeadAlertInbox
+      tags: [notifications]
+      security:
+        - clerkSession: []
+      summary: Owner-scoped unread real-lead alerts
+      responses:
+        "200":
+          description: Lead alert inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadAlertInbox"
+        "401":
+          description: Authentication required
+    post:
+      operationId: readLeadAlerts
+      tags: [notifications]
+      security:
+        - clerkSession: []
+      summary: Mark only the owner's alerts through an observed event ID as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertReadReceipt"
+      responses:
+        "204":
+          description: Alerts marked read
+        "401":
+          description: Authentication required
   /leads:
     get:
       operationId: getLeads
@@ -467,6 +536,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        ownerPhone:
+          type: [string, "null"]
+        leadAlertsEnabled:
+          type: boolean
         businessHours:
           type: [string, "null"]
         timeZone:
@@ -533,6 +606,11 @@ components:
       type: object
       additionalProperties: false
       properties:
+        ownerPhone:
+          type: [string, "null"]
+          maxLength: 16
+        leadAlertsEnabled:
+          type: boolean
         businessHours:
           type: string
           minLength: 1
@@ -615,6 +693,53 @@ components:
       required:
         - token
         - platform
+    OwnerDemoConfirmation:
+      type: object
+      additionalProperties: false
+      required: [confirmedNumber, confirmed]
+      properties:
+        scenario:
+          type: string
+          enum: [current, after_hours]
+        confirmedNumber:
+          type: string
+        confirmed:
+          type: boolean
+    AlertReadReceipt:
+      type: object
+      additionalProperties: false
+      required: [throughId]
+      properties:
+        throughId:
+          type: number
+          multipleOf: 1
+          minimum: 1
+    LeadAlertInbox:
+      type: object
+      required: [enabled, unreadCount, alerts]
+      properties:
+        enabled:
+          type: boolean
+        unreadCount:
+          type: number
+          multipleOf: 1
+        alerts:
+          type: array
+          items:
+            type: object
+            required: [id, title, body, deepLink, createdAt]
+            properties:
+              id:
+                type: number
+                multipleOf: 1
+              title:
+                type: string
+              body:
+                type: string
+              deepLink:
+                type: string
+              createdAt:
+                type: string
     NotificationDevice:
       type: object
       properties:

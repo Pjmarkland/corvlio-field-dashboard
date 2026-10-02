@@ -6,7 +6,6 @@ import type { RetellCall } from "@workspace/api-zod";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
-import { sendLeadNotificationEmail } from "../lib/gmail";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { persistAnalyzedCall } from "../lib/retellPersistence";
 import { extractRetellLead } from "../lib/retellLeadData";
@@ -159,6 +158,14 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     return;
   }
 
+  // Inspect signed raw fields before Zod strips provider fields. All outbound
+  // calls are excluded from inbound customer leads, even if metadata is absent.
+  const rawCall = req.body?.call;
+  if (rawCall?.direction === "outbound" || rawCall?.metadata?.corvlio_call_type === "owner_test") {
+    res.sendStatus(204);
+    return;
+  }
+
   const body = RetellPostCallWebhookBody.safeParse(req.body);
   if (!body.success) {
     req.log.warn({ error: body.error.flatten() }, "Invalid Retell post-call webhook payload");
@@ -193,8 +200,6 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     }
 
     const details = extractRetellLead(call);
-    const { callerName, phoneNumber: callerPhoneNumber, issueReason } = details;
-
     const retellCallId = firstString(call.call_id)
       ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     if (!call.call_id) req.log.warn("Retell call ID missing; using legacy payload fingerprint");
@@ -205,25 +210,9 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       callStartedAt: callStartedAt(call.start_timestamp),
       durationMs: callDurationMs(call.duration_ms),
       outcome: callOutcome(call),
-    }, body.data.event === "call_analyzed");
+    }, body.data.event === "call_analyzed", business.leadAlertsEnabled !== false && !business.isSample);
 
     if (lead.notify) {
-      void sendLeadNotificationEmail({
-      ownerEmail: business.ownerEmail,
-      callerName,
-      phoneNumber: callerPhoneNumber,
-      issue: issueReason,
-    }).catch((error) => {
-      req.log.error(
-        {
-          leadId: lead.id,
-          businessId: business.id,
-          error: error instanceof Error ? error.message : "Unknown Gmail error",
-        },
-        "Retell lead email notification failed",
-      );
-    });
-
     void runNotificationOutboxNow().catch((error) => {
       req.log.error(
         {

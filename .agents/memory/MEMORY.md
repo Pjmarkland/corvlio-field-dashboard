@@ -9,3 +9,4 @@
 - [OpenAPI Zod generation constraints](openapi-zod-generation-constraints.md) — keep email/URL checks and strict unknown-key rejection explicit at server boundaries with current codegen.
 - [Phone cost safety](phone-cost-safety.md) — demos never purchase or scrape; pending purchases need recovery, and missing pre-call signatures remain allowed during rollout.
 - [Retell transfer isolation](retell-transfer-isolation.md) — inbound LLM overrides do not support per-call tools; shared transfers need enforced business isolation, not just prompting.
+- [Retell release boundaries](retell-release-boundaries.md) — separate agency sales KB dependencies from field intake; pin live versions before changing shared-agent webhook routing.

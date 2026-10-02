@@ -8,6 +8,9 @@
 
 export interface BusinessProfile {
   /** @nullable */
+  ownerPhone?: string | null;
+  leadAlertsEnabled?: boolean;
+  /** @nullable */
   businessHours?: string | null;
   /** @nullable */
   timeZone?: string | null;

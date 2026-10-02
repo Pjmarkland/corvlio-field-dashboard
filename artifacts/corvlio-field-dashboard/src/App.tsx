@@ -19,6 +19,8 @@ import { ThemeProvider, useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
 import { InstallHint } from '@/components/InstallHint';
 import { LeadContactActions } from '@/components/LeadContactActions';
+import { ReceptionistControls } from '@/components/ReceptionistControls';
+import { LeadAlertBell } from '@/components/LeadAlertBell';
 import { leadsRefreshInterval } from '@/lib/leadRefresh';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { displayIssue, displayName, displayPhone, nameInitials, usablePhone, preferLeadCallback } from '@/lib/leadDisplay';
@@ -292,6 +294,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
             </div>
             <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex"><span className="h-2 w-2 rounded-full bg-[#49a979]" /> On the road · synced</div>
             <div className="flex items-center gap-3">
+              <LeadAlertBell />
               <div className="hidden text-right sm:block"><p className="max-w-48 truncate text-xs font-semibold">{businessName ?? 'Unconfigured account'}</p><p className="font-mono text-[10px] text-muted-foreground">Owner operator</p></div>
               <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground" data-testid="avatar-account">{businessName ? initials(businessName) : '—'}</div>
             </div>
@@ -422,8 +425,7 @@ type NotificationStatusRowProps = {
 };
 
 function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
-  const { data, isLoading } = useGetNotificationStatus();
-  const pollerReady = data?.poller.initialized && !data?.poller.lastError;
+  const { data, isLoading, isError } = useGetNotificationStatus();
   const isNative = Capacitor.isNativePlatform();
 
   let badge: ReactNode;
@@ -432,14 +434,17 @@ function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
   if (isLoading) {
     badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">Checking…</span>;
     detail = 'Fetching notification status from the server.';
-  } else if (!pollerReady) {
-    badge = <span className="rounded-full bg-[#f1e3bb] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#8c6418]">Initializing</span>;
-    detail = data?.poller.lastError ? `Poller error: ${data.poller.lastError}` : 'Lead poller is starting up — check back in a moment.';
+  } else if (isError) {
+    badge = <span className="rounded-full bg-muted px-2 py-1 text-xs">Unavailable</span>;
+    detail = 'Device status could not load. Please reload.';
+  } else if (isNative && Capacitor.getPlatform() !== 'ios') {
+    badge = <span className="rounded-full bg-muted px-2 py-1 text-xs">Not enabled</span>;
+    detail = 'Android push is not configured. Email and in-app lead alerts are available.';
   } else if (isNative) {
     // Native Capacitor: show live push registration state.
     switch (push.pushStatus) {
       case 'idle':
-        detail = 'Poller is running. Tap Enable to receive push alerts on this device.';
+        detail = 'Tap Enable to register this iPhone for native APNs alerts. Device delivery still needs a real-device check.';
         badge = <button type="button" onClick={push.onRegister} className="shrink-0 min-h-9 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">Enable</button>;
         break;
       case 'requesting':
@@ -476,10 +481,10 @@ function NotificationStatusRow({ push }: { push: NotificationStatusRowProps }) {
     const deviceCount = data?.enabledDeviceCount ?? 0;
     if (deviceCount === 0) {
       badge = <span className="rounded-full bg-muted px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">No devices</span>;
-      detail = 'Poller is running. Install the app on your phone to enable push alerts.';
+      detail = 'Browser web push is not enabled. The iOS Capacitor app can register for native Apple push.';
     } else {
       badge = <span className="rounded-full bg-[#d9eee1] px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-[#398660]">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>;
-      detail = `Push alerts active on ${deviceCount} registered device${deviceCount !== 1 ? 's' : ''}.`;
+      detail = `${deviceCount} device registration${deviceCount !== 1 ? 's' : ''} on file; delivery requires configured Apple credentials and a real-device check.`;
     }
   }
 
@@ -509,6 +514,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
     { key: 'businessName', label: 'Business name' }, { key: 'agentName', label: 'Receptionist name' },
     { key: 'businessType', label: 'Business type' }, { key: 'businessWebsiteUrl', label: 'Business website URL', type: 'url' },
     { key: 'ownerEmail', label: 'Owner email', type: 'email' }, { key: 'serviceArea', label: 'Service area' },
+    { key: 'ownerPhone', label: 'Your own phone number (country code, e.g. +14155550123)', type: 'tel' },
     { key: 'personalityToneDescription', label: 'Receptionist personality and tone', multiline: true },
     { key: 'majorIssueExamples', label: 'Urgent issue examples', multiline: true }, { key: 'servicesNotOffered', label: 'Services not offered', multiline: true },
     { key: 'pricingPolicy', label: 'Pricing policy', multiline: true }, { key: 'financingPolicy', label: 'Financing policy', multiline: true },
@@ -569,13 +575,17 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
-  const [settings, setSettings] = useState<SettingsState>(loadSettings);
-  const update = (patch: Partial<SettingsState>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  };
-  return <><PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." /><BusinessProfileEditor key={user?.id ?? 'signed-out'} businessName={businessName} retellPhoneNumber={retellPhoneNumber} /><div className="mt-4 space-y-4"><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-5 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#f1e3bb] text-[#8c6418] dark:bg-amber-950 dark:text-amber-200"><Bell size={17} /></div><div><h2 className="font-bold">Notifications</h2><p className="text-xs text-muted-foreground">Choose how Corvlio keeps you in the loop.</p></div></div><ToggleRow label="New lead alerts" description="Show an in-app alert when a call comes in." checked={settings.notifications} onChange={(checked) => update({ notifications: checked })} testId="toggle-new-leads" /><ToggleRow label="Daily field digest" description="A morning recap of open and completed calls." checked={settings.dailyDigest} onChange={(checked) => update({ dailyDigest: checked })} testId="toggle-daily-digest" /></section><section className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-muted-foreground"><ShieldCheck size={17} /></div><div><h2 className="font-bold">Account controls</h2><p className="text-sm leading-relaxed text-muted-foreground">Your signed-in owner account and local privacy controls.</p></div></div><NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} /><Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link><button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button></section></div></>;
+  return <>
+    <PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />
+    <BusinessProfileEditor key={user?.id ?? 'signed-out'} businessName={businessName} retellPhoneNumber={retellPhoneNumber} />
+    <ReceptionistControls key={`controls-${user?.id}`} />
+    <section className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <h2 className="mb-4 flex items-center gap-2 font-bold"><ShieldCheck size={17} /> Account controls</h2>
+      <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
+      <Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link>
+      <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button>
+    </section>
+  </>;
 }
 
 function ToggleRow({ label, description, checked, onChange, testId }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void; testId: string }) {

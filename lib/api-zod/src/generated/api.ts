@@ -30,6 +30,8 @@ export const HealthCheckResponse = zod.object({
  * @summary Get the signed-in owner's business profile
  */
 export const GetBusinessProfileResponse = zod.object({
+  "ownerPhone": zod.string().nullish(),
+  "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "businessName": zod.string(),
@@ -57,6 +59,8 @@ export const GetBusinessProfileResponse = zod.object({
 /**
  * @summary Update the signed-in owner's business profile
  */
+export const updateBusinessProfileBodyOwnerPhoneMax = 16;
+
 export const updateBusinessProfileBodyBusinessHoursMax = 500;
 
 export const updateBusinessProfileBodyTimeZoneMax = 100;
@@ -100,6 +104,8 @@ export const updateBusinessProfileBodyEmergencyContactInfoMax = 4000;
 
 
 export const UpdateBusinessProfileBody = zod.object({
+  "ownerPhone": zod.string().max(updateBusinessProfileBodyOwnerPhoneMax).nullish(),
+  "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().min(1).max(updateBusinessProfileBodyBusinessHoursMax).optional(),
   "timeZone": zod.string().min(1).max(updateBusinessProfileBodyTimeZoneMax).optional(),
   "businessName": zod.string().min(1).max(updateBusinessProfileBodyBusinessNameMax).optional(),
@@ -123,6 +129,8 @@ export const UpdateBusinessProfileBody = zod.object({
 })
 
 export const UpdateBusinessProfileResponse = zod.object({
+  "ownerPhone": zod.string().nullish(),
+  "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "businessName": zod.string(),
@@ -145,6 +153,57 @@ export const UpdateBusinessProfileResponse = zod.object({
   "emergencyContactInfo": zod.string().nullable(),
   "retellPhoneNumber": zod.string().nullable()
 })
+
+
+/**
+ * @summary Place one development-only test call to the owner's confirmed saved number
+ */
+export const CreateOwnerDemoCallBody = zod.object({
+  "scenario": zod.enum(['current', 'after_hours']).optional(),
+  "confirmedNumber": zod.string(),
+  "confirmed": zod.boolean()
+})
+
+export const CreateOwnerDemoCallResponse = zod.object({
+  "callId": zod.string(),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Owner-scoped unread real-lead alerts
+ */
+export const getLeadAlertInboxResponseUnreadCountMultipleOf = 1;
+
+export const getLeadAlertInboxResponseAlertsItemIdMultipleOf = 1;
+
+
+
+export const GetLeadAlertInboxResponse = zod.object({
+  "enabled": zod.boolean(),
+  "unreadCount": zod.number().multipleOf(getLeadAlertInboxResponseUnreadCountMultipleOf),
+  "alerts": zod.array(zod.object({
+  "id": zod.number().multipleOf(getLeadAlertInboxResponseAlertsItemIdMultipleOf),
+  "title": zod.string(),
+  "body": zod.string(),
+  "deepLink": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Mark only the owner's alerts through an observed event ID as read
+ */
+export const readLeadAlertsBodyThroughIdMultipleOf = 1;
+
+
+
+export const ReadLeadAlertsBody = zod.object({
+  "throughId": zod.number().min(1).multipleOf(readLeadAlertsBodyThroughIdMultipleOf)
+})
+
+export const ReadLeadAlertsResponse = zod.void()
 
 
 /**

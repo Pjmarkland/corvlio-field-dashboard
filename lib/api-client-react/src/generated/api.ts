@@ -23,9 +23,12 @@ import type {
   AdminActivity,
   AdminBusinessDetail,
   AdminOverview,
+  AlertReadReceipt,
   BusinessProfile,
   BusinessProfileUpdate,
+  CreateOwnerDemoCall200,
   HealthStatus,
+  LeadAlertInbox,
   LeadStatusResult,
   LeadStatusUpdate,
   LeadWorkspace,
@@ -34,6 +37,7 @@ import type {
   NotificationOutboxEvent,
   NotificationPollResult,
   NotificationStatus,
+  OwnerDemoConfirmation,
   WelcomeEntry
 } from './api.schemas';
 
@@ -359,6 +363,225 @@ export const useUpdateBusinessProfile = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateBusinessProfileMutationOptions(options));
+    }
+
+export const getCreateOwnerDemoCallUrl = () => {
+
+
+
+
+  return `/api/businesses/me/demo-call`
+}
+
+/**
+ * @summary Place one development-only test call to the owner's confirmed saved number
+ */
+export const createOwnerDemoCall = async (ownerDemoConfirmation: OwnerDemoConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<CreateOwnerDemoCall200> => {
+
+  return customFetch<CreateOwnerDemoCall200>(getCreateOwnerDemoCallUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ownerDemoConfirmation)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerDemoCallMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerDemoCall>>, TError,{data: BodyType<OwnerDemoConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerDemoCall>>, TError,{data: BodyType<OwnerDemoConfirmation>}, TContext> => {
+
+const mutationKey = ['createOwnerDemoCall'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerDemoCall>>, {data: BodyType<OwnerDemoConfirmation>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOwnerDemoCall(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerDemoCallMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerDemoCall>>>
+    export type CreateOwnerDemoCallMutationBody = BodyType<OwnerDemoConfirmation>
+    export type CreateOwnerDemoCallMutationError = ErrorType<void>
+
+    /**
+ * @summary Place one development-only test call to the owner's confirmed saved number
+ */
+export const useCreateOwnerDemoCall = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerDemoCall>>, TError,{data: BodyType<OwnerDemoConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerDemoCall>>,
+        TError,
+        {data: BodyType<OwnerDemoConfirmation>},
+        TContext
+      > => {
+      return useMutation(getCreateOwnerDemoCallMutationOptions(options));
+    }
+
+export const getGetLeadAlertInboxUrl = () => {
+
+
+
+
+  return `/api/notifications/inbox`
+}
+
+/**
+ * @summary Owner-scoped unread real-lead alerts
+ */
+export const getLeadAlertInbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<LeadAlertInbox> => {
+
+  return customFetch<LeadAlertInbox>(getGetLeadAlertInboxUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLeadAlertInboxQueryKey = () => {
+    return [
+    `/api/notifications/inbox`
+    ] as const;
+    }
+
+
+export const getGetLeadAlertInboxQueryOptions = <TData = Awaited<ReturnType<typeof getLeadAlertInbox>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeadAlertInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLeadAlertInboxQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeadAlertInbox>>> = ({ signal }) => getLeadAlertInbox({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLeadAlertInbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLeadAlertInboxQueryResult = NonNullable<Awaited<ReturnType<typeof getLeadAlertInbox>>>
+export type GetLeadAlertInboxQueryError = ErrorType<void>
+
+
+/**
+ * @summary Owner-scoped unread real-lead alerts
+ */
+
+export function useGetLeadAlertInbox<TData = Awaited<ReturnType<typeof getLeadAlertInbox>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeadAlertInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLeadAlertInboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReadLeadAlertsUrl = () => {
+
+
+
+
+  return `/api/notifications/inbox`
+}
+
+/**
+ * @summary Mark only the owner's alerts through an observed event ID as read
+ */
+export const readLeadAlerts = async (alertReadReceipt: AlertReadReceipt, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getReadLeadAlertsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(alertReadReceipt)
+  }
+);}
+
+
+
+
+
+export const getReadLeadAlertsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof readLeadAlerts>>, TError,{data: BodyType<AlertReadReceipt>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof readLeadAlerts>>, TError,{data: BodyType<AlertReadReceipt>}, TContext> => {
+
+const mutationKey = ['readLeadAlerts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof readLeadAlerts>>, {data: BodyType<AlertReadReceipt>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  readLeadAlerts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReadLeadAlertsMutationResult = NonNullable<Awaited<ReturnType<typeof readLeadAlerts>>>
+    export type ReadLeadAlertsMutationBody = BodyType<AlertReadReceipt>
+    export type ReadLeadAlertsMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark only the owner's alerts through an observed event ID as read
+ */
+export const useReadLeadAlerts = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof readLeadAlerts>>, TError,{data: BodyType<AlertReadReceipt>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof readLeadAlerts>>,
+        TError,
+        {data: BodyType<AlertReadReceipt>},
+        TContext
+      > => {
+      return useMutation(getReadLeadAlertsMutationOptions(options));
     }
 
 export const getGetLeadsUrl = () => {

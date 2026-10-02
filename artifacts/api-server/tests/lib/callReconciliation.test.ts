@@ -61,11 +61,11 @@ describe("transactional call reconciliation", () => {
     expect(legacy.retellCallId).toBe("call-1");
     expect(tx.createLead).not.toHaveBeenCalled();
   });
-  it("repairs a missing notification for an already linked lead", async () => {
+  it("never sends a new alert on late analysis of an already linked lead, even if alerts were off originally", async () => {
     const { tx, leads, records } = fixture();
     leads.push({ id: 42, businessId: 1, retellCallId: "call-1" });
     records.set("call-1", { businessId: 1, leadId: 42 });
-    expect((await reconcileCall("call-1", 1, tx)).notify).toBe(true);
+    expect((await reconcileCall("call-1", 1, tx)).notify).toBe(false);
     expect((await reconcileCall("call-1", 1, tx)).notify).toBe(false);
   });
   it("never reconciles a call ID or lead across business ownership", async () => {
