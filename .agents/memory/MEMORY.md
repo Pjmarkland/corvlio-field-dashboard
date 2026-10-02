@@ -8,3 +8,4 @@
 - [Admin route authorization](admin-route-authorization.md) — keep authorization on protected APIs and return a consistent 404 instead of client-side redirects.
 - [OpenAPI Zod generation constraints](openapi-zod-generation-constraints.md) — keep email/URL checks and strict unknown-key rejection explicit at server boundaries with current codegen.
 - [Phone cost safety](phone-cost-safety.md) — demos never purchase or scrape; pending purchases need recovery, and missing pre-call signatures remain allowed during rollout.
+- [Retell transfer isolation](retell-transfer-isolation.md) — inbound LLM overrides do not support per-call tools; shared transfers need enforced business isolation, not just prompting.

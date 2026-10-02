@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LeadContactActions } from '@/components/LeadContactActions';
 import { InstallHint } from '@/components/InstallHint';
-import { displayIssue, displayName, displayPhone, usablePhone } from '@/lib/leadDisplay';
+import { displayIssue, displayName, displayPhone, usablePhone, preferLeadCallback } from '@/lib/leadDisplay';
 import { installPlatform, INSTALL_HINT_KEY } from '@/hooks/useInstallHint';
 
 describe('lead fallbacks', () => {
@@ -14,6 +14,15 @@ describe('lead fallbacks', () => {
 });
 
 describe('contact actions', () => {
+  it('prefers a spoken callback over a mismatched legacy phone for calling and texting, retaining caller ID', () => {
+    const lead = preferLeadCallback({ phone: '+1-555-0101', callbackNumber: '+1-555-0188', callerId: '+1-555-0101' });
+    expect(lead.phone).toBe('+1-555-0188');
+    expect(lead.callerId).toBe('+1-555-0101');
+    render(<LeadContactActions leadId="callback" phone={lead.phone} />);
+    expect(screen.getByTestId('button-call-callback').getAttribute('href')).toBe('tel:+15550188');
+    expect(screen.getByTestId('button-text-callback').getAttribute('href')).toBe('sms:+15550188');
+    expect(preferLeadCallback({ phone: '+1-555-0101', callbackNumber: ' ' }).phone).toBe('+1-555-0101');
+  });
   it('disables call and text without a usable phone', () => {
     render(<LeadContactActions leadId="1" phone="" />);
     expect((screen.getByTestId('button-call-1') as HTMLButtonElement).disabled).toBe(true);

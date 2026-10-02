@@ -11,6 +11,10 @@ export function displayIssue(issue?: string | null) {
 export function displayPhone(phone?: string | null) {
   return phone?.trim() || NO_PHONE;
 }
+/** Keep an explicit caller-supplied callback authoritative, even for legacy responses. */
+export function preferLeadCallback<T extends { phone: string; callbackNumber?: string | null }>(lead: T): T {
+  return { ...lead, phone: lead.callbackNumber?.trim() || lead.phone };
+}
 /** Returns a dialable string or null when the phone has too few digits. */
 export function usablePhone(phone?: string | null) {
   const trimmed = phone?.trim() ?? '';

@@ -9,6 +9,8 @@ import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { sendLeadNotificationEmail } from "../lib/gmail";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { persistAnalyzedCall } from "../lib/retellPersistence";
+import { extractRetellLead } from "../lib/retellLeadData";
+import { businessClock, DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE } from "../lib/businessHours";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -24,14 +26,6 @@ function firstString(...values: unknown[]): string | null {
 
 function callPhoneNumber(call: { to_number?: string }, fallback?: string): string | null {
   return firstString(call.to_number, fallback);
-}
-
-function analysisValue(
-  analysis: Record<string, unknown> | null | undefined,
-  ...keys: string[]
-): string | null {
-  if (!analysis) return null;
-  return firstString(...keys.map((key) => analysis[key]));
 }
 
 function callStartedAt(timestamp: number | undefined): Date | null {
@@ -86,8 +80,15 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
 function dynamicVariables(
   business: NonNullable<Awaited<ReturnType<typeof findBusinessByPhoneNumber>>> | null,
 ) {
-  const agentName = business?.agentName?.trim();
+  const savedName = business?.agentName?.trim();
+  const agentName = savedName && !/^(agent_name|\{\{.*\}\})$/i.test(savedName) ? savedName : null;
+  const hours = business?.businessHours ?? DEFAULT_BUSINESS_HOURS;
+  const timeZone = business?.timeZone ?? DEFAULT_TIME_ZONE;
   return {
+    business_hours: business ? hours : "",
+    time_zone: business ? timeZone : "",
+    ...(business ? businessClock(hours, timeZone) : { current_local_time: "", business_is_open: "unknown", next_opening: "" }),
+    transfer_available: "false",
     agent_name: agentName || DEFAULT_AGENT_NAME,
     business_name: business?.businessName ?? "",
     business_type: business?.businessType ?? "",
@@ -165,7 +166,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     return;
   }
 
-  if (body.data.event !== "call_analyzed") {
+  if (!["call_analyzed", "call_ended"].includes(body.data.event ?? "")) {
     res.sendStatus(204);
     return;
   }
@@ -185,35 +186,26 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       res.sendStatus(204);
       return;
     }
+    if (body.data.event === "call_ended" && !call.call_id) {
+      req.log.warn("Call-ended webhook missing call ID; waiting for analyzed event to avoid duplicate legacy leads");
+      res.sendStatus(204);
+      return;
+    }
 
-    const analysis = call.call_analysis?.custom_analysis_data;
-    const callerName = analysisValue(analysis, "caller_name", "customer_name", "name");
-    const callerPhoneNumber = firstString(
-      call.from_number,
-      analysisValue(analysis, "phone_number", "caller_phone_number"),
-    );
-    const issueReason = analysisValue(analysis, "issue_reason", "issue", "reason", "call_reason");
-    const address = analysisValue(analysis, "address", "service_address");
-    const urgencyLevel = analysisValue(analysis, "urgency_level", "urgency");
-    const availability = analysisValue(
-      analysis,
-      "availability",
-      "preferred_availability",
-      "preferred_time",
-    );
+    const details = extractRetellLead(call);
+    const { callerName, phoneNumber: callerPhoneNumber, issueReason } = details;
 
     const retellCallId = firstString(call.call_id)
       ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     if (!call.call_id) req.log.warn("Retell call ID missing; using legacy payload fingerprint");
     const lead = await persistAnalyzedCall(retellCallId, {
-      businessId: business.id, callerName, phoneNumber: callerPhoneNumber,
-      issueReason, address, urgencyLevel, availability,
+      businessId: business.id, ...details,
     }, {
       businessId: business.id, retellCallId,
       callStartedAt: callStartedAt(call.start_timestamp),
       durationMs: callDurationMs(call.duration_ms),
       outcome: callOutcome(call),
-    });
+    }, body.data.event === "call_analyzed");
 
     if (lead.notify) {
       void sendLeadNotificationEmail({

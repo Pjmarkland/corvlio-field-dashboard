@@ -16,6 +16,7 @@ import {
   type WebsiteEnrichmentField,
 } from "../lib/businessDirectory";
 import { enrichBusinessFromWebsite } from "../lib/websiteEnrichment";
+import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, parseBusinessHours, validTimeZone } from "../lib/businessHours";
 
 const router: IRouter = Router();
 
@@ -24,6 +25,8 @@ type BusinessProfileUpdate = z.infer<typeof UpdateBusinessProfileBody>;
 type BusinessProfileField = keyof BusinessProfileUpdate;
 
 const BUSINESS_PROFILE_COLUMN_BY_FIELD: Record<BusinessProfileField, string> = {
+  businessHours: "businessHours",
+  timeZone: "timeZone",
   businessName: "businessName",
   agentName: "agentName",
   businessType: "businessType",
@@ -63,6 +66,8 @@ const ENRICHMENT_FIELD_BY_PROFILE_FIELD: Partial<
 
 function toBusinessProfile(business: OwnedBusiness) {
   return {
+    businessHours: business.businessHours ?? DEFAULT_BUSINESS_HOURS,
+    timeZone: business.timeZone ?? DEFAULT_TIME_ZONE,
     businessName: business.businessName,
     agentName: business.agentName,
     businessType: business.businessType,
@@ -140,6 +145,11 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
   }
 
   const businessName = body.data.businessName?.trim();
+  if ((body.data.businessHours !== undefined && !parseBusinessHours(body.data.businessHours))
+    || (body.data.timeZone !== undefined && !validTimeZone(body.data.timeZone.trim()))) {
+    res.status(400).json({ error: "Use valid business hours (Mon-Fri 09:00-17:00; Sat 10:00-14:00, or 24/7) and an IANA time zone" });
+    return;
+  }
   if (body.data.businessName !== undefined && !businessName) {
     res.status(400).json({ error: "Business name cannot be empty" });
     return;
@@ -226,6 +236,8 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
 });
 
 const OnboardBusinessBody = z.object({
+  businessHours: z.string().trim().max(500).refine(v => parseBusinessHours(v) !== null).optional(),
+  timeZone: z.string().trim().max(100).refine(validTimeZone).optional(),
   isSample: z.boolean().optional(),
   businessName: z.string().min(1),
   agentName: z.string().trim().max(40).optional(),
@@ -265,6 +277,8 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     || body.data.businessName.trim().toLowerCase().includes("fictional sample")
     || body.data.ownerEmail.toLowerCase() === "owner@example.com";
   const businessInfo = {
+    businessHours: body.data.businessHours,
+    timeZone: body.data.timeZone,
     isSample,
     clerkUserId: userId,
     businessName: body.data.businessName,

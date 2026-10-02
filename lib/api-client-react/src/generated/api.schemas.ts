@@ -27,6 +27,16 @@ export const LeadStatus = {
 } as const;
 
 export interface Lead {
+  /** @nullable */
+  callerId?: string | null;
+  /** @nullable */
+  callbackNumber?: string | null;
+  /** @nullable */
+  availability?: string | null;
+  /** @nullable */
+  transcript?: string | null;
+  /** @nullable */
+  summary?: string | null;
   id: string;
   name: string;
   phone: string;
@@ -37,6 +47,19 @@ export interface Lead {
   createdAt: string;
   /** @nullable */
   contactedAt: string | null;
+}
+
+export type WelcomeEntryNextPath = typeof WelcomeEntryNextPath[keyof typeof WelcomeEntryNextPath];
+
+
+export const WelcomeEntryNextPath = {
+  '/onboarding': '/onboarding',
+  '/dashboard': '/dashboard',
+} as const;
+
+export interface WelcomeEntry {
+  showWelcome: boolean;
+  nextPath: WelcomeEntryNextPath;
 }
 
 export type LeadStatusUpdateStatus = typeof LeadStatusUpdateStatus[keyof typeof LeadStatusUpdateStatus];
@@ -80,6 +103,10 @@ export interface LeadWorkspace {
 }
 
 export interface BusinessProfile {
+  /** @nullable */
+  businessHours?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
   businessName: string;
   /** @nullable */
   agentName: string | null;
@@ -120,6 +147,16 @@ export interface BusinessProfile {
 }
 
 export interface BusinessProfileUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  businessHours?: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  timeZone?: string;
   /**
      * @minLength 1
      * @maxLength 160

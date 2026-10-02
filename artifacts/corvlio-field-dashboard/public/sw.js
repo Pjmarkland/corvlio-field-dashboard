@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'corvlio-field-desk-';
-const CACHE_NAME = `${CACHE_PREFIX}v5`;
+const CACHE_NAME = `${CACHE_PREFIX}v6`;
 const SCOPE_URL = new URL(self.registration.scope);
 const OFFLINE_URL = new URL('./', SCOPE_URL).toString();
 const APP_SHELL = [

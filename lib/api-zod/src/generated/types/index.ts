@@ -35,3 +35,5 @@ export * from './notificationPlatform';
 export * from './notificationPollResult';
 export * from './notificationStatus';
 export * from './notificationStatusPoller';
+export * from './welcomeEntry';
+export * from './welcomeEntryNextPath';

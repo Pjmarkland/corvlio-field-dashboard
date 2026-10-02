@@ -5,7 +5,7 @@ import { reconcileCall } from "./callReconciliation";
 type LeadInput = typeof leadsTable.$inferInsert;
 type RecordInput = typeof retellCallRecordsTable.$inferInsert;
 
-export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, recordInput: RecordInput) {
+export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, recordInput: RecordInput, analysisComplete = true) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(542312, hashtext(${callId}))`);
     return reconcileCall(callId, leadInput.businessId, {
@@ -44,6 +44,24 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
       },
       async linkLead(leadId, id) {
         await tx.update(leadsTable).set({ retellCallId: id }).where(eq(leadsTable.id, leadId));
+      },
+      async enrichLead(leadId) {
+        const [current] = await tx.select().from(leadsTable).where(eq(leadsTable.id, leadId));
+        if (!current) throw new Error("Lead disappeared during reconciliation");
+        const updates = Object.fromEntries(Object.entries(leadInput).filter(([field, value]) =>
+          !["businessId", "id", "retellCallId", "status", "contactedAt", "createdAt"].includes(field)
+          && value !== null && value !== undefined && value !== ""));
+        // An out-of-order call_ended must never replace a spoken callback with caller ID.
+        if (!leadInput.callbackNumber && current.callbackNumber) updates.phoneNumber = current.callbackNumber;
+        // A late call_ended only fills gaps; it cannot erase richer analysis.
+        if (!analysisComplete) {
+          for (const field of Object.keys(updates)) {
+            if (field !== "transcript" && current[field as keyof typeof current]) delete updates[field];
+          }
+        }
+        if (Object.keys(updates).length) {
+          await tx.update(leadsTable).set(updates).where(eq(leadsTable.id, leadId));
+        }
       },
       async saveRecord(id, leadId) {
         await tx.insert(retellCallRecordsTable).values({ ...recordInput, retellCallId: id, leadId })

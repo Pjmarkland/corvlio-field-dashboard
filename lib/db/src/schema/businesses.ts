@@ -4,6 +4,8 @@ import { boolean, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "d
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
   businessName: text("business_name").notNull(),
+  businessHours: text("business_hours").notNull().default("Mon-Fri 09:00-17:00"),
+  timeZone: text("time_zone").notNull().default("America/New_York"),
   agentName: text("agent_name"),
   clerkUserId: text("clerk_user_id"),
   ownerEmail: text("owner_email"),

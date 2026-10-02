@@ -9,6 +9,15 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Claim the verified new user's one-time welcome screen
+ */
+export const ClaimWelcomeResponse = zod.object({
+  "showWelcome": zod.boolean(),
+  "nextPath": zod.enum(['/onboarding', '/dashboard'])
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -21,6 +30,8 @@ export const HealthCheckResponse = zod.object({
  * @summary Get the signed-in owner's business profile
  */
 export const GetBusinessProfileResponse = zod.object({
+  "businessHours": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "businessName": zod.string(),
   "agentName": zod.string().nullable(),
   "businessType": zod.string().nullable(),
@@ -46,6 +57,10 @@ export const GetBusinessProfileResponse = zod.object({
 /**
  * @summary Update the signed-in owner's business profile
  */
+export const updateBusinessProfileBodyBusinessHoursMax = 500;
+
+export const updateBusinessProfileBodyTimeZoneMax = 100;
+
 export const updateBusinessProfileBodyBusinessNameMax = 160;
 
 export const updateBusinessProfileBodyAgentNameMax = 40;
@@ -85,6 +100,8 @@ export const updateBusinessProfileBodyEmergencyContactInfoMax = 4000;
 
 
 export const UpdateBusinessProfileBody = zod.object({
+  "businessHours": zod.string().min(1).max(updateBusinessProfileBodyBusinessHoursMax).optional(),
+  "timeZone": zod.string().min(1).max(updateBusinessProfileBodyTimeZoneMax).optional(),
   "businessName": zod.string().min(1).max(updateBusinessProfileBodyBusinessNameMax).optional(),
   "agentName": zod.string().max(updateBusinessProfileBodyAgentNameMax).nullish(),
   "businessType": zod.string().max(updateBusinessProfileBodyBusinessTypeMax).nullish(),
@@ -106,6 +123,8 @@ export const UpdateBusinessProfileBody = zod.object({
 })
 
 export const UpdateBusinessProfileResponse = zod.object({
+  "businessHours": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "businessName": zod.string(),
   "agentName": zod.string().nullable(),
   "businessType": zod.string().nullable(),
@@ -140,6 +159,11 @@ export const GetLeadsResponse = zod.object({
   "retellPhoneNumber": zod.string().nullable(),
   "timeZone": zod.string().nullable(),
   "leads": zod.array(zod.object({
+  "callerId": zod.string().nullish(),
+  "callbackNumber": zod.string().nullish(),
+  "availability": zod.string().nullish(),
+  "transcript": zod.string().nullish(),
+  "summary": zod.string().nullish(),
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),

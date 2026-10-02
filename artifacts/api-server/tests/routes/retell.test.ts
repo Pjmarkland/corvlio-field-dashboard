@@ -41,6 +41,7 @@ let server: Server;
 let baseUrl: string;
 
 const OTHER_DYNAMIC_VARIABLE_KEYS = [
+  "business_hours", "time_zone", "current_local_time", "business_is_open", "next_opening", "transfer_available",
   "business_name",
   "business_type",
   "service_area",
@@ -143,6 +144,30 @@ const signedRequest = (path: string, body: string, timestamp = Date.now(), signe
 };
 
 describe("Retell webhook safety", () => {
+  it("persists a partial ended call and later canonical/legacy analysis without losing callback or transcript", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.test" }));
+    mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });
+    const call = { call_id: "call-partial", to_number: "+14155550123", from_number: "+15559990000",
+      transcript: "user: My pipe is leaking. I'm Sam.",
+    };
+    expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
+    expect(mocks.persistAnalyzedCall.mock.calls[0]).toEqual([
+      "call-partial", expect.objectContaining({ transcript: call.transcript, callerId: call.from_number, phoneNumber: call.from_number, summary: expect.stringContaining("My pipe is leaking") }),
+      expect.any(Object), false,
+    ]);
+    expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
+      ...call, call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
+        "USER NAME": "Sam", ISSUE: "Leaking pipe", ADDRESS: "12 Test St", URGENCY: "today", AVAILABILITY: "afternoon",
+        callback_number: "+15551230000",
+      } },
+    } }))).status).toBe(204);
+    expect(mocks.persistAnalyzedCall.mock.calls[1]).toEqual([
+      "call-partial", expect.objectContaining({ callerName: "Sam", issueReason: "Leaking pipe", address: "12 Test St",
+        urgencyLevel: "today", availability: "afternoon", callerId: "+15559990000", callbackNumber: "+15551230000",
+        phoneNumber: "+15551230000", transcript: call.transcript, summary: "Sam has a leaking pipe." }),
+      expect.any(Object), true,
+    ]);
+  });
   it("allows missing pre-call signatures during the compatibility rollout and logs them", async () => {
     expect((await requestPreCall()).status).toBe(200);
     expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("allowing during compatibility"));
@@ -180,6 +205,15 @@ describe("Retell webhook safety", () => {
 });
 
 describe("Retell pre-call dynamic variables", () => {
+  it("supplies current saved hours/timezone/policies and disables unsafe shared transfer", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({
+      businessHours: "24/7", timeZone: "America/Phoenix", servicesNotOffered: "Electrical", emergencyContactInfo: "Call emergency services for danger",
+    }));
+    const vars = (await requestPreCall()).body.call_inbound.dynamic_variables;
+    expect(vars).toMatchObject({ business_hours: "24/7", time_zone: "America/Phoenix", business_is_open: "true",
+      services_not_offered: "Electrical", emergency_contact_info: "Call emergency services for danger", transfer_available: "false" });
+    expect(vars.current_local_time).toBeTruthy();
+  });
   it("defaults an explicitly blank receptionist name to Aria", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ agentName: "   " }));
 
@@ -213,7 +247,7 @@ describe("Retell pre-call dynamic variables", () => {
     expect(Object.keys(dynamicVariables).sort()).toEqual(
       ["agent_name", ...OTHER_DYNAMIC_VARIABLE_KEYS].sort(),
     );
-    expect(dynamicVariables).toEqual({
+    expect(dynamicVariables).toMatchObject({
       agent_name: "Aria",
       business_name: "Example Heating",
       business_type: "",
@@ -230,6 +264,9 @@ describe("Retell pre-call dynamic variables", () => {
       credentials: "",
       owner_availability: "",
       emergency_contact_info: "",
+      business_hours: "Mon-Fri 09:00-17:00",
+      time_zone: "America/New_York",
+      transfer_available: "false",
     });
   });
 

@@ -9,6 +9,16 @@
 export interface BusinessProfileUpdate {
   /**
      * @minLength 1
+     * @maxLength 500
+     */
+  businessHours?: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  timeZone?: string;
+  /**
+     * @minLength 1
      * @maxLength 160
      */
   businessName?: string;

@@ -1,3 +1,5 @@
+import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE } from '@/lib/businessCoverage';
+
 export type OnboardingForm = {
   isSample: boolean;
   businessName: string;
@@ -18,6 +20,8 @@ export type OnboardingForm = {
   credentials: string;
   ownerAvailability: string;
   emergencyContact: string;
+  businessHours: string;
+  timeZone: string;
   privacyAccepted: boolean;
   termsAccepted: boolean;
   serviceAgreementAccepted: boolean;
@@ -43,6 +47,8 @@ export const initialForm: OnboardingForm = {
   credentials: '',
   ownerAvailability: '',
   emergencyContact: '',
+  businessHours: DEFAULT_BUSINESS_HOURS,
+  timeZone: DEFAULT_TIME_ZONE,
   privacyAccepted: false,
   termsAccepted: false,
   serviceAgreementAccepted: false,
@@ -113,6 +119,8 @@ export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
     maintenancePlans: '',
     credentials: '',
     ownerAvailability: 'Sample hours only: Monday–Friday, 8am–5pm. Replace before using with real callers.',
+    businessHours: DEFAULT_BUSINESS_HOURS,
+    timeZone: DEFAULT_TIME_ZONE,
     emergencyContact: 'Fictional sample only: this is not an emergency service. For immediate danger, contact local emergency services.',
   };
 }

@@ -21,7 +21,7 @@ import { InstallHint } from '@/components/InstallHint';
 import { LeadContactActions } from '@/components/LeadContactActions';
 import { leadsRefreshInterval } from '@/lib/leadRefresh';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import { displayIssue, displayName, displayPhone, nameInitials, usablePhone } from '@/lib/leadDisplay';
+import { displayIssue, displayName, displayPhone, nameInitials, usablePhone, preferLeadCallback } from '@/lib/leadDisplay';
 import logoUrl from '@/assets/logo.svg';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -35,6 +35,9 @@ import {
   readOnboardingConfirmation,
   type OnboardingConfirmation,
 } from '@/lib/onboardingConfirmation';
+import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
+import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
+import WelcomePage from '@/pages/welcome';
 import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
@@ -44,6 +47,8 @@ import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
 import {
   ArrowLeft,
   ArrowUpRight,
+  CalendarClock,
+  PhoneIncoming,
   Bell,
   Check,
   CheckCircle2,
@@ -78,6 +83,11 @@ type Lead = {
   status: LeadStatus;
   createdAt: string;
   contactedAt: string | null;
+  callerId?: string | null;
+  callbackNumber?: string | null;
+  availability?: string | null;
+  transcript?: string | null;
+  summary?: string | null;
 };
 type StatusHandler = (id: string, status: LeadStatus) => void;
 
@@ -378,7 +388,15 @@ export function DetailPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; o
   const lead = leads.find((item) => item.id === params.id);
   if (!lead) return <NotFound />;
   const saving = savingLeadId === lead.id;
-  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{displayName(lead.name)}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{displayIssue(lead.issue)}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><LeadContactActions leadId={lead.id} phone={lead.phone} prefix="detail-" large callLabel={`Call ${displayName(lead.name).split(' ')[0]}`} textLabel="Send text" /></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={displayPhone(lead.phone)} href={usablePhone(lead.phone) ? `tel:${usablePhone(lead.phone)}` : undefined} /><InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><div className="mt-6 border-t border-border pt-5"><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Saved to your Corvlio workspace. Calling or texting does not change it.</p></div><div className="detail-action-spacer" /><div className="detail-action-bar border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md" data-testid="bar-detail-actions"><div className="mx-auto max-w-[1160px]">{lead.status === 'pending' ? <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button> : <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="min-h-12 w-full rounded-xl border border-border text-sm font-bold text-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}</div></div></div>;
+  return <div className="animate-rise-in"><Link href="/dashboard" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground" data-testid="link-back-leads"><ArrowLeft size={16} /> Back to leads</Link><div className="mb-7 flex items-start gap-4"><div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{initials(lead.name)}</div><div><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${lead.urgency === 'urgent' ? 'bg-primary/15 text-[#c84b29]' : 'bg-muted text-muted-foreground'}`}>{urgencyLabel(lead.urgency)}</span><span className="font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span></div><h1 className="text-[32px] font-800 leading-none tracking-[-0.055em]">{displayName(lead.name)}</h1><p className="mt-2 text-sm text-muted-foreground">New receptionist lead</p></div></div><div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="text-xl font-semibold leading-snug tracking-[-0.02em]">{displayIssue(lead.issue)}</p><div className="mt-5 flex items-start gap-2 border-t border-sidebar-border pt-4 text-sm text-sidebar-foreground/70"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span>{lead.address}</span></div></div><div className="grid grid-cols-2 gap-3"><LeadContactActions leadId={lead.id} phone={lead.phone} prefix="detail-" large callLabel={`Call ${displayName(lead.name).split(' ')[0]}`} textLabel="Send text" /></div><div className="mt-8 space-y-1 rounded-2xl border border-border bg-card p-2"><InfoRow icon={<Phone size={16} />} label="Phone" value={displayPhone(lead.phone)} href={usablePhone(lead.phone) ? `tel:${usablePhone(lead.phone)}` : undefined} />{lead.callerId && lead.callerId.trim() && displayPhone(lead.callerId) !== displayPhone(lead.phone) ? <InfoRow icon={<PhoneIncoming size={16} />} label="Caller ID" value={displayPhone(lead.callerId)} /> : null}{lead.availability?.trim() ? <InfoRow icon={<CalendarClock size={16} />} label="Availability" value={lead.availability.trim()} /> : null}<InfoRow icon={<MapPin size={16} />} label="Address" value={lead.address} /><InfoRow icon={<Clock3 size={16} />} label="Received" value={relativeTime(lead.createdAt)} /></div><LeadCallNotes summary={lead.summary} transcript={lead.transcript} /><div className="mt-6 border-t border-border pt-5"><p className="text-sm font-bold">Lead status</p><p className="mt-1 text-xs text-muted-foreground">Saved to your Corvlio workspace. Calling or texting does not change it.</p></div><div className="detail-action-spacer" /><div className="detail-action-bar border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md" data-testid="bar-detail-actions"><div className="mx-auto max-w-[1160px]">{lead.status === 'pending' ? <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button> : <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="min-h-12 w-full rounded-xl border border-border text-sm font-bold text-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}</div></div></div>;
+}
+
+function LeadCallNotes({ summary, transcript }: { summary?: string | null; transcript?: string | null }) {
+  const [open, setOpen] = useState(false);
+  const sum = summary?.trim();
+  const text = transcript?.trim();
+  if (!sum && !text) return null;
+  return <div className="mt-4 space-y-3" data-testid="lead-call-notes">{sum ? <section className="rounded-2xl border border-border bg-card p-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">Call summary</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed" data-testid="lead-summary">{sum}</p></section> : null}{text ? <section className="rounded-2xl border border-border bg-card"><button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="button-toggle-transcript" className="flex min-h-12 w-full items-center justify-between px-4 text-sm font-bold"><span>Transcript</span><ChevronRight size={16} className={`transition-transform ${open ? 'rotate-90' : ''}`} /></button>{open ? <p className="whitespace-pre-wrap border-t border-border px-4 py-3 text-sm leading-relaxed text-muted-foreground" data-testid="lead-transcript">{text}</p> : null}</section> : null}</div>;
 }
 
 function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) {
@@ -499,6 +517,13 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
     { key: 'credentials', label: 'Credentials', multiline: true }, { key: 'ownerAvailability', label: 'Owner availability', multiline: true },
     { key: 'emergencyContactInfo', label: 'Emergency contact information', multiline: true },
   ];
+  type Coverage = { businessHours: string; timeZone: string };
+  const coverageOf = (p: BusinessProfile | null): Coverage => {
+    const x = (p ?? {}) as unknown as Partial<Record<keyof Coverage, string | null>>;
+    return { businessHours: x.businessHours ?? DEFAULT_BUSINESS_HOURS, timeZone: x.timeZone ?? DEFAULT_TIME_ZONE };
+  };
+  const coverage = coverageOf(draft);
+  const changeCoverage = (key: keyof Coverage, value: string) => setDraft((current) => current ? ({ ...current, [key]: value } as unknown as BusinessProfile) : current);
   const change = (key: keyof BusinessProfile, value: string) => setDraft((current) => current ? { ...current, [key]: value } : current);
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -507,12 +532,15 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
       setNotice({ type: 'error', message: 'Enter a business name and valid owner email.' });
       return;
     }
+    const coverageError = validateBusinessHours(coverage.businessHours) ?? validateTimeZone(coverage.timeZone);
+    if (coverageError) { setNotice({ type: 'error', message: coverageError }); return; }
     setNotice(null);
     const data = Object.fromEntries(fields.map(({ key }) => {
       const value = draft[key as keyof BusinessProfile];
       if (key === 'businessType') return [key, value];
       return [key, key === 'businessName' || key === 'ownerEmail' ? (typeof value === 'string' ? value.trim() : value) : typeof value === 'string' && value.trim() ? value.trim() : null];
     })) as BusinessProfileUpdate;
+    Object.assign(data, { businessHours: coverage.businessHours.trim(), timeZone: coverage.timeZone.trim() });
     mutation.mutate({ data }, {
       onSuccess: (profile) => {
         setDraft(profile);
@@ -527,7 +555,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="mb-5"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Business profile</p><h2 className="mt-1 text-lg font-bold">Details your receptionist needs</h2><p className="mt-1 text-sm text-muted-foreground">Update these anytime. Changes are saved to your business profile.</p></div>
       {query.isLoading ? <div className="space-y-3" aria-label="Loading business profile"><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-12 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div> : query.isError ? <div role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm">Could not load your business details. <button type="button" onClick={() => void query.refetch()} className="font-semibold text-primary underline">Try again</button></div> : draft ? <form onSubmit={submit} data-testid="form-business-profile">
-        <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, multiline, type }) => { const value = draft[key as keyof BusinessProfile]; return <label key={key} className={`block ${multiline ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-xs font-semibold">{label}{key === 'businessName' || key === 'ownerEmail' ? <span className="ml-1 text-primary">*</span> : null}</span>{multiline ? <textarea rows={3} maxLength={4000} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} /> : <input type={type ?? 'text'} required={key === 'businessName' || key === 'ownerEmail'} pattern={key === 'businessWebsiteUrl' ? 'https?://.+' : undefined} title={key === 'businessWebsiteUrl' ? 'Enter a URL beginning with http:// or https://' : undefined} maxLength={key === 'businessName' ? 160 : key === 'ownerEmail' ? 320 : key === 'agentName' ? 40 : key === 'businessType' ? 200 : 2048} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} placeholder={key === 'agentName' ? 'Aria' : key === 'businessWebsiteUrl' ? 'https://yourbusiness.com' : ''} className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} />}</label>; })}</div>
+        <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, multiline, type }) => { const value = draft[key as keyof BusinessProfile]; return <label key={key} className={`block ${multiline ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-xs font-semibold">{label}{key === 'businessName' || key === 'ownerEmail' ? <span className="ml-1 text-primary">*</span> : null}</span>{multiline ? <textarea rows={3} maxLength={4000} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} className="w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} /> : <input type={type ?? 'text'} required={key === 'businessName' || key === 'ownerEmail'} pattern={key === 'businessWebsiteUrl' ? 'https?://.+' : undefined} title={key === 'businessWebsiteUrl' ? 'Enter a URL beginning with http:// or https://' : undefined} maxLength={key === 'businessName' ? 160 : key === 'ownerEmail' ? 320 : key === 'agentName' ? 40 : key === 'businessType' ? 200 : 2048} value={typeof value === 'string' ? value : ''} onChange={(event) => change(key as keyof BusinessProfile, event.target.value)} placeholder={key === 'agentName' ? 'Aria' : key === 'businessWebsiteUrl' ? 'https://yourbusiness.com' : ''} className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring" data-testid={`input-profile-${key}`} />}</label>; })}<BusinessCoverageFields prefix="profile" values={coverage} onChange={changeCoverage} /></div>
         <label className="mt-4 block"><span className="mb-1.5 block text-xs font-semibold">Corvlio phone number</span><input readOnly value={draft.retellPhoneNumber ?? retellPhoneNumber ?? 'Pending'} data-testid="input-profile-retellPhoneNumber" className="min-h-12 w-full rounded-xl border border-input bg-muted/50 px-3.5 text-sm text-muted-foreground" /><span className="mt-1.5 block text-xs text-muted-foreground">Assigned and managed by Corvlio.</span></label>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="text-xs text-muted-foreground">Receptionist name is optional. Blank uses Aria.</p><button type="submit" disabled={mutation.isPending} data-testid="button-save-business-profile" className="min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-60">{mutation.isPending ? 'Saving details…' : 'Save business details'}</button></div>
         {notice ? <p role={notice.type === 'error' ? 'alert' : 'status'} data-testid="status-profile-save" className={`mt-3 text-sm ${notice.type === 'error' ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-300'}`}>{notice.message}</p> : null}
@@ -639,8 +667,8 @@ function SignInPage() {
   return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div>;
 }
 
-function SignUpPage() {
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div>;
+export function SignUpPage() {
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/welcome`} /></div>;
 }
 
 function LeadDataRouter() {
@@ -662,7 +690,7 @@ function LeadDataRouter() {
     }
   }, [onboardingConfirmation, user?.id]);
   const leads = useMemo(
-    () => [...(data?.leads ?? [])]
+    () => (data?.leads ?? []).map(preferLeadCallback)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
     [data?.leads],
   );
@@ -710,6 +738,10 @@ function LeadDataRouter() {
   }
 
   return <Router refreshLeads={() => refetch()} leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} retellPhoneNumber={data.retellPhoneNumber} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'America/New_York'} onStatus={onStatus} savingLeadId={savingLeadId} />;
+}
+
+function WelcomeRoute() {
+  return <><Show when="signed-in"><WelcomePage /></Show><Show when="signed-out"><Redirect to="/sign-in" /></Show></>;
 }
 
 function AuthenticatedRouter() {
@@ -766,7 +798,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {

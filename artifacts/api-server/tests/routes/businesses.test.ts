@@ -166,6 +166,15 @@ async function updateMyBusiness(body: Record<string, unknown>) {
 }
 
 describe("owner business profile API", () => {
+  it("saves validated hours/timezone and rejects malformed schedules/zones without updating", async () => {
+    const good = await updateMyBusiness({ businessHours: "Mon-Fri 08:00-18:00; Sat 09:00-13:00", timeZone: "America/Chicago" });
+    expect(good.status).toBe(200);
+    expect(await good.json()).toMatchObject({ businessHours: "Mon-Fri 08:00-18:00; Sat 09:00-13:00", timeZone: "America/Chicago" });
+    mocks.updateOwnedBusiness.mockClear();
+    expect((await updateMyBusiness({ businessHours: "Mon-Fri 99:00-99:00" })).status).toBe(400);
+    expect((await updateMyBusiness({ timeZone: "Mars/Unknown" })).status).toBe(400);
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
   it("returns the signed-in owner's business profile without cacheable data", async () => {
     const response = await getMyBusiness();
 

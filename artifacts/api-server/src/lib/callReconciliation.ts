@@ -7,6 +7,7 @@ export interface CallTransaction {
   findLegacyLead(): Promise<CallLead | undefined>;
   createLead(callId: string): Promise<CallLead>;
   linkLead(leadId: number, callId: string): Promise<void>;
+  enrichLead?(leadId: number): Promise<void>;
   saveRecord(callId: string, leadId: number): Promise<void>;
   ensureNotification(leadId: number): Promise<boolean>;
 }
@@ -23,6 +24,7 @@ export async function reconcileCall(callId: string, businessId: number, tx: Call
   }
   if (!lead) lead = await tx.createLead(callId);
   else if (!lead.retellCallId) await tx.linkLead(lead.id, callId);
+  await tx.enrichLead?.(lead.id);
   await tx.saveRecord(callId, lead.id);
   const notify = await tx.ensureNotification(lead.id);
   return { id: lead.id, notify };

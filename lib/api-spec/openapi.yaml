@@ -19,6 +19,26 @@ tags:
   - name: admin
     description: Read-only founder administration operations
 paths:
+  /user/welcome:
+    post:
+      operationId: claimWelcome
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Claim the verified new user's one-time welcome screen
+      responses:
+        "200":
+          description: Welcome eligibility and next destination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WelcomeEntry"
+        "401":
+          description: Authentication required
+        "403":
+          description: Verified email required
+        "502":
+          description: Welcome could not be checked
   /healthz:
     get:
       operationId: healthCheck
@@ -343,6 +363,16 @@ components:
     Lead:
       type: object
       properties:
+        callerId:
+          type: [string, "null"]
+        callbackNumber:
+          type: [string, "null"]
+        availability:
+          type: [string, "null"]
+        transcript:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
         id:
           type: string
         name:
@@ -375,6 +405,15 @@ components:
         - status
         - createdAt
         - contactedAt
+    WelcomeEntry:
+      type: object
+      properties:
+        showWelcome:
+          type: boolean
+        nextPath:
+          type: string
+          enum: ["/onboarding", "/dashboard"]
+      required: [showWelcome, nextPath]
     LeadStatusUpdate:
       type: object
       additionalProperties: false
@@ -428,6 +467,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        businessHours:
+          type: [string, "null"]
+        timeZone:
+          type: [string, "null"]
         businessName:
           type: string
         agentName:
@@ -490,6 +533,14 @@ components:
       type: object
       additionalProperties: false
       properties:
+        businessHours:
+          type: string
+          minLength: 1
+          maxLength: 500
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 100
         businessName:
           type: string
           minLength: 1

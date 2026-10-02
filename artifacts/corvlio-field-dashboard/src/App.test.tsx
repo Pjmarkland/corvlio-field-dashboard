@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { preferLeadCallback } from '@/lib/leadDisplay';
 
 const {
   mockRevoke,
@@ -213,6 +214,24 @@ describe('UnconfiguredAccountScreen sign-out escape hatch', () => {
 });
 describe('LeadDetail status actions', () => {
   const lead = { id: 'L1', name: '', phone: '(415) 555-0123', issue: '', address: '1 Pier', urgency: 'normal' as const, status: 'pending' as const, createdAt: new Date().toISOString(), contactedAt: null };
+  it('uses the normalized spoken callback and shows caller ID, availability, summary and the expandable transcript', () => {
+    const { hook } = memoryLocation({ path: '/leads/L1' });
+    const onStatus = vi.fn();
+    const detailed = preferLeadCallback({ ...lead, phone: '+1-555-0101', callbackNumber: '+1-555-0188',
+      callerId: '+1-555-0101', availability: 'Afternoons', summary: 'Caller needs a pipe repaired.',
+      transcript: 'user: Please call me at the other number.' });
+    render(<TestRouter hook={hook}><Route path="/leads/:id"><DetailPage leads={[detailed]} onStatus={onStatus} savingLeadId={null} /></Route></TestRouter>);
+    expect(screen.getByTestId('button-detail-call-L1').getAttribute('href')).toBe('tel:+15550188');
+    expect(screen.getByTestId('link-info-phone').getAttribute('href')).toBe('tel:+15550188');
+    expect(screen.getByText('Caller ID')).toBeTruthy();
+    expect(screen.getByText('+1-555-0101')).toBeTruthy();
+    expect(screen.getByText('Afternoons')).toBeTruthy();
+    expect(screen.getByTestId('lead-summary').textContent).toBe(detailed.summary);
+    expect(screen.queryByTestId('lead-transcript')).toBeNull();
+    fireEvent.click(screen.getByTestId('button-toggle-transcript'));
+    expect(screen.getByTestId('lead-transcript').textContent).toBe(detailed.transcript);
+    expect(onStatus).not.toHaveBeenCalled();
+  });
   it('never marks contacted from tel/sms, only from the explicit button', () => {
     const onStatus = vi.fn();
     const { hook } = memoryLocation({ path: '/leads/L1' });

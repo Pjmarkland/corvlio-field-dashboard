@@ -7,6 +7,10 @@
  */
 
 export interface BusinessProfile {
+  /** @nullable */
+  businessHours?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
   businessName: string;
   /** @nullable */
   agentName: string | null;

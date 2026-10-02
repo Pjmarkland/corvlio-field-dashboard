@@ -33,7 +33,8 @@ import type {
   NotificationDeviceRegistration,
   NotificationOutboxEvent,
   NotificationPollResult,
-  NotificationStatus
+  NotificationStatus,
+  WelcomeEntry
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -62,6 +63,77 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getClaimWelcomeUrl = () => {
+
+
+
+
+  return `/api/user/welcome`
+}
+
+/**
+ * @summary Claim the verified new user's one-time welcome screen
+ */
+export const claimWelcome = async ( options?: Parameters<typeof customFetch>[1]): Promise<WelcomeEntry> => {
+
+  return customFetch<WelcomeEntry>(getClaimWelcomeUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimWelcomeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimWelcome>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimWelcome>>, TError,void, TContext> => {
+
+const mutationKey = ['claimWelcome'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimWelcome>>, void> = () => {
+
+
+          return  claimWelcome(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimWelcomeMutationResult = NonNullable<Awaited<ReturnType<typeof claimWelcome>>>
+
+    export type ClaimWelcomeMutationError = ErrorType<void>
+
+    /**
+ * @summary Claim the verified new user's one-time welcome screen
+ */
+export const useClaimWelcome = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimWelcome>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimWelcome>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimWelcomeMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

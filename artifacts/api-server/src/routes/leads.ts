@@ -67,7 +67,7 @@ router.get("/leads", async (req, res): Promise<void> => {
       provisioningState: business.isSample ? "sample" : business.retellPhoneNumber ? "ready" : business.provisioningState,
       businessName: business.businessName,
       retellPhoneNumber: business.retellPhoneNumber,
-      timeZone: "America/New_York",
+      timeZone: business.timeZone ?? "America/New_York",
       leads: leads.map((lead) => ({
         id: String(lead.id),
         name: lead.callerName ?? "",
@@ -78,6 +78,11 @@ router.get("/leads", async (req, res): Promise<void> => {
         status: normalizeStatus(lead.status),
         createdAt: lead.createdAt,
         contactedAt: lead.contactedAt,
+        callerId: lead.callerId,
+        callbackNumber: lead.callbackNumber,
+        availability: lead.availability,
+        transcript: lead.transcript,
+        summary: lead.summary,
       })),
     }));
   } catch (error) {

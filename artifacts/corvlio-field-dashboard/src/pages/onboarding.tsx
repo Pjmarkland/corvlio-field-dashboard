@@ -6,6 +6,8 @@ import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
+import { validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
 import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSignOut } from '@/hooks/useSignOut';
@@ -356,6 +358,12 @@ function OnboardingPage() {
       return;
     }
 
+    const coverageError = validateBusinessHours(form.businessHours) ?? validateTimeZone(form.timeZone);
+    if (coverageError) {
+      setSubmission({ kind: 'error', message: coverageError });
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmission(null);
 
@@ -384,6 +392,8 @@ function OnboardingPage() {
           credentials: form.credentials,
           ownerAvailability: form.ownerAvailability,
           emergencyContactInfo: form.emergencyContact,
+          businessHours: form.businessHours.trim(),
+          timeZone: form.timeZone.trim(),
         }),
       });
 
@@ -559,6 +569,7 @@ function OnboardingPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="ownerAvailability" label="Owner availability" value={form.ownerAvailability} onChange={(value) => updateField('ownerAvailability', value)} placeholder="Mon–Fri, 7am–5pm. I review new leads between jobs." multiline rows={4} />
                 <Field id="emergencyContact" label="Emergency contact information" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours line, dispatch instructions, or urgent-call guidance." multiline rows={4} />
+                <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} />
               </div>
             </section>
           </div>

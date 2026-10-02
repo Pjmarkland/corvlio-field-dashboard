@@ -9,6 +9,11 @@ const retellCallAnalysisSchema = z
 export const RetellCallSchema = z
   .object({
     call_id: z.string().optional(),
+    transcript: z.string().optional(),
+    transcript_object: z.array(z.object({
+      role: z.string(),
+      content: z.string(),
+    }).passthrough()).optional(),
     start_timestamp: z.number().finite().optional(),
     duration_ms: z.number().finite().optional(),
     disconnection_reason: z.string().optional(),
