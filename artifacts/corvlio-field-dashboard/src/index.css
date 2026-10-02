@@ -163,6 +163,27 @@
 .dark [data-owner-ui] [class~="bg-white/70"] { background-color: hsl(150 35% 19% / .8); }
 .dark [data-owner-ui] [class~="text-[#c84b29]"] { color: hsl(8 75% 72%); }
 
+/* Keep owner-facing controls readable in dark mode without changing Clerk or admin colors. */
+.dark [data-owner-ui] {
+  --primary: 213 94% 68%;
+  --primary-foreground: 214 68% 10%;
+  --primary-hover: 210 100% 78%;
+}
+
+.dark [data-owner-ui] :is(input, textarea, select) {
+  color: hsl(var(--foreground));
+}
+
+.dark [data-owner-ui] :is(input, textarea)::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
+.dark [data-owner-ui] select option {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+}
+
 /* Founder console: a warmer, quieter layer over the field app theme. */
 .admin-console {
   --admin-ink: #17231f;
