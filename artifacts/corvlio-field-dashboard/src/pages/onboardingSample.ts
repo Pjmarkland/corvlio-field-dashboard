@@ -59,10 +59,42 @@ export const responseTimeOptions = [
   { value: 'We return calls by the next business day.', label: 'Next business day' },
 ];
 
+export const sampleCallPreview = {
+  businessName: 'Demo Pipeworks (Fictional Sample)',
+  receptionistName: 'Aria',
+  conversation: [
+    {
+      speaker: 'receptionist',
+      text: "Thanks for calling Demo Pipeworks. I'm Aria, the virtual receptionist. How can I help you today?",
+    },
+    {
+      speaker: 'caller',
+      text: 'There is a small leak under my kitchen sink, but I was able to turn off the water.',
+    },
+    {
+      speaker: 'receptionist',
+      text: "I'm glad you were able to stop it. I'll take a few details so the team can follow up. What's your name and the best number to reach you?",
+    },
+    {
+      speaker: 'caller',
+      text: 'Jordan Lee, (555) 010-0123.',
+    },
+    {
+      speaker: 'receptionist',
+      text: "Thanks, Jordan. I've noted a contained sink leak for the team. They aim to return calls by the next business day. I can't confirm a price or appointment, but the team can discuss those when they follow up.",
+    },
+  ],
+  boundaries: [
+    'Does not guess at prices',
+    'Does not promise appointments',
+    'Uses the sample next-business-day callback commitment',
+  ],
+} as const;
+
 export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
   return {
     ...current,
-    businessName: 'Demo Pipeworks (Fictional Sample)',
+    businessName: sampleCallPreview.businessName,
     businessType: 'Plumbing',
     businessWebsiteUrl: '',
     ownerEmail: 'owner@example.com',

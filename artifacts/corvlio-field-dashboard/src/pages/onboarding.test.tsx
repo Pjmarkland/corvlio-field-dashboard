@@ -10,6 +10,26 @@ const toneChoices = [
 ];
 
 describe('sample business onboarding helper', () => {
+  it('previews the fictional call without applying sample details or submitting setup', () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const apply = vi.fn();
+
+    render(
+      <form onSubmit={submit}>
+        <SampleBusinessHelper onApply={apply} />
+        <button type="submit">Submit setup</button>
+      </form>,
+    );
+
+    fireEvent.click(screen.getByTestId('button-preview-sample-call'));
+
+    expect(screen.getByRole('heading', { name: 'Sample call preview' })).toBeTruthy();
+    expect(screen.getByText(/does not place a call, save a business profile, or provision a phone number/i)).toBeTruthy();
+    expect(screen.getByText(/There is a small leak under my kitchen sink/i)).toBeTruthy();
+    expect(apply).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it('fills fictional details without submitting and preserves the receptionist name and consent state', async () => {
     const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
 

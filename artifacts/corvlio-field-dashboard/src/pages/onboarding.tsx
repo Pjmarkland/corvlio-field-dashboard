@@ -1,30 +1,118 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetLeadsQueryKey } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSignOut } from '@/hooks/useSignOut';
-import { applySampleBusiness, initialForm, responseTimeOptions, toneOptions, type OnboardingForm } from './onboardingSample';
+import { applySampleBusiness, initialForm, responseTimeOptions, sampleCallPreview, toneOptions, type OnboardingForm } from './onboardingSample';
 
 export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   return (
-    <div className="mt-5 rounded-xl border border-primary/25 bg-primary/[0.06] p-4">
-      <button
-        type="button"
-        onClick={onApply}
-        data-testid="button-fill-sample-business"
-        className="min-h-12 w-full rounded-lg text-left text-sm font-semibold text-primary underline decoration-primary/35 underline-offset-4 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
-        Don&apos;t have a business? Use a sample business to try it out.
-      </button>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-        Fills editable fictional plumbing details and clears the website. Nothing is submitted until you choose Submit setup.
-      </p>
-    </div>
+    <>
+      <div className="mt-5 rounded-xl border border-primary/25 bg-primary/[0.06] p-4">
+        <p className="text-sm font-semibold">Want to see how the receptionist handles a call?</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Preview a fictional plumbing call first, or fill the form with editable sample details.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            data-testid="button-preview-sample-call"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/35 bg-background px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <PhoneCall size={16} />
+            Preview sample call
+          </button>
+          <button
+            type="button"
+            onClick={onApply}
+            data-testid="button-fill-sample-business"
+            className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Fill sample details in form
+          </button>
+        </div>
+      </div>
+
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-2xl gap-5 p-5 sm:p-7" data-testid="dialog-sample-call-preview">
+          <DialogHeader className="pr-7 text-left">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                <PhoneCall size={17} />
+              </span>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                Fictional demo
+              </span>
+            </div>
+            <DialogTitle className="text-xl font-800 tracking-tight">Sample call preview</DialogTitle>
+            <DialogDescription>
+              A scripted example of how {sampleCallPreview.receptionistName} could handle a routine service request for {sampleCallPreview.businessName}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border bg-muted/35 p-3 sm:p-4" aria-label="Fictional sample call transcript">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <p className="text-sm font-semibold">{sampleCallPreview.businessName}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Receptionist: {sampleCallPreview.receptionistName}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-background px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                Sample transcript
+              </span>
+            </div>
+            <ol className="space-y-3">
+              {sampleCallPreview.conversation.map((message, index) => {
+                const isReceptionist = message.speaker === 'receptionist';
+                return (
+                  <li key={index} className={`flex ${isReceptionist ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${isReceptionist ? 'rounded-tl-sm bg-card text-foreground shadow-sm' : 'rounded-tr-sm bg-primary text-primary-foreground'}`}>
+                      <p className={`mb-1 font-mono text-[9px] uppercase tracking-[0.13em] ${isReceptionist ? 'text-primary' : 'text-primary-foreground/70'}`}>
+                        {isReceptionist ? sampleCallPreview.receptionistName : 'Caller'}
+                      </p>
+                      <p>{message.text}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sample call boundaries</p>
+            <ul className="mt-2 grid gap-2 text-xs leading-relaxed text-muted-foreground sm:grid-cols-3">
+              {sampleCallPreview.boundaries.map((boundary) => (
+                <li key={boundary} className="flex gap-2">
+                  <ShieldCheck size={14} className="mt-0.5 shrink-0 text-[#398660] dark:text-emerald-300" />
+                  <span>{boundary}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground" data-testid="sample-call-no-provisioning-note">
+            This is a fixed, fictional example. It does not place a call, save a business profile, or provision a phone number.
+          </p>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(false)}
+              className="min-h-11 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              Done
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
