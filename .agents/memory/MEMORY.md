@@ -11,3 +11,4 @@
 - [Retell transfer isolation](retell-transfer-isolation.md) — inbound LLM overrides do not support per-call tools; shared transfers need enforced business isolation, not just prompting.
 - [Retell release boundaries](retell-release-boundaries.md) — separate agency sales KB dependencies from field intake; pin live versions before changing shared-agent webhook routing.
 - [Call quality semantics](call-quality-semantics.md) — confirmation is not caller ID; preserve unknown historical capture evidence rather than inflating completeness.
+- [Publish expression indexes](publish-expression-indexes.md) — use generated normalization columns and column-only indexes to avoid Publish truncating nested index expressions.

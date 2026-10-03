@@ -12,6 +12,10 @@ export const businessesTable = pgTable("businesses", {
   ownerPhone: text("owner_phone"),
   leadAlertsEnabled: boolean("lead_alerts_enabled").notNull().default(true),
   retellPhoneNumber: text("retell_phone_number"),
+  // Keep the index column-only: Publish can truncate comma-containing index expressions.
+  retellPhoneNormalized: text("retell_phone_normalized").generatedAlwaysAs(
+    sql`NULLIF(regexp_replace(retell_phone_number, '[^0-9]', '', 'g'), '')`,
+  ),
   retellAgentId: text("retell_agent_id"),
   isSample: boolean("is_sample").notNull().default(false),
   provisioningState: text("provisioning_state").notNull().default("pending"),
@@ -41,7 +45,7 @@ export const businessesTable = pgTable("businesses", {
 }, (table) => [
   uniqueIndex("businesses_clerk_user_id_unique").on(table.clerkUserId),
   uniqueIndex("businesses_phone_normalized_unique")
-    .on(sql`nullif(regexp_replace(${table.retellPhoneNumber}, '[^0-9]', '', 'g'), '')`),
+    .on(table.retellPhoneNormalized),
 ]);
 
 export type Business = typeof businessesTable.$inferSelect;
