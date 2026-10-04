@@ -70,3 +70,17 @@ mtime_ms = 1790969762416
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/8bceee20-8227-41ee-8964-9a3840b6870b/8b0e49c5-e7bd-4bec-bdff-9c416368a8c1"
 storage_version_token = "1790970401714429"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "eoAgwdRKIWdnQ2QAr8D7M"
+uri = "file://recovery/corvlio-recovery-review.html"
+type = "html"
+title = "Corvlio recovery review and preview-only SQL"
+description = "Exact findings, copied fields, tested SQL, manual application order and identity/conflict blockers. Nothing has been applied to production."
+logical_id = "1895391f-3846-41a4-af51-1524154ab95a"
+content_hash = "sha256:248674df77d75105effe322e1d71f024692a2602242a54df9745f4f5bb0e02da"
+size = 26717
+mtime_ms = 1791147653214
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/1895391f-3846-41a4-af51-1524154ab95a/af4a1a13-ea7d-49fa-8ca6-9a1f8c8cba43"
+storage_version_token = "1791147653832842"
+content_type = "text/html"

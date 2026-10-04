@@ -1,0 +1,181 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corvlio recovery review — not applied</title><style>body{font:16px/1.55 system-ui,sans-serif;color:#182337;background:#eef2f6;margin:0}main{max-width:980px;margin:30px auto;padding:36px;background:white;border-radius:12px}h1{font-size:30px;line-height:1.2}h2{margin-top:34px;border-top:1px solid #dbe2ea;padding-top:22px;font-size:23px}p{margin:3px 0}.gap{height:10px}.badge{padding:12px 16px;background:#fff4d6;border-left:4px solid #b57b00}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0}th,td{text-align:left;vertical-align:top;border:1px solid #dbe2ea;padding:9px}th{background:#eef2f6}code{font:13px/1.5 ui-monospace,monospace;overflow-wrap:anywhere;background:#f2f5f8;padding:2px 4px}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#f2f5f8;font:13px/1.55 ui-monospace,monospace}.bullet{padding-left:12px}textarea{box-sizing:border-box;width:100%;height:500px;font:12px/1.5 ui-monospace,monospace;padding:14px;border:1px solid #ccd5df}button{background:#163e76;color:white;padding:12px 18px;border:0;border-radius:6px;font:600 14px system-ui;cursor:pointer;margin:10px 0}@media(max-width:650px){main{margin:0;padding:20px;border-radius:0}}@media print{body{background:white}main{margin:0;padding:0}button{display:none}textarea{height:auto}table{font-size:11px}}</style><main><div class="badge"><strong>Prepared, tested, NOT applied.</strong> No production writes. No publish. No Retell requests. Current production session identity still required.</div><h1>Corvlio existing-number recovery — manual review only</h1><div class="gap"></div><p>Prepared from read-only checks on 2026-10-04. No production write or publish was performed.</p><div class="gap"></div><h2>Decision</h2><div class="gap"></div><p>Use <code>recovery/corvlio-existing-number.sql</code>, not a new permanent admin feature.</p><p>This is a manual, database-owner-authorized data insertion, not an app claim endpoint.</p><p>It therefore does not use ADMIN_EMAILS: access is controlled by the production SQL editor.</p><p>It makes zero HTTP/Retell calls and does not buy, provision, configure, transfer, or release numbers.</p><p>It is not imported by the app, run during build/startup, or attached to Publish.</p><p>Do not turn it into an automatic migration.</p><div class="gap"></div><h2>Exact production findings</h2><div class="gap"></div><p>Email: <code>pjmarkland08@gmail.com</code>.</p><div class="gap"></div><div class="table-wrap"><table><tr><th>ID</th><th>Business</th><th>Recorded Clerk ID</th><th>Phone / agent</th><th>Created and updated (UTC)</th></tr><tr><td>1</td><td>Pjs company</td><td>user_3JVhBQOcZqDEYShLub8a7S49rLE</td><td>Both NULL</td><td>2026-09-18 17:28:02.091943</td></tr><tr><td>2</td><td>Pjs company</td><td>user_3JVjDbcAMFuIEvpXZYUD9jxBtWq</td><td>Both NULL</td><td>2026-09-18 17:39:52.113095</td></tr></table></div><div class="gap"></div><p>Both rows remain unchanged. There is no production business named Corvlio, no business</p><p>with normalized phone <code>16624994839</code>, and no provisioning attempt for <code>+16624994839</code>.</p><p>There are 10 production businesses and 0 production leads; neither older PJ business</p><p>has call records. The development Corvlio business has 0 leads.</p><p>These are present-state counts, not proof of historical lead preservation.</p><div class="gap"></div><p>Production app tables do not provide an authoritative email-to-current-session mapping.</p><p>There is no local users/sessions table. The two IDs above are business-link history,</p><p>not proof of PJ's current signed-in production Clerk identity.</p><p>The Clerk setup is external; managed Replit Clerk dashboard access is unavailable.</p><p>Never choose either historical ID based only on email. Never copy the development</p><p>Clerk ID <code>user_3K2xZZqDscJ2qct9xlf9XBp3jR5</code> into production.</p><div class="gap"></div><p>Production has valid unique indexes on clerk_user_id and retell_phone_normalized.</p><p>Phone normalization is a stored generated digit-only value. No user triggers exist</p><p>on businesses at the time of review. The script rechecks all these protections.</p><div class="gap"></div><h2>Exact planned change</h2><div class="gap"></div><p>If the verified production login has no business and the number remains unassigned:</p><p>insert exactly ONE new businesses row, with a fresh production ID, linked to the</p><p>verified production Clerk ID and existing number <code>+16624994839</code>.</p><p>Do not copy development business ID 5: production ID 5 is a different business.</p><p>Do not change rows 1 or 2, or any other existing row.</p><p>No leads, call records, devices, provisioning attempts, notifications, or users are copied.</p><p>No production table or index is created, altered, dropped, or reseeded.</p><div class="gap"></div><p>Copy these exact development values:</p><div class="gap"></div><div class="table-wrap"><table><tr><th>Field</th><th>Value</th></tr><tr><td>business_name</td><td>Corvlio</td></tr><tr><td>business_type</td><td>AI Receptionist</td></tr><tr><td>agent_name / receptionist name</td><td>NULL — no name stored in this development business; do not invent one</td></tr><tr><td>personality_tone_description</td><td>Warm, kind, helpful</td></tr><tr><td>business_hours</td><td>Mon-Fri 09:00-17:00</td></tr><tr><td>time_zone</td><td>America/New_York</td></tr><tr><td>service_area</td><td><code>Estero/Fort Myers </code> — trailing space preserved</td></tr><tr><td>retell_phone_number</td><td>+16624994839</td></tr><tr><td>retell_agent_id</td><td>agent_57af301bd0aa3994b83b3a2ee9</td></tr><tr><td>owner_email</td><td>Pjmarkland08@gmail.com</td></tr><tr><td>owner_phone</td><td>NULL</td></tr><tr><td>lead_alerts_enabled</td><td>true</td></tr><tr><td>is_sample</td><td>false</td></tr><tr><td>provisioning_state</td><td>pending — preserved; app reports ready from the existing phone, not by buying another</td></tr><tr><td>typical_response_time_commitment</td><td>Within 24 hours</td></tr><tr><td>owner_availability</td><td>Anytime</td></tr><tr><td>emergency_contact_info</td><td>8634463029</td></tr><tr><td>business_website_url</td><td>Corvlio.com</td></tr><tr><td>website_enrichment_sources</td><td>{&quot;typicalResponseTimeCommitment&quot;:&quot;https://corvlio.com/&quot;}</td></tr><tr><td>website_enrichment_attempted_at</td><td>2026-09-30T11:59:53.219Z</td></tr><tr><td>agreements_accepted_at</td><td>2026-09-30T11:59:53.192Z</td></tr></table></div><div class="gap"></div><p>Copy empty strings exactly for major_issue_examples, services_not_offered,</p><p>pricing_policy, financing_policy, brands_worked_with, warranty_info,</p><p>maintenance_plan_offerings, and credentials_certifications.</p><div class="gap"></div><p>Do NOT copy the source clerk_user_id, id, created_at, updated_at, or generated phone column.</p><p>Production generates the new ID and digit-only phone; row timestamps use insertion time.</p><p>The snapshot was checked field-for-field against the current development record.</p><div class="gap"></div><h2>Critical conflict</h2><div class="gap"></div><p>If PJ's real production ID is either older recorded ID, that login already owns a business.</p><p>The one-business-per-Clerk-ID rule makes adding a second business to that same login</p><p>incompatible with leaving the older business untouched. The script refuses and writes</p><p>nothing. Stop and request a separately approved ownership plan; do not unlink an older</p><p>business, invent a new identity, or create a replacement account as a workaround.</p><div class="gap"></div><h2>Application order</h2><div class="gap"></div><p>1. PJ opens the PUBLISHED app, signs in as pjmarkland08@gmail.com, and stops at onboarding.</p><p>   Do not submit the form or click any number-provisioning controls.</p><p>   In desktop browser Developer Tools → Console, run this read-only expression:</p><div class="gap"></div><pre>   ({
+     userId: window.Clerk?.user?.id,
+     primaryEmail: window.Clerk?.user?.primaryEmailAddress?.emailAddress,
+     emailVerification: window.Clerk?.user?.primaryEmailAddress?.verification?.status
+   })</pre><div class="gap"></div><p>   Confirm the app is the published production URL, the primary email is PJ's,</p><p>   and verification is &quot;verified&quot;. Share only these results in chat, never cookies,</p><p>   tokens, keys, full request headers, or session credentials.</p><p>   If Clerk is undefined or the email is not verified, stop. The project's external</p><p>   Clerk administrator can alternatively verify the user in the external PRODUCTION</p><p>   Clerk instance. Do not use a development Auth user listing as production proof.</p><div class="gap"></div><p>2. In this Replit project, the database owner opens the Database tool, selects</p><p>   Production, and opens My Data → SQL runner. Open the SQL file in the workspace</p><p>   Files area and copy the ENTIRE file. Change only input 1 to the verified user ID</p><p>   and input 3 to:</p><p>   <code>PRODUCTION SESSION VERIFIED: pjmarkland08@gmail.com</code></p><p>   Leave input 2 at <code>PREVIEW ONLY</code>. Run it as one transaction.</p><p>   Review eligible, blockers, copied_fields_and_target_user, and existing owner/phone IDs.</p><p>   This preview allocates no ID and writes no business data. Save the result.</p><p>   With the untouched placeholder inputs the preview is intentionally blocked.</p><p>   If eligible is false, stop. The agent can discuss the result from chat.</p><p>   If the SQL runner cannot execute the whole transaction, do not split it.</p><p>   Report the error and stop; a separately authorized database operator must run</p><p>   the intact transaction with a PostgreSQL client.</p><div class="gap"></div><p>3. When the identity and preview are satisfactory, the project owner may manually</p><p>   click Publish on Replit to publish the existing routing build. The agent does</p><p>   not publish. Review any database/schema prompt; stop on unexpected changes.</p><p>   This recovery adds no schema changes, and Publish does not execute this SQL</p><p>   or copy development rows into production.</p><p>   The existing routing guards remain in this build; linked owners bypass setup/welcome.</p><div class="gap"></div><p>4. Re-run PREVIEW ONLY in Production immediately before applying. If eligible is true,</p><p>   replace only input 2 with the exact phrase:</p><p>   <code>INSERT CORVLIO +16624994839 FOR VERIFIED PRODUCTION USER</code></p><p>   Run the entire SQL file once. Do not change the copied payload or remove checks.</p><p>   Save recovery_review_result with the SQL and identity evidence as the review/audit</p><p>   record. There is no permanent audit table or app audit feed for this manual option.</p><p>   A repeat with the same identity and unchanged recovered settings is a no-op.</p><p>   If recovered settings have since changed, the script refuses rather than overwriting.</p><p>   Any error aborts the transaction. If the runner leaves it open, issue ROLLBACK</p><p>   before another query. Never COMMIT a failed transaction piecemeal.</p><div class="gap"></div><p>5. Ask the agent in chat to verify production READ-ONLY: new Corvlio row and its</p><p>   exact identity/phone, unchanged old rows, and no unintended business modifications.</p><p>   Save the pre-apply preview so there is a baseline to compare against.</p><p>   Read-replica verification can lag briefly. PJ then refreshes the published app</p><p>   (or signs out and back in) and should reach the dashboard without submitting setup.</p><div class="gap"></div><h2>What can be done from chat</h2><div class="gap"></div><p>The agent can prepare/review SQL, run isolated development tests, compare safe session</p><p>identity results, and read production to verify before/after. It will not execute</p><p>production mutations or publish. Only the project/database owner performs the SQL</p><p>apply and Publish clicks on the Replit website.</p><div class="gap"></div><h2>Risks and limits</h2><div class="gap"></div><p class="bullet">• SQL trusts the operator's production-session identity verification; SQL cannot ask</p><p>  Clerk whether an ID belongs to that verified email. Guessing an ID can expose the</p><p>  recovered business to the wrong person. Keep apply blocked until identity is proven.</p><p class="bullet">• The script takes a short business-table writer lock during apply (3-second lock</p><p>  timeout, 15-second statement timeout). Business reads continue. Other business</p><p>  writes may briefly wait; lock timeout means stop/retry, not bypass the lock.</p><p class="bullet">• Insertion advances the normal business-ID sequence. A failed/rolled-back insert can</p><p>  leave an ID gap. No existing row is modified and the sequence is not reseeded.</p><p class="bullet">• No Retell requests were made during this preparation. Number existence was verified</p><p>  in the earlier read-only investigation, not freshly rechecked here. The snapshot's</p><p>  shared agent ID is preserved. Do not infer that webhook delivery, live call routing,</p><p>  transfer behavior, or SMS has been verified. No test call has been made.</p><p class="bullet">• Adding the mapping enables the app's existing production lookup by owner and phone.</p><p>  Future inbound webhooks can then create leads and existing enabled alerts can run.</p><p>  The SQL itself creates no lead, notification, or provisioning attempt.</p><p class="bullet">• Retell must already deliver to the intended production webhook for live intake.</p><p>  If it delivers elsewhere or has a stale explicit business identifier, stop and</p><p>  investigate read-only; this SQL deliberately makes no Retell configuration changes.</p><p class="bullet">• The snapshot is fixed. If PJ changes development settings before applying, stop</p><p>  and re-review rather than silently importing an updated version.</p><p class="bullet">• Current zero lead counts cannot certify preservation of historical leads.</p><p class="bullet">• Real production-session sign-in and post-recovery behavior remain unverified until</p><p>  PJ provides the actual session ID and performs the authorized manual recovery.</p><p>  Prior browser verification was blocked by a synthetic Clerk fixture.</p><div class="gap"></div><h2>Verification completed</h2><div class="gap"></div><p>12 PostgreSQL recovery tests passed using an isolated development temporary table</p><p>and temporary ID sequence, all rolled back. They verify the real source snapshot,</p><p>no-write preview/no sequence allocation, exact copying, repeat safety, formatted</p><p>phone conflicts, either older owner conflict, invalid/development IDs, missing</p><p>identity attestation, explicit confirmation, preserving later edits, independent</p><p>phone uniqueness, missing indexes, and changed normalization. Apply also verifies</p><p>the writer lock is held.</p><div class="gap"></div><p>66 frontend tests and 141 API tests passed. Frontend type check and production build</p><p>passed. Existing-owner onboarding/welcome routing regression tests remain included.</p><p>The build has non-blocking chunk-size and sourcemap warnings.</p><h2>Exact reviewed SQL — defaults to preview only</h2><p>This download contains the same SQL tested in development. Verify the production identity before changing the marked inputs. Do not run it automatically.</p><button id="download">Download reviewed SQL (preview mode)</button><textarea id="sql" readonly aria-label="Exact reviewed SQL">-- MANUAL DATA RECOVERY ONLY. Not a migration, startup hook, or provisioning action.
+-- Agent must NOT run this on production. Nothing invokes Retell.
+-- Default is PREVIEW: no INSERT and no sequence allocation.
+-- Edit ONLY the three marked inputs after independently verifying the production session.
+-- Run the entire file as ONE query/transaction, not statement by statement.
+BEGIN;
+SET LOCAL lock_timeout = '3s';
+SET LOCAL statement_timeout = '15s';
+
+DO $recovery$
+DECLARE
+  -- INPUT 1: Never use an ID just because it appears on an old email-matching row.
+  target_user_id text := 'REPLACE_WITH_VERIFIED_PRODUCTION_CLERK_USER_ID';
+  -- INPUT 2: Leave PREVIEW ONLY for the first run.
+  confirmation text := 'PREVIEW ONLY';
+  -- INPUT 3: Set only after checking the signed-in PRODUCTION user's verified primary email.
+  identity_attestation text := 'NOT VERIFIED';
+  required_confirmation constant text := 'INSERT CORVLIO +16624994839 FOR VERIFIED PRODUCTION USER';
+  required_attestation constant text := 'PRODUCTION SESSION VERIFIED: pjmarkland08@gmail.com';
+  source_user_id constant text := 'user_3K2xZZqDscJ2qct9xlf9XBp3jR5';
+  -- Exact development business snapshot. ID, Clerk identity and row timestamps are NOT copied.
+  payload jsonb := $snapshot${
+    &quot;business_name&quot;: &quot;Corvlio&quot;,
+    &quot;business_hours&quot;: &quot;Mon-Fri 09:00-17:00&quot;,
+    &quot;time_zone&quot;: &quot;America/New_York&quot;,
+    &quot;agent_name&quot;: null,
+    &quot;owner_email&quot;: &quot;Pjmarkland08@gmail.com&quot;,
+    &quot;owner_phone&quot;: null,
+    &quot;lead_alerts_enabled&quot;: true,
+    &quot;retell_phone_number&quot;: &quot;+16624994839&quot;,
+    &quot;retell_agent_id&quot;: &quot;agent_57af301bd0aa3994b83b3a2ee9&quot;,
+    &quot;is_sample&quot;: false,
+    &quot;provisioning_state&quot;: &quot;pending&quot;,
+    &quot;service_area&quot;: &quot;Estero/Fort Myers &quot;,
+    &quot;business_type&quot;: &quot;AI Receptionist&quot;,
+    &quot;major_issue_examples&quot;: &quot;&quot;,
+    &quot;personality_tone_description&quot;: &quot;Warm, kind, helpful&quot;,
+    &quot;services_not_offered&quot;: &quot;&quot;,
+    &quot;pricing_policy&quot;: &quot;&quot;,
+    &quot;financing_policy&quot;: &quot;&quot;,
+    &quot;brands_worked_with&quot;: &quot;&quot;,
+    &quot;typical_response_time_commitment&quot;: &quot;Within 24 hours&quot;,
+    &quot;warranty_info&quot;: &quot;&quot;,
+    &quot;maintenance_plan_offerings&quot;: &quot;&quot;,
+    &quot;credentials_certifications&quot;: &quot;&quot;,
+    &quot;owner_availability&quot;: &quot;Anytime&quot;,
+    &quot;emergency_contact_info&quot;: &quot;8634463029&quot;,
+    &quot;business_website_url&quot;: &quot;Corvlio.com&quot;,
+    &quot;website_enrichment_attempted_at&quot;: &quot;2026-09-30T11:59:53.219Z&quot;,
+    &quot;website_enrichment_sources&quot;: {&quot;typicalResponseTimeCommitment&quot;: &quot;https://corvlio.com/&quot;},
+    &quot;agreements_accepted_at&quot;: &quot;2026-09-30T11:59:53.192Z&quot;
+  }$snapshot$::jsonb;
+  intended public.businesses%ROWTYPE;
+  phone_row public.businesses%ROWTYPE;
+  owner_row public.businesses%ROWTYPE;
+  inserted_row public.businesses%ROWTYPE;
+  phone_unique boolean;
+  owner_unique boolean;
+  blockers text[] := ARRAY[]::text[];
+  already_claimed boolean := false;
+  applying boolean := confirmation = required_confirmation;
+  result jsonb;
+BEGIN
+  IF confirmation NOT IN ('PREVIEW ONLY', required_confirmation) THEN
+    RAISE EXCEPTION 'Unknown confirmation; use PREVIEW ONLY or the exact reviewed confirmation phrase';
+  END IF;
+  -- Serialize the conflict check and INSERT against all other business writers.
+  -- Readers remain available. A busy table fails quickly instead of waiting indefinitely.
+  IF applying THEN
+    LOCK TABLE public.businesses IN SHARE ROW EXCLUSIVE MODE;
+  END IF;
+  payload := payload || jsonb_build_object('clerk_user_id', target_user_id);
+  SELECT * INTO intended FROM jsonb_populate_record(NULL::public.businesses, payload);
+  -- Normalize even formatted numbers when looking for conflicts.
+  SELECT * INTO phone_row FROM public.businesses
+    WHERE regexp_replace(retell_phone_number, '[^0-9]', '', 'g') = '16624994839';
+  SELECT * INTO owner_row FROM public.businesses WHERE clerk_user_id = target_user_id;
+  SELECT
+    EXISTS (SELECT 1 FROM pg_index i
+      WHERE i.indrelid = 'public.businesses'::regclass AND i.indisunique AND i.indisvalid
+        AND i.indnatts = 1 AND i.indpred IS NULL AND i.indexprs IS NULL
+        AND i.indkey[0] = (SELECT attnum FROM pg_attribute
+          WHERE attrelid = 'public.businesses'::regclass AND attname = 'retell_phone_normalized')),
+    EXISTS (SELECT 1 FROM pg_index i
+      WHERE i.indrelid = 'public.businesses'::regclass AND i.indisunique AND i.indisvalid
+        AND i.indnatts = 1 AND i.indpred IS NULL AND i.indexprs IS NULL
+        AND i.indkey[0] = (SELECT attnum FROM pg_attribute
+          WHERE attrelid = 'public.businesses'::regclass AND attname = 'clerk_user_id'))
+    INTO phone_unique, owner_unique;
+
+  -- Compare only copied fields; timestamps are canonicalized by the row type.
+  -- If a successful recovery is later edited, refuse rather than overwrite it.
+  already_claimed := phone_row.id IS NOT NULL
+    AND owner_row.id = phone_row.id
+    AND (SELECT jsonb_object_agg(k, to_jsonb(phone_row)-&gt;k) FROM jsonb_object_keys(payload) k)
+      = (SELECT jsonb_object_agg(k, to_jsonb(intended)-&gt;k) FROM jsonb_object_keys(payload) k);
+  already_claimed := coalesce(already_claimed, false);
+  blockers := array_remove(ARRAY[
+    CASE WHEN target_user_id !~ '^user_[A-Za-z0-9]+$' THEN 'Verified production Clerk user ID is missing or invalid' END,
+    CASE WHEN target_user_id = source_user_id THEN 'Target is the known development Clerk ID, not a verified production identity' END,
+    CASE WHEN identity_attestation &lt;&gt; required_attestation THEN 'Production session and verified primary email have not been attested' END,
+    CASE WHEN NOT phone_unique OR NOT owner_unique THEN 'Required unique phone/owner indexes are missing or invalid' END,
+    CASE WHEN NOT EXISTS (
+      SELECT 1 FROM pg_attribute a JOIN pg_attrdef d
+        ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      WHERE a.attrelid = 'public.businesses'::regclass
+        AND a.attname = 'retell_phone_normalized' AND a.attgenerated = 's'
+        AND pg_get_expr(d.adbin, d.adrelid) =
+          $expression$NULLIF(regexp_replace(retell_phone_number, '[^0-9]'::text, ''::text, 'g'::text), ''::text)$expression$
+    ) THEN 'Generated phone normalization rule differs from the reviewed production schema' END,
+    CASE WHEN phone_row.id IS NOT NULL AND NOT already_claimed THEN 'Number already belongs to a business, or recovered settings differ; refusing any overwrite' END,
+    CASE WHEN owner_row.id IS NOT NULL AND NOT already_claimed THEN 'Production login already owns a business; additive recovery cannot preserve that row and also reuse this login' END,
+    CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.businesses'::regclass AND NOT tgisinternal)
+      THEN 'Business table now has user triggers; re-review side effects before insertion' END
+  ], NULL);
+  result := jsonb_build_object(
+    'mode', CASE WHEN applying THEN 'apply' ELSE 'preview' END,
+    'action', CASE WHEN already_claimed THEN 'already_claimed_no_write' ELSE 'insert_one_business' END,
+    'eligible', cardinality(blockers) = 0,
+    'blockers', to_jsonb(blockers),
+    'source', jsonb_build_object('environment', 'development', 'business_id', 5,
+      'snapshot_updated_at', '2026-09-30T12:00:11.486Z'),
+    'copied_fields_and_target_user', payload,
+    'existing_phone_business_id', phone_row.id,
+    'existing_owner_business_id', owner_row.id,
+    'existing_rows_modified', 0,
+    'leads_copied', 0,
+    'retell_requests', 0,
+    'generated_fields', jsonb_build_object('id', 'new database default',
+      'created_at', 'insertion time', 'updated_at', 'insertion time',
+      'retell_phone_normalized', 'generated by existing database rule'),
+    'database_actor', session_user,
+    'transaction_time', transaction_timestamp()
+  );
+  IF applying THEN
+    IF cardinality(blockers) &gt; 0 THEN
+      RAISE EXCEPTION 'RECOVERY BLOCKED: %', array_to_string(blockers, '; ');
+    END IF;
+    IF NOT already_claimed THEN
+      INSERT INTO public.businesses (
+        business_name, business_hours, time_zone, agent_name, clerk_user_id,
+        owner_email, owner_phone, lead_alerts_enabled, retell_phone_number,
+        retell_agent_id, is_sample, provisioning_state, service_area, business_type,
+        major_issue_examples, personality_tone_description, services_not_offered,
+        pricing_policy, financing_policy, brands_worked_with,
+        typical_response_time_commitment, warranty_info, maintenance_plan_offerings,
+        credentials_certifications, owner_availability, emergency_contact_info,
+        business_website_url, website_enrichment_attempted_at,
+        website_enrichment_sources, agreements_accepted_at
+      ) VALUES (
+        intended.business_name, intended.business_hours, intended.time_zone,
+        intended.agent_name, intended.clerk_user_id, intended.owner_email,
+        intended.owner_phone, intended.lead_alerts_enabled, intended.retell_phone_number,
+        intended.retell_agent_id, intended.is_sample, intended.provisioning_state,
+        intended.service_area, intended.business_type, intended.major_issue_examples,
+        intended.personality_tone_description, intended.services_not_offered,
+        intended.pricing_policy, intended.financing_policy, intended.brands_worked_with,
+        intended.typical_response_time_commitment, intended.warranty_info,
+        intended.maintenance_plan_offerings, intended.credentials_certifications,
+        intended.owner_availability, intended.emergency_contact_info,
+        intended.business_website_url, intended.website_enrichment_attempted_at,
+        intended.website_enrichment_sources, intended.agreements_accepted_at
+      ) RETURNING * INTO inserted_row;
+      result := result || jsonb_build_object('inserted_business_id', inserted_row.id,
+        'inserted_record', to_jsonb(inserted_row));
+    ELSE
+      result := result || jsonb_build_object('existing_business_id', phone_row.id);
+    END IF;
+  END IF;
+  PERFORM set_config('corvlio_recovery.result', result::text, true);
+END
+$recovery$;
+
+-- Save this result with the SQL and production identity verification as the review/audit record.
+-- There is deliberately no new audit table or write to any other production table.
+SELECT current_setting('corvlio_recovery.result')::jsonb AS recovery_review_result;
+COMMIT;</textarea></main><script>document.getElementById("download").onclick=function(){const url=URL.createObjectURL(new Blob([document.getElementById("sql").value],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="corvlio-existing-number.sql";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}</script></html>
