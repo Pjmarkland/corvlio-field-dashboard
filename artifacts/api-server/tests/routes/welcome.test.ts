@@ -70,6 +70,15 @@ describe("one-time verified welcome entry", () => {
     mocks.findBusiness.mockResolvedValue({ id: 1 });
     expect(await (await claim()).json()).toEqual({ showWelcome: false, nextPath: "/dashboard" });
     expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.updateUserMetadata).not.toHaveBeenCalled();
+  });
+  it("always prioritizes an existing business over new-user age and a missing welcome marker", async () => {
+    mocks.findBusiness.mockResolvedValue({ id: 1, businessName: "Existing business", retellPhoneNumber: null });
+    for (let visit = 0; visit < 2; visit++) {
+      expect(await (await claim()).json()).toEqual({ showWelcome: false, nextPath: "/dashboard" });
+    }
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.updateUserMetadata).not.toHaveBeenCalled();
   });
   it("leaves older unconfigured users on their existing onboarding path", async () => {
     user.createdAt = WELCOME_LAUNCH_AT - 1;

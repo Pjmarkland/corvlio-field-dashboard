@@ -1,4 +1,5 @@
 - [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
+- [Owner routing safety](owner-routing-safety.md) — routing guards cannot repair missing production ownership; never silently relink businesses by email.
 - [PWA data-source migrations](pwa-data-source-migrations.md) — invalidate installed app shells and legacy client data when replacing a persisted data source.
 - [Google Sheets row writes](google-sheets-row-writes.md) — stable-ID lookup handles normal reorders; strict simultaneous-sort safety needs a lock-bearing Apps Script.
 - [Native asset compositing](native-asset-compositing.md) — preserve output canvases with parenthesized ImageMagick overlays; repeated PNG renders may differ in metadata.
