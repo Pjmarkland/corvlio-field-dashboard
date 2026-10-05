@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
+import { collectRetellListItems } from "../artifacts/api-server/src/lib/retellListPagination.mjs";
 
 // No publish endpoint, phone-number mutations, or calls are used by this script.
 if (!process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT || process.env.NODE_ENV === "production") {
@@ -21,8 +22,10 @@ async function request(path, method = "GET", body) {
   if (!r.ok) throw new Error(`Retell ${method} ${path.split("?")[0].split("/")[1]} failed (${r.status}): ${await r.text()}`);
   return r.json();
 }
-const versionsResponse = await request(`/list-agent-versions/${encodeURIComponent(id)}`);
-const versions = Array.isArray(versionsResponse) ? versionsResponse : versionsResponse.items;
+const versions = await collectRetellListItems((paginationKey) => {
+  const query = paginationKey === undefined ? "" : `?${new URLSearchParams({ pagination_key: paginationKey })}`;
+  return request(`/list-agent-versions/${encodeURIComponent(id)}${query}`);
+}, { allowLegacyArray: true });
 const publishedVersion = versions.filter(v => v.is_published).sort((a,b) => b.version-a.version)[0]?.version;
 const draftVersion = versions.filter(v => !v.is_published).sort((a,b) => b.version-a.version)[0]?.version;
 assert.notEqual(publishedVersion, undefined, "No published baseline found");

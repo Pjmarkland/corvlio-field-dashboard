@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { businessesTable, db, ownerDemoCallsTable, type Business } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { dynamicVariables } from "./retellVariables";
+import { collectRetellListItems } from "./retellListPagination.mjs";
 
 export class DemoCallError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -47,8 +48,10 @@ export async function placeOwnerDemoCall(business: Business, number: string, con
     throw new DemoCallError(400, "This existing number isn't a Retell-managed outbound number. No replacement will be purchased. You can review the greeting and hours below.");
   }
   type Version = { version: number; is_published: boolean };
-  const versionsResponse = await retell<Version[] | { items: Version[] }>(`/list-agent-versions/${encodeURIComponent(agentId)}`);
-  const versions = Array.isArray(versionsResponse) ? versionsResponse : versionsResponse.items;
+  const versions = await collectRetellListItems<Version>((paginationKey) => {
+    const query = paginationKey === undefined ? "" : `?${new URLSearchParams({ pagination_key: paginationKey })}`;
+    return retell<unknown>(`/list-agent-versions/${encodeURIComponent(agentId)}${query}`);
+  }, { allowLegacyArray: true });
   const version = versions.filter((v: { is_published: boolean }) => v.is_published === false)
     .sort((a: { version: number }, b: { version: number }) => b.version - a.version)[0]?.version;
   if (!Number.isSafeInteger(version)) throw new DemoCallError(400, "There is no unpublished receptionist draft available to test.");

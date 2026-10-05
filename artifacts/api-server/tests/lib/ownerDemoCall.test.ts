@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit) => {
     calls.push({ url, options });
     const result = url.includes("get-phone-number") ? { phone_number_type: "retell-twilio" }
-      : url.includes("list-agent") ? { items: [{ version: 0, is_published: true }, { version: 1, is_published: false }] }
+      : url.includes("list-agent") ? { items: [{ version: 0, is_published: true }, { version: 1, is_published: false }], has_more: false }
       : url.includes("get-agent") ? { is_published: false, response_engine: { type: "retell-llm", llm_id: "draft-llm", version: 1 } }
       : url.includes("get-retell") ? { is_published: false } : { call_id: "demo-call" };
     return new Response(JSON.stringify(result), { status: 200 });
@@ -64,6 +64,37 @@ describe("owner-only development demo calls", () => {
     for (let i = 0; i < 3; i++) await placeOwnerDemoCall(business, business.ownerPhone!, true);
     await expect(placeOwnerDemoCall(business, business.ownerPhone!, true)).rejects.toMatchObject({ status: 429 });
     expect(calls.filter(c => c.options.method === "POST")).toHaveLength(3);
+  });
+  it("reads every version page before selecting the newest unpublished draft", async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const listUrls: string[] = [];
+    vi.mocked(fetch).mockImplementation(async (url, options) => {
+      if (!String(url).includes("list-agent-versions")) return original(url, options);
+      listUrls.push(String(url));
+      const cursor = new URL(String(url)).searchParams.get("pagination_key");
+      const page = cursor === null
+        ? { items: [{ version: 0, is_published: true }], has_more: true, pagination_key: "next /+?& page" }
+        : { items: [{ version: 4, is_published: false }], has_more: false };
+      return new Response(JSON.stringify(page), { status: 200 });
+    });
+    await placeOwnerDemoCall(business, business.ownerPhone!, true);
+    expect(listUrls).toHaveLength(2);
+    expect(new URL(listUrls[1]).searchParams.get("pagination_key")).toBe("next /+?& page");
+    const write = calls.find(c => c.options.method === "POST")!;
+    expect(JSON.parse(write.options.body as string).override_agent_version).toBe(4);
+  });
+  it("does not reserve an attempt or dial if a later list page fails", async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url, options) => {
+      if (!String(url).includes("list-agent-versions")) return original(url, options);
+      const cursor = new URL(String(url)).searchParams.get("pagination_key");
+      return cursor === null
+        ? new Response(JSON.stringify({ items: [{ version: 1, is_published: false }], has_more: true, pagination_key: "next" }))
+        : new Response("Unavailable", { status: 503 });
+    });
+    await expect(placeOwnerDemoCall(business, business.ownerPhone!, true)).rejects.toMatchObject({ status: 502 });
+    expect(used).toBe(0);
+    expect(calls.some(c => c.options.method === "POST")).toBe(false);
   });
   it("rechecks saved numbers inside the rate-limit lock", async () => {
     current = { ...business, ownerPhone: "+15559990000" };
