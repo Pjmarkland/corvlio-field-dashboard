@@ -166,6 +166,36 @@ async function updateMyBusiness(body: Record<string, unknown>) {
 }
 
 describe("owner business profile API", () => {
+  it.each(["Fuck Plumbing", "F u c k Plumbing", "N1gg3r Services"])("rejects unsafe names through direct create/edit APIs: %s", async businessName => {
+    const before = structuredClone(business);
+    const created = await onboard({ ...validBody, businessName });
+    const edited = await updateMyBusiness({ businessName, serviceArea: "Must not save" });
+    for (const response of [created, edited]) {
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "Please use your real business name without offensive language." });
+    }
+    expect(business).toEqual(before);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+    expect(mocks.findBusinessByClerkUserId).not.toHaveBeenCalled();
+    expect(mocks.claimWebsiteEnrichment).not.toHaveBeenCalled();
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+  });
+  it.each(["Scunthorpe Plumbing", "Dickson Electric", "Penistone Builders"])("allows legitimate names in both APIs: %s", async businessName => {
+    const original = structuredClone(business);
+    expect((await onboard({ ...validBody, businessName })).status).toBe(200);
+    // Exercise PATCH with its complete profile fixture, independently of the
+    // provisioning mock's partial onboarding record (no real DB is involved).
+    business = original;
+    expect((await updateMyBusiness({ businessName })).status).toBe(200);
+    expect(business?.businessName).toBe(businessName);
+  });
+  it("does not rewrite or reject an existing name when unrelated settings are edited", async () => {
+    business = { ...business, businessName: "Fuck Legacy Name" };
+    expect((await updateMyBusiness({ leadAlertsEnabled: false })).status).toBe(200);
+    expect(business?.businessName).toBe("Fuck Legacy Name");
+    expect(mocks.updateOwnedBusiness.mock.calls[0][2]).toEqual({ leadAlertsEnabled: false });
+  });
   it("saves validated hours/timezone and rejects malformed schedules/zones without updating", async () => {
     const good = await updateMyBusiness({ businessHours: "Mon-Fri 08:00-18:00; Sat 09:00-13:00", timeZone: "America/Chicago" });
     expect(good.status).toBe(200);

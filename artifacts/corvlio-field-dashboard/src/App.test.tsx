@@ -127,6 +127,31 @@ describe('Business profile settings', () => {
     await waitFor(() => expect(mockUpdateBusinessProfile.mock.calls[0][0].data.personalityToneDescription).toBe('No-nonsense'));
   });
 
+  it('shows the friendly server name rejection without reporting a successful save', async () => {
+    const message = 'Please use your real business name without offensive language.';
+    mockUpdateBusinessProfile.mockImplementation((_variables, options) => {
+      options.onError({ status: 400, data: { error: message } });
+    });
+    renderProfileEditor();
+    fireEvent.change(screen.getByTestId('input-profile-businessName'), { target: { value: 'Rejected test name' } });
+    fireEvent.submit(screen.getByTestId('form-business-profile'));
+    await waitFor(() => expect(screen.getByTestId('status-profile-save').textContent).toBe(message));
+    expect(screen.queryByText('Business details saved.')).toBeNull();
+  });
+
+  it.each([
+    new Error('network details must not be displayed'),
+    { status: 400, data: { error: 7 } },
+    { status: 500, data: { error: 'internal details must not be displayed' } },
+  ])('keeps a generic message for network failures or malformed validation responses', async (error) => {
+    mockUpdateBusinessProfile.mockImplementation((_variables, options) => {
+      options.onError(error);
+    });
+    renderProfileEditor();
+    fireEvent.submit(screen.getByTestId('form-business-profile'));
+    await waitFor(() => expect(screen.getByTestId('status-profile-save').textContent).toBe('Could not save your details. Check your connection and try again.'));
+  });
+
   it('validates http/https website URLs and saves profile values with feedback', async () => {
     mockUpdateBusinessProfile.mockImplementation((variables, options) => {
       options.onSuccess({ ...sampleProfile, ...variables.data });

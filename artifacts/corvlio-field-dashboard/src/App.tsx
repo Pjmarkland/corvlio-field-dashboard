@@ -558,7 +558,16 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
         if (profile.businessName !== businessName) void client.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
         setNotice({ type: 'success', message: 'Business details saved.' });
       },
-      onError: () => setNotice({ type: 'error', message: 'Could not save your details. Check your connection and try again.' }),
+      onError: (error) => {
+        // Generated response types omit the server's validation-error body.
+        // Treat it as unknown and narrow at runtime rather than trusting it.
+        const payload = error.data as unknown;
+        const message = error.status === 400 && payload && typeof payload === 'object'
+          && 'error' in payload && typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not save your details. Check your connection and try again.';
+        setNotice({ type: 'error', message });
+      },
     });
   };
   return <div className="space-y-4">

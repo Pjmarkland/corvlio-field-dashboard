@@ -13,3 +13,4 @@
 - [Retell release boundaries](retell-release-boundaries.md) — separate agency sales KB dependencies from field intake; pin live versions before changing shared-agent webhook routing.
 - [Call quality semantics](call-quality-semantics.md) — confirmation is not caller ID; preserve unknown historical capture evidence rather than inflating completeness.
 - [Publish expression indexes](publish-expression-indexes.md) — use generated normalization columns and column-only indexes to avoid Publish truncating nested index expressions.
+- [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.

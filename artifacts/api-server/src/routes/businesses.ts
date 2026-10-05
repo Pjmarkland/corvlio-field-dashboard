@@ -17,6 +17,7 @@ import {
 } from "../lib/businessDirectory";
 import { enrichBusinessFromWebsite } from "../lib/websiteEnrichment";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, parseBusinessHours, validTimeZone } from "../lib/businessHours";
+import { businessNameValidationError } from "../lib/businessNameValidation";
 
 const router: IRouter = Router();
 
@@ -162,6 +163,13 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Business name cannot be empty" });
     return;
   }
+  if (businessName !== undefined) {
+    const nameError = businessNameValidationError(businessName);
+    if (nameError) {
+      res.status(400).json({ error: nameError });
+      return;
+    }
+  }
 
   const ownerEmail = body.data.ownerEmail?.trim();
   if (
@@ -281,6 +289,12 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     return;
   }
 
+  const nameError = businessNameValidationError(body.data.businessName);
+  if (nameError) {
+    res.status(400).json({ error: nameError });
+    return;
+  }
+
   const isSample = body.data.isSample === true
     || body.data.businessName.trim().toLowerCase().includes("fictional sample")
     || body.data.ownerEmail.toLowerCase() === "owner@example.com";
@@ -289,7 +303,7 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     timeZone: body.data.timeZone,
     isSample,
     clerkUserId: userId,
-    businessName: body.data.businessName,
+    businessName: body.data.businessName.trim(),
     agentName: body.data.agentName?.trim() || null,
     businessType: body.data.businessType,
     ownerEmail: body.data.ownerEmail,
