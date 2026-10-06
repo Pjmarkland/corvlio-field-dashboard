@@ -41,6 +41,7 @@ export * from './notificationPlatform';
 export * from './notificationPollResult';
 export * from './notificationStatus';
 export * from './notificationStatusPoller';
+export * from './ownerDemoCapability';
 export * from './ownerDemoConfirmation';
 export * from './ownerDemoConfirmationScenario';
 export * from './welcomeEntry';

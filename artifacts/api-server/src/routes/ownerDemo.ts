@@ -3,13 +3,19 @@ import { CreateOwnerDemoCallBody } from "@workspace/api-zod";
 import { Router } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { DemoCallError, placeOwnerDemoCall } from "../lib/ownerDemoCall";
+import { ownerDemoCallingEnabled } from "../lib/ownerDemoConfig";
 
 const router = Router();
+router.get("/businesses/me/demo-call-capability", (req, res): void => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (!getAuth(req).userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  res.json({ enabled: ownerDemoCallingEnabled(), production: process.env.NODE_ENV === "production" });
+});
 router.post("/businesses/me/demo-call", async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
-  if (process.env.NODE_ENV === "production") { res.status(404).json({ error: "Not found" }); return; }
+  if (!ownerDemoCallingEnabled()) { res.status(404).json({ error: "Not found" }); return; }
   const parsed = CreateOwnerDemoCallBody.strict().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Confirm your saved owner phone number first." }); return; }
   try {

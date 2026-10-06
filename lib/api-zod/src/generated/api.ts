@@ -181,7 +181,16 @@ export const GetAdminCallQualityResponse = zod.object({
 
 
 /**
- * @summary Place one development-only test call to the owner's confirmed saved number
+ * @summary Read server-controlled availability of owner test calls
+ */
+export const GetOwnerDemoCallCapabilityResponse = zod.object({
+  "enabled": zod.boolean(),
+  "production": zod.boolean()
+})
+
+
+/**
+ * @summary Place one test call to the owner's confirmed saved number when enabled
  */
 export const CreateOwnerDemoCallBody = zod.object({
   "scenario": zod.enum(['current', 'after_hours']).optional(),

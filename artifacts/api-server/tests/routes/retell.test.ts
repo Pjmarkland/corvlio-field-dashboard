@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createHmac } from "node:crypto";
 import express from "express";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { dynamicVariables } from "../../src/lib/retellVariables";
 
 const mocks = vi.hoisted(() => ({
   findBusinessByPhoneNumber: vi.fn(),
@@ -145,6 +146,33 @@ const signedRequest = (path: string, body: string, timestamp = Date.now(), signe
 };
 
 describe("Retell webhook safety", () => {
+  it.each(["rejection", "synchronous error"])("answers generically when pre-call lookup has a %s", async kind => {
+    if (kind === "rejection") mocks.findBusinessByPhoneNumber.mockRejectedValueOnce(new Error("Database unavailable"));
+    else mocks.findBusinessByPhoneNumber.mockImplementationOnce(() => { throw new Error("Database unavailable"); });
+    const result = await requestPreCall();
+    expect(result).toEqual({ status: 200, body: { call_inbound: { dynamic_variables: dynamicVariables(null) } } });
+    expect(mocks.logError).toHaveBeenCalledWith(
+      { error: "Database unavailable" },
+      expect.stringContaining("answering with generic"),
+    );
+  });
+
+  it("bounds a stalled lookup to 3.5 seconds, returns generic variables, and handles a late rejection", async () => {
+    let rejectLookup!: (error: Error) => void;
+    mocks.findBusinessByPhoneNumber.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectLookup = reject; }));
+    const started = Date.now();
+    const result = await requestPreCall();
+    expect(Date.now() - started).toBeLessThan(6000);
+    expect(result).toEqual({ status: 200, body: { call_inbound: { dynamic_variables: dynamicVariables(null) } } });
+    expect(mocks.logError).toHaveBeenCalledWith(
+      { error: expect.stringContaining("3500ms pre-call deadline") },
+      expect.stringContaining("answering with generic"),
+    );
+    rejectLookup(new Error("Late database error"));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(mocks.logError).toHaveBeenCalledTimes(1);
+  }, 10_000);
+
   it("persists a partial ended call and later canonical/legacy analysis without losing callback or transcript", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.test" }));
     mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });

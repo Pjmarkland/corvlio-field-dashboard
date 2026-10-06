@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetBusinessProfileQueryKey, getGetLeadAlertInboxQueryKey,
-  useGetBusinessProfile, useUpdateBusinessProfile, useCreateOwnerDemoCall,
+  useGetBusinessProfile, useUpdateBusinessProfile, useCreateOwnerDemoCall, useGetOwnerDemoCallCapability, getGetOwnerDemoCallCapabilityQueryKey,
 } from '@workspace/api-client-react';
 import { Phone, Bell } from 'lucide-react';
 
 export function ReceptionistControls() {
   const { data: profile, isError } = useGetBusinessProfile();
+  const capability = useGetOwnerDemoCallCapability({ query: { queryKey: getGetOwnerDemoCallCapabilityQueryKey(), retry: false, refetchInterval: 30_000 } });
+  const demoEnabled = capability.data?.enabled === true && !capability.isError;
   const save = useUpdateBusinessProfile();
   const call = useCreateOwnerDemoCall();
   const client = useQueryClient();
@@ -16,13 +18,13 @@ export function ReceptionistControls() {
   const [scenario, setScenario] = useState<'current' | 'after_hours'>('current');
   const [message, setMessage] = useState<string | null>(null);
   const requesting = useRef(false);
-  useEffect(() => { setConfirmed(false); setConfirming(false); }, [profile?.ownerPhone]);
+  useEffect(() => { setConfirmed(false); setConfirming(false); }, [profile?.ownerPhone, demoEnabled]);
   const invalidate = () => {
     void client.invalidateQueries({ queryKey: getGetBusinessProfileQueryKey() });
     void client.invalidateQueries({ queryKey: getGetLeadAlertInboxQueryKey() });
   };
   const requestCall = async () => {
-    if (!confirmed || !profile?.ownerPhone || call.isPending || requesting.current) return;
+    if (!demoEnabled || !confirmed || !profile?.ownerPhone || call.isPending || requesting.current) return;
     requesting.current = true;
     setMessage(null);
     // Reset confirmation after every attempt; a second call needs fresh consent.
@@ -38,13 +40,14 @@ export function ReceptionistControls() {
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="flex items-center gap-2 font-bold"><Phone size={17} /> Hear your receptionist</h2>
       <p className="mt-2 text-sm text-muted-foreground">One TEST call from your existing receptionist number to your saved owner phone. No customer lead, count, or alert is created.</p>
-      <p className="mt-2 text-xs text-muted-foreground">Development only. Up to 3 attempts per business day, including failed or uncertain requests; calls end within 5 minutes. Normal Retell call-minute charges apply. No number or service is purchased.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Up to 3 attempts per business day, including failed or uncertain requests; calls end within 5 minutes. Normal Retell call-minute charges apply. No number or service is purchased.</p>
+      {!demoEnabled ? <p role="status" className="mt-3 text-sm text-muted-foreground" data-testid="demo-unavailable">{capability.isLoading ? 'Checking test-call availability…' : capability.isError ? 'Test calling is unavailable right now. Use the no-call preview below.' : 'Phone demos are coming soon. Use the no-call preview below.'}</p> : null}
       <div className="mt-4 rounded-xl bg-muted p-3 text-sm">
         <p>From: <strong>{profile.retellPhoneNumber || 'No receptionist number yet'}</strong></p>
         <p>To: <strong>{profile.ownerPhone || 'Save your own phone number in Business profile above'}</strong></p>
       </div>
       {!profile.retellPhoneNumber ? <p className="mt-3 text-sm text-muted-foreground">Your business doesn't have a number yet. Nothing will be purchased. You can review the greeting below.</p> : null}
-      <label className="mt-4 block text-sm font-semibold">Test scenario
+      {demoEnabled ? <><label className="mt-4 block text-sm font-semibold">Test scenario
         <select value={scenario} onChange={e => setScenario(e.target.value as typeof scenario)} className="mt-1 min-h-12 w-full rounded-xl border border-input bg-background px-3 text-foreground" data-testid="demo-scenario">
           <option value="current">Current business hours</option><option value="after_hours">Simulate after hours (TEST only)</option>
         </select>
@@ -54,8 +57,8 @@ export function ReceptionistControls() {
         if (!profile.retellPhoneNumber) { setMessage("Your business doesn't have a receptionist number yet. No number will be purchased."); return; }
         if (!profile.ownerPhone) { setMessage('Save your own phone number above first.'); return; }
         setConfirming(true); setConfirmed(false);
-      }}>Hear your receptionist</button>
-      {confirming ? <div className="mt-4 rounded-xl border border-border p-4" data-testid="demo-confirmation">
+      }}>Hear your receptionist</button></> : null}
+      {demoEnabled && confirming ? <div className="mt-4 rounded-xl border border-border p-4" data-testid="demo-confirmation">
         <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} data-testid="demo-confirm-number" /><span>I confirm <strong>{profile.ownerPhone}</strong> is my own phone number, and I want one test call now using normal Retell call minutes.</span></label>
         <button type="button" onClick={() => void requestCall()} disabled={!confirmed || call.isPending} className="mt-3 min-h-12 w-full rounded-xl bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50" data-testid="demo-place-call">{call.isPending ? 'Requesting one call…' : 'Call my confirmed number'}</button>
         <button type="button" onClick={() => { setConfirming(false); setConfirmed(false); }} disabled={call.isPending} className="mt-2 min-h-12 w-full text-sm">Cancel</button>

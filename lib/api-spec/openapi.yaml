@@ -117,13 +117,29 @@ paths:
           description: Not found or not authorized
         "502":
           description: Unable to load scorecard
+  /businesses/me/demo-call-capability:
+    get:
+      operationId: getOwnerDemoCallCapability
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Read server-controlled availability of owner test calls
+      responses:
+        "200":
+          description: Current runtime availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerDemoCapability"
+        "401":
+          description: Authentication required
   /businesses/me/demo-call:
     post:
       operationId: createOwnerDemoCall
       tags: [businesses]
       security:
         - clerkSession: []
-      summary: Place one development-only test call to the owner's confirmed saved number
+      summary: Place one test call to the owner's confirmed saved number when enabled
       requestBody:
         required: true
         content:
@@ -759,6 +775,14 @@ components:
       required:
         - token
         - platform
+    OwnerDemoCapability:
+      type: object
+      required: [enabled, production]
+      properties:
+        enabled:
+          type: boolean
+        production:
+          type: boolean
     OwnerDemoConfirmation:
       type: object
       additionalProperties: false

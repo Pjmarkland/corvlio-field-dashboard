@@ -102,8 +102,15 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     return;
   }
 
+  let lookupTimer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const business = await findBusinessByPhoneNumber(phoneNumber);
+    const business = await Promise.race([
+      Promise.resolve().then(() => findBusinessByPhoneNumber(phoneNumber)),
+      new Promise<never>((_resolve, reject) => {
+        lookupTimer = setTimeout(() => reject(new Error("Business lookup exceeded the 3500ms pre-call deadline")), 3500);
+        lookupTimer.unref();
+      }),
+    ]);
     res.json({
       call_inbound: {
         dynamic_variables: dynamicVariables(business ?? null),
@@ -112,9 +119,11 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   } catch (error) {
     req.log.error(
       { error: error instanceof Error ? error.message : "Unknown business lookup error" },
-      "Retell pre-call business lookup failed",
+      "Retell pre-call business lookup failed; answering with generic no-business variables",
     );
-    res.status(502).json({ error: "Unable to load business configuration" });
+    res.status(200).json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
+  } finally {
+    if (lookupTimer) clearTimeout(lookupTimer);
   }
 });
 

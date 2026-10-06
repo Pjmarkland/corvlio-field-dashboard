@@ -205,10 +205,13 @@ describe('trade notes and the manual post-onboarding call link', () => {
     const { rerender } = render(<BusinessWelcomeCard businessName="Plumbing" confirmation={confirmation} />);
     expect(screen.getByTestId('button-call-new-number').getAttribute('href')).toBe('tel:+15551230002');
     expect(screen.getByText(/This is your AI receptionist/)).toBeTruthy();
+    expect(screen.getByTestId('call-forwarding-help').textContent).toContain('+15551230002');
     rerender(<BusinessWelcomeCard businessName="Plumbing" confirmation={{ ...confirmation, isSample: true }} />);
     expect(screen.queryByTestId('button-call-new-number')).toBeNull();
+    expect(screen.queryByTestId('call-forwarding-help')).toBeNull();
     rerender(<BusinessWelcomeCard businessName="Plumbing" confirmation={{ ...confirmation, phoneNumber: null }} />);
     expect(screen.queryByTestId('button-call-new-number')).toBeNull();
+    expect(screen.queryByTestId('call-forwarding-help')).toBeNull();
   });
 });
 

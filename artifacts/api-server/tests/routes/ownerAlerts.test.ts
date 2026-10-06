@@ -37,6 +37,23 @@ function request(path: string, method = "GET", body?: unknown, user = "owner") {
   return fetch(base + path, { method, headers: { "content-type": "application/json", ...(user ? { "x-test-user": user } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 describe("owner-only demo and unread alerts API", () => {
+  beforeEach(() => { vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", ""); });
+  it("requires authentication for the no-store capability endpoint without looking up a business", async () => {
+    expect((await request("/businesses/me/demo-call-capability", "GET", undefined, "")).status).toBe(401);
+    expect(m.find).not.toHaveBeenCalled();
+  });
+  it.each(["", "false", "true"])("reports and enforces the production opt-in (%s)", async flag => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", flag);
+    const capability = await request("/businesses/me/demo-call-capability");
+    expect(capability.headers.get("cache-control")).toBe("private, no-store");
+    expect(await capability.json()).toEqual({ enabled: flag === "true", production: true });
+    expect(m.find).not.toHaveBeenCalled();
+    const result = await request("/businesses/me/demo-call", "POST", { confirmed: true, confirmedNumber: "+15551230001" });
+    expect(result.status).toBe(flag === "true" ? 200 : 404);
+    if (flag === "true") expect(m.demo).toHaveBeenCalledWith({ id: 7, leadAlertsEnabled: true }, "+15551230001", true, undefined);
+    else expect(m.demo).not.toHaveBeenCalled();
+  });
   it("rejects signed-out callers before business lookup", async () => {
     expect((await request("/businesses/me/demo-call", "POST", { confirmed: true, confirmedNumber: "+15551230001" }, "")).status).toBe(401);
     expect((await request("/notifications/inbox", "GET", undefined, "")).status).toBe(401);

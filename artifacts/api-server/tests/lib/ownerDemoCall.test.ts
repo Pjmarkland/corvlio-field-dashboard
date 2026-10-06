@@ -16,6 +16,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   current = business; used = 0; calls = [];
   vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("REPLIT_DEV_DOMAIN", "development.example");
+  vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", "");
+  vi.stubEnv("PUBLIC_API_BASE_URL", "https://production.example");
   vi.stubEnv("RETELL_SHARED_AGENT_ID", "draft-agent"); vi.stubEnv("RETELL_API_KEY", "test-placeholder");
   m.select.mockImplementation(() => ({ from: () => ({ where: () => ({ for: async () => [current], then: (fn: (x: unknown) => unknown) => Promise.resolve([{ used }]).then(fn) }) }) }));
   m.insert.mockImplementation(() => ({ values: async () => { used++; } }));
@@ -30,7 +32,11 @@ beforeEach(() => {
     return new Response(JSON.stringify(result), { status: 200 });
   }));
 });
-describe("owner-only development demo calls", () => {
+describe.each(["development", "production"])("owner-only demo calls in %s", mode => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", mode);
+    if (mode === "production") vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", "true");
+  });
   it.each([
     [null, true], ["+15559990000", true], [business.ownerPhone, false],
   ])("rejects unconfirmed or different destinations before contacting Retell", (number, confirmed) => {
@@ -43,10 +49,19 @@ describe("owner-only development demo calls", () => {
     }
     expect(fetch).not.toHaveBeenCalled();
   });
-  it("does not run in production", async () => {
+  it.each(["", "false", "1", "TRUE"])("does not run in production without exact true opt-in (%s)", async flag => {
     vi.stubEnv("NODE_ENV", "production");
-    await expect(placeOwnerDemoCall(business, business.ownerPhone!, true)).rejects.toThrow("development");
+    vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", flag);
+    await expect(placeOwnerDemoCall(business, business.ownerPhone!, true)).rejects.toThrow("disabled");
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(["", "http://production.example", "not-a-url"])("does not dial with missing or unsafe production webhook URL (%s)", async base => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ENABLE_PRODUCTION_OWNER_DEMO_CALLS", "true");
+    vi.stubEnv("PUBLIC_API_BASE_URL", base);
+    await expect(placeOwnerDemoCall(business, business.ownerPhone!, true)).rejects.toMatchObject({ status: 503 });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(m.transaction).not.toHaveBeenCalled();
   });
   it("uses only the existing business number, confirmed owner, unpublished versions and development webhook", async () => {
     expect(await placeOwnerDemoCall(business, business.ownerPhone!, true, "after_hours")).toMatchObject({ callId: "demo-call" });
@@ -56,7 +71,7 @@ describe("owner-only development demo calls", () => {
     expect(JSON.parse(writes[0].options.body as string)).toMatchObject({
       from_number: business.retellPhoneNumber, to_number: business.ownerPhone, override_agent_version: 1,
       metadata: { corvlio_call_type: "owner_test" },
-      agent_override: { agent: { max_call_duration_ms: 300000, webhook_url: "https://development.example/api/webhooks/retell/post-call" } },
+      agent_override: { agent: { max_call_duration_ms: 300000, webhook_url: `https://${mode === "production" ? "production" : "development"}.example/api/webhooks/retell/post-call` } },
       retell_llm_dynamic_variables: { business_is_open: "false", transfer_available: "false", business_name: "Test Plumbing" },
     });
   });

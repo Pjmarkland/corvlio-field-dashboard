@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { businessesTable, db, ownerDemoCallsTable, type Business } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { dynamicVariables } from "./retellVariables";
+import { ownerDemoCallingEnabled, ownerDemoWebhookUrl } from "./ownerDemoConfig";
 import { collectRetellListItems } from "./retellListPagination.mjs";
 
 export class DemoCallError extends Error {
@@ -38,9 +39,12 @@ async function retell<T>(path: string, body?: unknown): Promise<T> {
 export async function placeOwnerDemoCall(business: Business, number: string, confirmed: boolean, scenario: "current" | "after_hours" = "current") {
   validateDemoConfirmation(business, number, confirmed);
   const agentId = business.retellAgentId || process.env.RETELL_SHARED_AGENT_ID;
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  if (process.env.NODE_ENV === "production" || !devDomain || !agentId) {
-    throw new DemoCallError(404, "Test calling is available in the development app only.");
+  if (!ownerDemoCallingEnabled()) {
+    throw new DemoCallError(404, "Test calling is disabled in production.");
+  }
+  const webhookUrl = ownerDemoWebhookUrl();
+  if (!webhookUrl || !agentId) {
+    throw new DemoCallError(503, "Test calling isn't configured. Production requires an HTTPS PUBLIC_API_BASE_URL and a receptionist agent. No call was placed.");
   }
   // Read-only provider checks. No outbound-agent assignment or number mutation.
   const phone = await retell<{ phone_number_type: string }>(`/get-phone-number/${encodeURIComponent(business.retellPhoneNumber!)}`);
@@ -83,7 +87,7 @@ export async function placeOwnerDemoCall(business: Business, number: string, con
       from_number: business.retellPhoneNumber, to_number: number,
       override_agent_id: agentId, override_agent_version: version,
       agent_override: { agent: {
-        webhook_url: `https://${devDomain}/api/webhooks/retell/post-call`,
+        webhook_url: webhookUrl,
         webhook_events: ["call_ended", "call_analyzed"], max_call_duration_ms: 300_000,
       } },
       metadata: { corvlio_call_type: "owner_test", demo_attempt_id: attemptId, scenario },

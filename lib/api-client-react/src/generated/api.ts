@@ -38,6 +38,7 @@ import type {
   NotificationOutboxEvent,
   NotificationPollResult,
   NotificationStatus,
+  OwnerDemoCapability,
   OwnerDemoConfirmation,
   WelcomeEntry
 } from './api.schemas';
@@ -443,6 +444,83 @@ export function useGetAdminCallQuality<TData = Awaited<ReturnType<typeof getAdmi
 
 
 
+export const getGetOwnerDemoCallCapabilityUrl = () => {
+
+
+
+
+  return `/api/businesses/me/demo-call-capability`
+}
+
+/**
+ * @summary Read server-controlled availability of owner test calls
+ */
+export const getOwnerDemoCallCapability = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerDemoCapability> => {
+
+  return customFetch<OwnerDemoCapability>(getGetOwnerDemoCallCapabilityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerDemoCallCapabilityQueryKey = () => {
+    return [
+    `/api/businesses/me/demo-call-capability`
+    ] as const;
+    }
+
+
+export const getGetOwnerDemoCallCapabilityQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerDemoCallCapability>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerDemoCallCapability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerDemoCallCapabilityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerDemoCallCapability>>> = ({ signal }) => getOwnerDemoCallCapability({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerDemoCallCapability>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerDemoCallCapabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerDemoCallCapability>>>
+export type GetOwnerDemoCallCapabilityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read server-controlled availability of owner test calls
+ */
+
+export function useGetOwnerDemoCallCapability<TData = Awaited<ReturnType<typeof getOwnerDemoCallCapability>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerDemoCallCapability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerDemoCallCapabilityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getCreateOwnerDemoCallUrl = () => {
 
 
@@ -452,7 +530,7 @@ export const getCreateOwnerDemoCallUrl = () => {
 }
 
 /**
- * @summary Place one development-only test call to the owner's confirmed saved number
+ * @summary Place one test call to the owner's confirmed saved number when enabled
  */
 export const createOwnerDemoCall = async (ownerDemoConfirmation: OwnerDemoConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<CreateOwnerDemoCall200> => {
 
@@ -501,7 +579,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateOwnerDemoCallMutationError = ErrorType<void>
 
     /**
- * @summary Place one development-only test call to the owner's confirmed saved number
+ * @summary Place one test call to the owner's confirmed saved number when enabled
  */
 export const useCreateOwnerDemoCall = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerDemoCall>>, TError,{data: BodyType<OwnerDemoConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -304,6 +304,11 @@ export interface NotificationDeviceRegistration {
   enabled?: boolean;
 }
 
+export interface OwnerDemoCapability {
+  enabled: boolean;
+  production: boolean;
+}
+
 export type OwnerDemoConfirmationScenario = typeof OwnerDemoConfirmationScenario[keyof typeof OwnerDemoConfirmationScenario];
 
 

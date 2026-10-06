@@ -14,3 +14,12 @@ Publishing a shared draft can immediately affect numbers routed to `latest_publi
 **Why:** The observed published agent sends results to Make while the draft targets development. An uncontrolled publish could redirect live results or activate the wrong business prompt across multiple numbers.
 
 **How to apply:** Inventory and, with explicit approval, pin live routes to the current numeric version before publishing a reviewed production candidate. Prepare the production app and both webhook paths separately; keep the old agent, KB, and Make pipeline available for rollback.
+
+Permission to enable owner demo calls in production is not permission to publish
+shared Retell drafts or change live phone-number routing.
+
+**Why:** one owner test call is scoped to an explicit agent version, while
+publishing a shared draft can affect unrelated businesses and the agency demo.
+
+**How to apply:** keep owner-call availability separate from provider release
+approval, and do not publish or repoint live routes merely to enable owner tests.

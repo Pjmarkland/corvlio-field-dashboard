@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ call: vi.fn(), save: vi.fn(), profile: {
+const m = vi.hoisted(() => ({ call: vi.fn(), save: vi.fn(), capability: { enabled: true, production: false } as { enabled: boolean; production: boolean } | undefined, capabilityError: false, capabilityLoading: false, profile: {
   businessName: 'Test Plumbing', retellPhoneNumber: '+15551230002', ownerPhone: '+15551230001',
   leadAlertsEnabled: true, businessHours: 'Mon-Fri 09:00-17:00', timeZone: 'America/New_York',
 } as Record<string, unknown> }));
 vi.mock('@workspace/api-client-react', () => ({
   useGetBusinessProfile: () => ({ data: m.profile }),
+  useGetOwnerDemoCallCapability: () => ({ data: m.capability, isError: m.capabilityError, isLoading: m.capabilityLoading }),
+  getGetOwnerDemoCallCapabilityQueryKey: () => ['/api/businesses/me/demo-call-capability'],
   useUpdateBusinessProfile: () => ({ mutateAsync: m.save, isPending: false }),
   useCreateOwnerDemoCall: () => ({ mutateAsync: m.call, isPending: false }),
   getGetBusinessProfileQueryKey: () => ['/api/businesses/me'],
@@ -19,11 +21,41 @@ function setup() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  m.capability = { enabled: true, production: false }; m.capabilityError = false; m.capabilityLoading = false;
   m.profile.ownerPhone = '+15551230001'; m.profile.retellPhoneNumber = '+15551230002';
   m.call.mockResolvedValue({ message: 'TEST call requested', callId: 'test-call' });
   m.save.mockResolvedValue({});
 });
 describe('owner demo confirmation and saved alert preference', () => {
+  it('hides production dialing when disabled but keeps the safe text preview', () => {
+    m.capability = { enabled: false, production: true };
+    setup();
+    expect(screen.queryByTestId('hear-receptionist')).toBeNull();
+    expect(screen.queryByTestId('demo-scenario')).toBeNull();
+    expect(screen.getByTestId('demo-unavailable').textContent).toContain('coming soon');
+    expect(screen.getByText('Safe no-call preview')).toBeTruthy();
+    expect(screen.getByText(/Thanks for calling Test Plumbing/)).toBeTruthy();
+    expect(m.call).not.toHaveBeenCalled();
+  });
+  it.each(['loading', 'error'])('does not expose dialing when availability is %s', state => {
+    m.capability = undefined; m.capabilityLoading = state === 'loading'; m.capabilityError = state === 'error';
+    setup();
+    expect(screen.queryByTestId('hear-receptionist')).toBeNull();
+    expect(screen.getByText('Safe no-call preview')).toBeTruthy();
+    expect(m.call).not.toHaveBeenCalled();
+  });
+  it('uses the same exact-number consent flow when production dialing is enabled', async () => {
+    m.capability = { enabled: true, production: true };
+    setup();
+    fireEvent.click(screen.getByTestId('hear-receptionist'));
+    expect(m.call).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('demo-confirm-number'));
+    fireEvent.click(screen.getByTestId('demo-place-call'));
+    await waitFor(() => expect(m.call).toHaveBeenCalledExactlyOnceWith({ data: {
+      confirmed: true, confirmedNumber: '+15551230001', scenario: 'current',
+    } }));
+    expect(screen.queryByText(/Development only/)).toBeNull();
+  });
   it('does not dial from Hear alone and requires consent to the exact saved number', async () => {
     setup();
     fireEvent.click(screen.getByTestId('hear-receptionist'));
