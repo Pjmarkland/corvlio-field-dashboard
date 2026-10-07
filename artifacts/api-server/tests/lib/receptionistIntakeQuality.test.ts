@@ -18,6 +18,35 @@ const complete = {
   outcome: "agent_hangup", nameCaptured: true, callbackCaptured: true, issueCaptured: true,
   addressCaptured: true, analysisComplete: true,
 } as RetellCallRecord;
+const optionalDetails = [
+  ["serviceArea", "service_area", "Not provided. Do not guess whether an address is covered; take the caller's location and ask the owner to confirm."],
+  ["majorIssueExamples", "major_issue_examples", "Not provided. Do not guess which issues the business handles; record the caller's issue and pass it to the owner."],
+  ["pricingPolicy", "pricing_policy", "Not provided. Do not quote or estimate prices; say the owner will follow up with a quote."],
+  ["financingPolicy", "financing_policy", "Not provided. Do not make any promises about this; say the owner will cover it when they call back."],
+  ["warrantyInfo", "warranty_info", "Not provided. Do not make any promises about this; say the owner will cover it when they call back."],
+  ["servicesNotOffered", "services_not_offered", "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner."],
+  ["brandsWorkedWith", "brands_worked_with", "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner."],
+  ["maintenancePlanOfferings", "maintenance_plan_offerings", "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner."],
+  ["credentialsCertifications", "credentials", "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner."],
+  ["typicalResponseTimeCommitment", "response_time_commitment", "Not provided. Say the owner will call back as soon as they can, without promising a specific time."],
+  ["ownerAvailability", "owner_availability", "Not provided. Take the caller's details and tell them the owner will be notified."],
+  ["emergencyContactInfo", "emergency_contact_info", "Not provided. Take the caller's details and tell them the owner will be notified."],
+] as const;
+describe("optional Retell business details", () => {
+  it.each(optionalDetails)("handles blank %s without inventing facts or changing saved text", (field, variable, fallback) => {
+    for (const blank of [undefined, null, "", " \t\n "]) {
+      expect(dynamicVariables({ [field]: blank } as Business)[variable]).toBe(fallback);
+    }
+    const saved = " \tOwner's saved details.\n ";
+    expect(dynamicVariables({ [field]: saved } as Business)[variable]).toBe(saved);
+  });
+  it("keeps optional details empty for the generic no-business case", () => {
+    const variables = dynamicVariables(null);
+    for (const [, variable] of optionalDetails) expect(variables[variable]).toBe("");
+    expect(variables.agent_name).toBe("Aria");
+    expect(variables.business_name).toBe("");
+  });
+});
 describe("tone, trade intake and honest call quality", () => {
   it.each([
     [null, "friendly-professional"], ["Professional & concise", "professional"],

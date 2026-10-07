@@ -291,7 +291,7 @@ describe("Retell pre-call dynamic variables", () => {
     expect(response.body.call_inbound.dynamic_variables.agent_name).toBe("Aria");
   });
 
-  it("returns every existing dynamic-variable key with empty-string fallbacks", async () => {
+  it("returns every existing dynamic-variable key with safe optional-detail fallbacks", async () => {
     const response = await requestPreCall();
     const dynamicVariables = response.body.call_inbound.dynamic_variables;
 
@@ -302,19 +302,19 @@ describe("Retell pre-call dynamic variables", () => {
       agent_name: "Aria",
       business_name: "Example Heating",
       business_type: "",
-      service_area: "",
-      major_issue_examples: "",
-      pricing_policy: "",
+      service_area: "Not provided. Do not guess whether an address is covered; take the caller's location and ask the owner to confirm.",
+      major_issue_examples: "Not provided. Do not guess which issues the business handles; record the caller's issue and pass it to the owner.",
+      pricing_policy: "Not provided. Do not quote or estimate prices; say the owner will follow up with a quote.",
       personality_tone_description: "Friendly and professional",
-      services_not_offered: "",
-      financing_policy: "",
-      brands_worked_with: "",
-      response_time_commitment: "",
-      warranty_info: "",
-      maintenance_plan_offerings: "",
-      credentials: "",
-      owner_availability: "",
-      emergency_contact_info: "",
+      services_not_offered: "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.",
+      financing_policy: "Not provided. Do not make any promises about this; say the owner will cover it when they call back.",
+      brands_worked_with: "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.",
+      response_time_commitment: "Not provided. Say the owner will call back as soon as they can, without promising a specific time.",
+      warranty_info: "Not provided. Do not make any promises about this; say the owner will cover it when they call back.",
+      maintenance_plan_offerings: "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.",
+      credentials: "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.",
+      owner_availability: "Not provided. Take the caller's details and tell them the owner will be notified.",
+      emergency_contact_info: "Not provided. Take the caller's details and tell them the owner will be notified.",
       business_hours: "Mon-Fri 09:00-17:00",
       time_zone: "America/New_York",
       transfer_available: "false",
