@@ -11,6 +11,7 @@ import {
   notificationDevicesTable,
   retellCallRecordsTable,
   provisioningAttemptsTable,
+  operationalFailuresTable,
 } from "@workspace/db";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { numberActivity } from "./numberActivity";
@@ -327,7 +328,7 @@ export async function getAdminBusiness(businessId: number) {
 }
 
 export async function getAdminActivity() {
-  const [businesses, leadCounts, recentLeads] = await Promise.all([
+  const [businesses, leadCounts, recentLeads, operationalFailures] = await Promise.all([
     db.select({ id: businessesTable.id }).from(businessesTable),
     db.select({
       status: leadsTable.status,
@@ -352,6 +353,7 @@ export async function getAdminActivity() {
       .innerJoin(businessesTable, eq(leadsTable.businessId, businessesTable.id))
       .orderBy(desc(leadsTable.createdAt), desc(leadsTable.id))
       .limit(100),
+    listRecentOperationalFailures(),
   ]);
   const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
   const uncontacted = leadCounts.filter((lead) => lead.status !== "contacted");
@@ -363,5 +365,26 @@ export async function getAdminActivity() {
     uncontactedOver24HoursCount: uncontacted
       .filter((lead) => lead.createdAt.getTime() <= staleCutoff).length,
     recentLeads,
+    operationalFailures,
   });
+}
+
+async function listRecentOperationalFailures() {
+  const failures = await db
+    .select()
+    .from(operationalFailuresTable)
+    .orderBy(desc(operationalFailuresTable.createdAt), desc(operationalFailuresTable.id))
+    .limit(100);
+  return failures.map((failure) => ({
+    id: failure.id,
+    source: failure.source,
+    summary: failure.summary,
+    details: failure.details,
+    businessId: failure.businessId,
+    businessName: failure.businessName,
+    createdAt: failure.createdAt.toISOString(),
+    alertAttempts: failure.alertAttempts,
+    alertSentAt: failure.alertSentAt?.toISOString() ?? null,
+    alertLastError: failure.alertLastError,
+  }));
 }

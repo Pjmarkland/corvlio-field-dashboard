@@ -15,6 +15,7 @@ import { sendApnsNotification, isApnsConfigured } from "./apnsAdapter";
 import { readGoogleSheetLeads } from "./googleSheets";
 import { logger } from "./logger";
 import { deliverLeadAlertEmails } from "./leadAlertEmail";
+import { deliverOperationalFailureAlerts } from "./operationalFailures";
 
 const POLL_INTERVAL_MS = 60_000;
 const SHEETS_READ_TIMEOUT_MS = 55_000; // must be < POLLER_LEASE_MS
@@ -412,7 +413,11 @@ export function runNotificationOutboxNow(): Promise<void> {
   outboxPromise = (async () => {
     do {
       outboxRequested = false;
-      await Promise.all([deliverLeadAlertEmails(), processNotificationOutbox()]);
+      await Promise.all([
+        deliverLeadAlertEmails(),
+        deliverOperationalFailureAlerts(),
+        processNotificationOutbox(),
+      ]);
     } while (outboxRequested);
   })().finally(() => {
     outboxPromise = null;

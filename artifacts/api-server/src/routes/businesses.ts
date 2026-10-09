@@ -18,6 +18,8 @@ import {
 import { enrichBusinessFromWebsite } from "../lib/websiteEnrichment";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
+import { recordOperationalFailure } from "../lib/operationalFailures";
+import { runNotificationOutboxNow } from "../lib/notificationService";
 
 const router: IRouter = Router();
 
@@ -354,14 +356,39 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     }
 
     if (result.phoneProvisioningPending) {
+      const provisioningDetails = result.provisioningError instanceof Error
+        ? result.provisioningError.message
+        : "Unknown Retell provisioning error";
       req.log.warn(
         {
-          error: result.provisioningError instanceof Error
-            ? result.provisioningError.message
-            : "Unknown Retell provisioning error",
+          businessId: result.business.id,
+          error: provisioningDetails,
         },
         "Business saved; Retell phone provisioning is pending",
       );
+      try {
+        const inserted = await recordOperationalFailure({
+          eventKey: `phone-provisioning:${result.business.id}:${result.business.provisioningState}`,
+          source: "phone_provisioning",
+          summary: "Business phone-number provisioning is pending",
+          details: provisioningDetails,
+          businessId: result.business.id,
+          businessName: result.business.businessName,
+        });
+        if (inserted) {
+          void runNotificationOutboxNow().catch((error) => {
+            req.log.error(
+              { error: error instanceof Error ? error.message : "Unknown outbox error" },
+              "Could not deliver the phone-provisioning failure alert immediately",
+            );
+          });
+        }
+      } catch (error) {
+        req.log.error(
+          { businessId: result.business.id, error: error instanceof Error ? error.message : "Unknown persistence error" },
+          "Could not record the phone-provisioning failure for admin review",
+        );
+      }
     }
 
     res.status(existingBusiness ? 200 : 201).json({

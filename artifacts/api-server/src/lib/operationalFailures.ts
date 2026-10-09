@@ -7,6 +7,7 @@ import { logger } from "./logger";
 import { sendAdminOperationalFailureEmail } from "./gmail";
 
 export type OperationalFailureSource =
+  | "pre_call_fallback"
   | "post_call_webhook"
   | "lead_gmail_notification"
   | "phone_provisioning";

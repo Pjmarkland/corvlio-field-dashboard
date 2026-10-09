@@ -16,6 +16,8 @@ export * from './adminLeadActivity';
 export * from './adminMetrics';
 export * from './adminOnboardingAnswers';
 export * from './adminOnboardingAnswersWebsiteEnrichmentSources';
+export * from './adminOperationalFailure';
+export * from './adminOperationalFailureSource';
 export * from './adminOverview';
 export * from './alertReadReceipt';
 export * from './businessProfile';

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   sendLeadNotificationEmail: vi.fn(),
   runNotificationOutboxNow: vi.fn(),
   persistAnalyzedCall: vi.fn(),
+  recordOperationalFailure: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
@@ -34,6 +35,9 @@ vi.mock("../../src/lib/notificationService", () => ({
 }));
 vi.mock("../../src/lib/retellPersistence", () => ({
   persistAnalyzedCall: mocks.persistAnalyzedCall,
+}));
+vi.mock("../../src/lib/operationalFailures", () => ({
+  recordOperationalFailure: mocks.recordOperationalFailure,
 }));
 
 import retellRouter from "../../src/routes/retell";
@@ -84,11 +88,10 @@ function makeBusiness(overrides: Record<string, unknown> = {}) {
 }
 
 async function requestPreCall(toNumber = "+14155550123") {
-  const response = await fetch(`${baseUrl}/webhooks/retell/pre-call`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ call_inbound: { to_number: toNumber } }),
-  });
+  const response = await signedRequest(
+    "pre-call",
+    JSON.stringify({ call_inbound: { to_number: toNumber } }),
+  );
   return {
     status: response.status,
     body: await response.json() as {
@@ -134,6 +137,7 @@ beforeEach(() => {
   mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: true });
   mocks.sendLeadNotificationEmail.mockResolvedValue(undefined);
   mocks.runNotificationOutboxNow.mockResolvedValue(undefined);
+  mocks.recordOperationalFailure.mockResolvedValue(true);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
 });
 
@@ -155,6 +159,11 @@ describe("Retell webhook safety", () => {
       { error: "Database unavailable" },
       expect.stringContaining("answering with generic"),
     );
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      source: "pre_call_fallback",
+      summary: "Inbound business lookup failed; generic fallback used",
+      details: expect.stringMatching(/Database unavailable|3500ms/),
+    }));
   });
 
   it("bounds a stalled lookup to 3.5 seconds, returns generic variables, and handles a late rejection", async () => {
@@ -173,29 +182,40 @@ describe("Retell webhook safety", () => {
     expect(mocks.logError).toHaveBeenCalledTimes(1);
   }, 10_000);
 
-  it("persists a partial ended call and later canonical/legacy analysis without losing callback or transcript", async () => {
+  it("ignores an early empty call-ended event, then persists the analyzed call and callback", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.test" }));
     mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });
     const call = { call_id: "call-partial", to_number: "+14155550123", from_number: "+15559990000",
       transcript: "user: My pipe is leaking. I'm Sam.",
     };
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
-    expect(mocks.persistAnalyzedCall.mock.calls[0]).toEqual([
-      "call-partial", expect.objectContaining({ transcript: call.transcript, callerId: call.from_number, phoneNumber: call.from_number, summary: expect.stringContaining("My pipe is leaking") }),
-      expect.any(Object), false, true,
-    ]);
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
       ...call, call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
         "USER NAME": "Sam", ISSUE: "Leaking pipe", ADDRESS: "12 Test St", URGENCY: "today", AVAILABILITY: "afternoon",
         callback_number: "+15551230000",
       } },
     } }))).status).toBe(204);
-    expect(mocks.persistAnalyzedCall.mock.calls[1]).toEqual([
+    expect(mocks.persistAnalyzedCall.mock.calls[0]).toEqual([
       "call-partial", expect.objectContaining({ callerName: "Sam", issueReason: "Leaking pipe", address: "12 Test St",
         urgencyLevel: "today", availability: "afternoon", callerId: "+15559990000", callbackNumber: "+15551230000",
         phoneNumber: "+15551230000", transcript: call.transcript, summary: "Sam has a leaking pipe." }),
       expect.any(Object), true, true,
     ]);
+  });
+  it.each([
+    { status: "error", duration_ms: 1500, call_analysis: { call_summary: "Some analysis" } },
+    { status: "ended", duration_ms: 0, call_analysis: { call_summary: "Some analysis" } },
+    { status: "ended", duration_ms: 1500, call_analysis: {} },
+    { status: "ended", duration_ms: 1500, call_analysis: { call_summary: "   " } },
+  ])("does not persist blank or failed calls %#", async state => {
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "blank-call", to_number: "+14155550123", ...state,
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).not.toHaveBeenCalled();
   });
   it.each([
     { direction: "outbound" },
@@ -214,14 +234,20 @@ describe("Retell webhook safety", () => {
     mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });
     const raw = JSON.stringify({ event: "call_analyzed", call: {
       call_id: "real", to_number: "+14155550123", from_number: "+15551230000",
+      call_analysis: { call_summary: "The caller has a leaking pipe." },
     } });
     expect((await signedRequest("post-call", raw)).status).toBe(204);
     expect(mocks.persistAnalyzedCall.mock.calls[0][4]).toBe(false);
     expect(mocks.runNotificationOutboxNow).not.toHaveBeenCalled();
   });
-  it("allows missing pre-call signatures during the compatibility rollout and logs them", async () => {
-    expect((await requestPreCall()).status).toBe(200);
-    expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("allowing during compatibility"));
+  it("rejects missing pre-call signatures before looking up a business", async () => {
+    const response = await fetch(`${baseUrl}/webhooks/retell/pre-call`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ call_inbound: { to_number: "+14155550123" } }),
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
   });
   it("verifies valid pre-call signatures against the exact raw bytes", async () => {
     const raw = '{ "call_inbound": { "to_number" : "+14155550123" } }';
@@ -252,6 +278,21 @@ describe("Retell webhook safety", () => {
     });
     expect(response.status).toBe(401);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+  });
+  it("records authenticated post-call processing failures for admin alerting", async () => {
+    mocks.findBusinessByPhoneNumber.mockRejectedValueOnce(new Error("Database unavailable"));
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "call-failure", to_number: "+14155550123",
+      call_analysis: { call_summary: "The caller has a leaking pipe." },
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(500);
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: expect.stringMatching(/^retell-post-call:/),
+      source: "post_call_webhook",
+      summary: "Post-call webhook processing failed",
+      details: "Database unavailable",
+    }));
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
   });
 });
 
@@ -332,7 +373,7 @@ describe("Retell pre-call dynamic variables", () => {
     expect(Object.keys(dynamicVariables).sort()).toEqual(
       ["agent_name", ...OTHER_DYNAMIC_VARIABLE_KEYS].sort(),
     );
-    expect(dynamicVariables.business_name).toBe("");
+    expect(dynamicVariables.business_name).toBe("our team");
     expect(mocks.findBusinessByPhoneNumber).toHaveBeenCalledWith("+14155550999");
   });
 });

@@ -11,6 +11,7 @@ import { persistAnalyzedCall } from "../lib/retellPersistence";
 import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
 import { recordOperationalFailure } from "../lib/operationalFailures";
+import type { OperationalFailureSource } from "../lib/operationalFailures";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -93,8 +94,10 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
-async function recordPostCallFailure(
+async function recordRetellFailure(
   req: Parameters<Parameters<typeof router.post>[1]>[0],
+  eventPrefix: string,
+  source: Extract<OperationalFailureSource, "pre_call_fallback" | "post_call_webhook">,
   input: {
     summary: string;
     details: string;
@@ -104,10 +107,10 @@ async function recordPostCallFailure(
 ): Promise<void> {
   try {
     const rawBody = req.rawBody ?? Buffer.from("");
-    const eventKey = `retell-post-call:${createHash("sha256").update(rawBody).digest("hex")}`;
+    const eventKey = `${eventPrefix}:${createHash("sha256").update(rawBody).digest("hex")}`;
     const inserted = await recordOperationalFailure({
       eventKey,
-      source: "post_call_webhook",
+      source,
       ...input,
     });
     if (inserted) {
@@ -124,6 +127,18 @@ async function recordPostCallFailure(
       "Could not record the failed post-call webhook for admin review",
     );
   }
+}
+
+function recordPostCallFailure(
+  req: Parameters<Parameters<typeof router.post>[1]>[0],
+  input: {
+    summary: string;
+    details: string;
+    businessId?: number;
+    businessName?: string;
+  },
+): Promise<void> {
+  return recordRetellFailure(req, "retell-post-call", "post_call_webhook", input);
 }
 
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
@@ -168,10 +183,15 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
       },
     });
   } catch (error) {
+    const details = error instanceof Error ? error.message : "Unknown business lookup error";
     req.log.error(
-      { error: error instanceof Error ? error.message : "Unknown business lookup error" },
+      { error: details },
       "Retell pre-call business lookup failed; answering with generic no-business variables",
     );
+    await recordRetellFailure(req, "retell-pre-call", "pre_call_fallback", {
+      summary: "Inbound business lookup failed; generic fallback used",
+      details,
+    });
     res.status(200).json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
   } finally {
     if (lookupTimer) clearTimeout(lookupTimer);

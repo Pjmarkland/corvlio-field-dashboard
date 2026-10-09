@@ -607,6 +607,12 @@ export const getAdminActivityResponseRecentLeadsItemIdMultipleOf = 1;
 
 export const getAdminActivityResponseRecentLeadsItemBusinessIdMultipleOf = 1;
 
+export const getAdminActivityResponseOperationalFailuresItemIdMultipleOf = 1;
+
+export const getAdminActivityResponseOperationalFailuresItemBusinessIdMultipleOf = 1;
+
+export const getAdminActivityResponseOperationalFailuresItemAlertAttemptsMultipleOf = 1;
+
 
 
 export const GetAdminActivityResponse = zod.object({
@@ -627,6 +633,18 @@ export const GetAdminActivityResponse = zod.object({
   "status": zod.string(),
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
+})),
+  "operationalFailures": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemIdMultipleOf),
+  "source": zod.enum(['pre_call_fallback', 'post_call_webhook', 'lead_gmail_notification', 'phone_provisioning']),
+  "summary": zod.string(),
+  "details": zod.string(),
+  "businessId": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemBusinessIdMultipleOf).nullable(),
+  "businessName": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "alertAttempts": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemAlertAttemptsMultipleOf),
+  "alertSentAt": zod.coerce.date().nullable(),
+  "alertLastError": zod.string().nullable()
 }))
 })
 

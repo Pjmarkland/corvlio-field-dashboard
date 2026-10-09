@@ -538,12 +538,40 @@ export interface AdminBusinessDetail {
   calls: AdminCallRecord[];
 }
 
+export type AdminOperationalFailureSource = typeof AdminOperationalFailureSource[keyof typeof AdminOperationalFailureSource];
+
+
+export const AdminOperationalFailureSource = {
+  pre_call_fallback: 'pre_call_fallback',
+  post_call_webhook: 'post_call_webhook',
+  lead_gmail_notification: 'lead_gmail_notification',
+  phone_provisioning: 'phone_provisioning',
+} as const;
+
+export interface AdminOperationalFailure {
+  id: number;
+  source: AdminOperationalFailureSource;
+  summary: string;
+  details: string;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  createdAt: string;
+  alertAttempts: number;
+  /** @nullable */
+  alertSentAt: string | null;
+  /** @nullable */
+  alertLastError: string | null;
+}
+
 export interface AdminActivity {
   businessCount: number;
   totalLeadCount: number;
   uncontactedLeadCount: number;
   uncontactedOver24HoursCount: number;
   recentLeads: AdminLeadActivity[];
+  operationalFailures: AdminOperationalFailure[];
 }
 
 export type CreateOwnerDemoCall200 = {

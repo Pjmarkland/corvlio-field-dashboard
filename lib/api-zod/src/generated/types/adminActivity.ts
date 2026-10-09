@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminLeadActivity } from './adminLeadActivity';
+import type { AdminOperationalFailure } from './adminOperationalFailure';
 
 export interface AdminActivity {
   businessCount: number;
@@ -13,4 +14,5 @@ export interface AdminActivity {
   uncontactedLeadCount: number;
   uncontactedOver24HoursCount: number;
   recentLeads: AdminLeadActivity[];
+  operationalFailures: AdminOperationalFailure[];
 }

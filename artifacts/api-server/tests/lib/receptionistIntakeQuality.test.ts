@@ -44,7 +44,7 @@ describe("optional Retell business details", () => {
     const variables = dynamicVariables(null);
     for (const [, variable] of optionalDetails) expect(variables[variable]).toBe("");
     expect(variables.agent_name).toBe("Aria");
-    expect(variables.business_name).toBe("");
+    expect(variables.business_name).toBe("our team");
   });
 });
 describe("tone, trade intake and honest call quality", () => {

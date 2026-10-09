@@ -62,6 +62,7 @@ router.get("/admin/businesses/:businessId", async (req, res): Promise<void> => {
 });
 
 router.get("/admin/activity", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
   try {
     res.json(await getAdminActivity());
   } catch (error) {

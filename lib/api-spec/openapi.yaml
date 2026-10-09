@@ -1237,10 +1237,55 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminLeadActivity"
+        operationalFailures:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOperationalFailure"
       required:
         - businessCount
         - totalLeadCount
         - uncontactedLeadCount
         - uncontactedOver24HoursCount
         - recentLeads
+        - operationalFailures
+    AdminOperationalFailure:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        source:
+          type: string
+          enum: [pre_call_fallback, post_call_webhook, lead_gmail_notification, phone_provisioning]
+        summary:
+          type: string
+        details:
+          type: string
+        businessId:
+          type: [number, "null"]
+          multipleOf: 1
+        businessName:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        alertAttempts:
+          type: number
+          multipleOf: 1
+        alertSentAt:
+          type: [string, "null"]
+          format: date-time
+        alertLastError:
+          type: [string, "null"]
+      required:
+        - id
+        - source
+        - summary
+        - details
+        - businessId
+        - businessName
+        - createdAt
+        - alertAttempts
+        - alertSentAt
+        - alertLastError
 
