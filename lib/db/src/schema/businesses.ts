@@ -21,6 +21,7 @@ export const businessesTable = pgTable("businesses", {
   provisioningState: text("provisioning_state").notNull().default("pending"),
   serviceArea: text("service_area"),
   businessType: text("business_type"),
+  servicesOffered: text("services_offered"),
   majorIssueExamples: text("major_issue_examples"),
   personalityToneDescription: text("personality_tone_description"),
   servicesNotOffered: text("services_not_offered"),
