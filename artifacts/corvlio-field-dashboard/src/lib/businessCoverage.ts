@@ -15,9 +15,9 @@ function dayIndex(token: string) {
 }
 
 /** Returns an error message, or null when the schedule is valid. */
-export function validateBusinessHours(value: string): string | null {
+export function validateBusinessHours(value: string, allowBlank = false): string | null {
   const text = value.trim();
-  if (!text) return 'Enter your business hours, for example Mon-Fri 09:00-17:00.';
+  if (!text) return allowBlank ? null : 'Enter your business hours, for example Mon-Fri 09:00-17:00.';
   if (/^24\s*\/\s*7$/i.test(text)) return null;
   for (const part of text.split(';')) {
     const segment = part.trim();
@@ -36,9 +36,9 @@ export function validateBusinessHours(value: string): string | null {
   return null;
 }
 
-export function validateTimeZone(value: string): string | null {
+export function validateTimeZone(value: string, allowBlank = false): string | null {
   const zone = value.trim();
-  if (!zone) return 'Choose your time zone, for example America/New_York.';
+  if (!zone) return allowBlank ? null : 'Choose your time zone, for example America/New_York.';
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: zone });
     return zone.includes('/') || zone === 'UTC' ? null : 'Use an IANA time zone such as America/Chicago.';

@@ -39,7 +39,7 @@ import {
   type OnboardingConfirmation,
 } from '@/lib/onboardingConfirmation';
 import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
+import { validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
 import WelcomePage from '@/pages/welcome';
 import { BusinessSetupGuard } from '@/components/BusinessSetupGuard';
 import OnboardingPage from '@/pages/onboarding';
@@ -522,6 +522,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
     { key: 'ownerEmail', label: 'Owner email', type: 'email' }, { key: 'serviceArea', label: 'Service area' },
     { key: 'ownerPhone', label: 'Your own phone number (country code, e.g. +14155550123)', type: 'tel' },
     { key: 'personalityToneDescription', label: 'Receptionist personality and tone', multiline: true },
+    { key: 'servicesOffered', label: 'Services offered', multiline: true },
     { key: 'majorIssueExamples', label: 'Urgent issue examples', multiline: true }, { key: 'servicesNotOffered', label: 'Services not offered', multiline: true },
     { key: 'pricingPolicy', label: 'Pricing policy', multiline: true }, { key: 'financingPolicy', label: 'Financing policy', multiline: true },
     { key: 'brandsWorkedWith', label: 'Brands worked with', multiline: true }, { key: 'responseTimeCommitment', label: 'Response time commitment', multiline: true },
@@ -532,7 +533,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
   type Coverage = { businessHours: string; timeZone: string };
   const coverageOf = (p: BusinessProfile | null): Coverage => {
     const x = (p ?? {}) as unknown as Partial<Record<keyof Coverage, string | null>>;
-    return { businessHours: x.businessHours ?? DEFAULT_BUSINESS_HOURS, timeZone: x.timeZone ?? DEFAULT_TIME_ZONE };
+    return { businessHours: x.businessHours ?? '', timeZone: x.timeZone ?? '' };
   };
   const coverage = coverageOf(draft);
   const changeCoverage = (key: keyof Coverage, value: string) => setDraft((current) => current ? ({ ...current, [key]: value } as unknown as BusinessProfile) : current);
@@ -544,7 +545,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
       setNotice({ type: 'error', message: 'Enter a business name and valid owner email.' });
       return;
     }
-    const coverageError = validateBusinessHours(coverage.businessHours) ?? validateTimeZone(coverage.timeZone);
+    const coverageError = validateBusinessHours(coverage.businessHours, true) ?? validateTimeZone(coverage.timeZone, true);
     if (coverageError) { setNotice({ type: 'error', message: coverageError }); return; }
     setNotice(null);
     const data = Object.fromEntries(fields.map(({ key }) => {
@@ -617,7 +618,9 @@ function NotFound() {
   return <div className="grid min-h-[60vh] place-items-center text-center"><div><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted"><X size={26} /></div><h1 className="text-2xl font-800">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">That field note wandered off.</p><Link href="/dashboard" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground" data-testid="link-not-found-home">Back to today</Link></div></div>;
 }
 
-function Router({ refreshLeads, leads, businessName, retellPhoneNumber, onboardingConfirmation, timeZone, onStatus, savingLeadId }: { refreshLeads: () => Promise<unknown>; leads: Lead[]; businessName: string; retellPhoneNumber: string | null; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+function Router({ refreshLeads, leads, businessName, retellPhoneNumber, onboardingConfirmation, timeZone: savedTimeZone, onStatus, savingLeadId }: { refreshLeads: () => Promise<unknown>; leads: Lead[]; businessName: string; retellPhoneNumber: string | null; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+  // Analytics can use this device's zone without saving it as a business fact.
+  const timeZone = savedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [location] = useLocation();
   return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id" component={() => <DetailPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} />} /><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
 }

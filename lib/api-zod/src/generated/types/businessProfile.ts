@@ -20,6 +20,8 @@ export interface BusinessProfile {
   /** @nullable */
   businessType: string | null;
   /** @nullable */
+  servicesOffered: string | null;
+  /** @nullable */
   businessWebsiteUrl: string | null;
   /** @nullable */
   ownerEmail: string | null;

@@ -13,15 +13,9 @@ export interface BusinessProfileUpdate {
      */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;
-  /**
-     * @minLength 1
-     * @maxLength 500
-     */
+  /** @maxLength 500 */
   businessHours?: string;
-  /**
-     * @minLength 1
-     * @maxLength 100
-     */
+  /** @maxLength 100 */
   timeZone?: string;
   /**
      * @minLength 1
@@ -38,6 +32,11 @@ export interface BusinessProfileUpdate {
      * @nullable
      */
   businessType?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  servicesOffered?: string | null;
   /**
      * @maxLength 2048
      * @nullable

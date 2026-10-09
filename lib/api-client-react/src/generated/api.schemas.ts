@@ -147,6 +147,8 @@ export interface BusinessProfile {
   /** @nullable */
   businessType: string | null;
   /** @nullable */
+  servicesOffered: string | null;
+  /** @nullable */
   businessWebsiteUrl: string | null;
   /** @nullable */
   ownerEmail: string | null;
@@ -187,15 +189,9 @@ export interface BusinessProfileUpdate {
      */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;
-  /**
-     * @minLength 1
-     * @maxLength 500
-     */
+  /** @maxLength 500 */
   businessHours?: string;
-  /**
-     * @minLength 1
-     * @maxLength 100
-     */
+  /** @maxLength 100 */
   timeZone?: string;
   /**
      * @minLength 1
@@ -212,6 +208,11 @@ export interface BusinessProfileUpdate {
      * @nullable
      */
   businessType?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  servicesOffered?: string | null;
   /**
      * @maxLength 2048
      * @nullable
@@ -284,6 +285,76 @@ export interface BusinessProfileUpdate {
      * @nullable
      */
   emergencyContactInfo?: string | null;
+}
+
+export interface WebsitePreviewInput {
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  websiteUrl: string;
+}
+
+export interface WebsitePreviewField {
+  /**
+     * @maxLength 600
+     * @nullable
+     */
+  value: string | null;
+  /**
+     * @maxLength 400
+     * @nullable
+     */
+  evidence: string | null;
+  /** @nullable */
+  sourceUrl: string | null;
+}
+
+export interface WebsitePreviewFields {
+  servicesOffered: WebsitePreviewField;
+  servicesNotOffered: WebsitePreviewField;
+  serviceArea: WebsitePreviewField;
+  businessHours: WebsitePreviewField;
+  brandsWorkedWith: WebsitePreviewField;
+  warrantyInfo: WebsitePreviewField;
+  emergencyContactInfo: WebsitePreviewField;
+  financingPolicy: WebsitePreviewField;
+  pricingPolicy: WebsitePreviewField;
+  maintenancePlanOfferings: WebsitePreviewField;
+  credentials: WebsitePreviewField;
+}
+
+export type WebsitePreviewStatus = typeof WebsitePreviewStatus[keyof typeof WebsitePreviewStatus];
+
+
+export const WebsitePreviewStatus = {
+  complete: 'complete',
+  partial: 'partial',
+  unavailable: 'unavailable',
+} as const;
+
+export type WebsitePreviewMissingFieldsItem = typeof WebsitePreviewMissingFieldsItem[keyof typeof WebsitePreviewMissingFieldsItem];
+
+
+export const WebsitePreviewMissingFieldsItem = {
+  servicesOffered: 'servicesOffered',
+  servicesNotOffered: 'servicesNotOffered',
+  serviceArea: 'serviceArea',
+  businessHours: 'businessHours',
+  brandsWorkedWith: 'brandsWorkedWith',
+  warrantyInfo: 'warrantyInfo',
+  emergencyContactInfo: 'emergencyContactInfo',
+  financingPolicy: 'financingPolicy',
+  pricingPolicy: 'pricingPolicy',
+  maintenancePlanOfferings: 'maintenancePlanOfferings',
+  credentials: 'credentials',
+} as const;
+
+export interface WebsitePreview {
+  status: WebsitePreviewStatus;
+  message: string;
+  fields: WebsitePreviewFields;
+  missingFields: WebsitePreviewMissingFieldsItem[];
 }
 
 export type NotificationPlatform = typeof NotificationPlatform[keyof typeof NotificationPlatform];
@@ -464,6 +535,8 @@ export interface AdminOnboardingAnswers {
   serviceArea: string | null;
   /** @nullable */
   businessType: string | null;
+  /** @nullable */
+  servicesOffered: string | null;
   /** @nullable */
   majorIssueExamples: string | null;
   /** @nullable */

@@ -37,6 +37,7 @@ export const GetBusinessProfileResponse = zod.object({
   "businessName": zod.string(),
   "agentName": zod.string().nullable(),
   "businessType": zod.string().nullable(),
+  "servicesOffered": zod.string().nullable(),
   "businessWebsiteUrl": zod.string().nullable(),
   "ownerEmail": zod.string().nullable(),
   "serviceArea": zod.string().nullable(),
@@ -70,6 +71,8 @@ export const updateBusinessProfileBodyBusinessNameMax = 160;
 export const updateBusinessProfileBodyAgentNameMax = 40;
 
 export const updateBusinessProfileBodyBusinessTypeMax = 200;
+
+export const updateBusinessProfileBodyServicesOfferedMax = 4000;
 
 export const updateBusinessProfileBodyBusinessWebsiteUrlMax = 2048;
 
@@ -106,11 +109,12 @@ export const updateBusinessProfileBodyEmergencyContactInfoMax = 4000;
 export const UpdateBusinessProfileBody = zod.object({
   "ownerPhone": zod.string().max(updateBusinessProfileBodyOwnerPhoneMax).nullish(),
   "leadAlertsEnabled": zod.boolean().optional(),
-  "businessHours": zod.string().min(1).max(updateBusinessProfileBodyBusinessHoursMax).optional(),
-  "timeZone": zod.string().min(1).max(updateBusinessProfileBodyTimeZoneMax).optional(),
+  "businessHours": zod.string().max(updateBusinessProfileBodyBusinessHoursMax).optional(),
+  "timeZone": zod.string().max(updateBusinessProfileBodyTimeZoneMax).optional(),
   "businessName": zod.string().min(1).max(updateBusinessProfileBodyBusinessNameMax).optional(),
   "agentName": zod.string().max(updateBusinessProfileBodyAgentNameMax).nullish(),
   "businessType": zod.string().max(updateBusinessProfileBodyBusinessTypeMax).nullish(),
+  "servicesOffered": zod.string().max(updateBusinessProfileBodyServicesOfferedMax).nullish(),
   "businessWebsiteUrl": zod.string().max(updateBusinessProfileBodyBusinessWebsiteUrlMax).nullish(),
   "ownerEmail": zod.string().max(updateBusinessProfileBodyOwnerEmailMax).optional(),
   "serviceArea": zod.string().max(updateBusinessProfileBodyServiceAreaMax).nullish(),
@@ -136,6 +140,7 @@ export const UpdateBusinessProfileResponse = zod.object({
   "businessName": zod.string(),
   "agentName": zod.string().nullable(),
   "businessType": zod.string().nullable(),
+  "servicesOffered": zod.string().nullable(),
   "businessWebsiteUrl": zod.string().nullable(),
   "ownerEmail": zod.string().nullable(),
   "serviceArea": zod.string().nullable(),
@@ -152,6 +157,127 @@ export const UpdateBusinessProfileResponse = zod.object({
   "ownerAvailability": zod.string().nullable(),
   "emergencyContactInfo": zod.string().nullable(),
   "retellPhoneNumber": zod.string().nullable()
+})
+
+
+/**
+ * @summary Preview public website facts without saving business data
+ */
+export const previewBusinessWebsiteBodyWebsiteUrlMax = 2048;
+
+
+
+export const PreviewBusinessWebsiteBody = zod.object({
+  "websiteUrl": zod.string().min(1).max(previewBusinessWebsiteBodyWebsiteUrlMax)
+})
+
+export const previewBusinessWebsiteResponseFieldsServicesOfferedValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsServicesOfferedEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsServicesNotOfferedValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsServicesNotOfferedEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsServiceAreaValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsServiceAreaEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsBusinessHoursValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsBusinessHoursEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsBrandsWorkedWithValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsBrandsWorkedWithEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsWarrantyInfoValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsWarrantyInfoEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsEmergencyContactInfoValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsEmergencyContactInfoEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsFinancingPolicyValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsFinancingPolicyEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsPricingPolicyValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsPricingPolicyEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsMaintenancePlanOfferingsValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsMaintenancePlanOfferingsEvidenceMax = 400;
+
+export const previewBusinessWebsiteResponseFieldsCredentialsValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsCredentialsEvidenceMax = 400;
+
+
+
+export const PreviewBusinessWebsiteResponse = zod.object({
+  "status": zod.enum(['complete', 'partial', 'unavailable']),
+  "message": zod.string(),
+  "fields": zod.object({
+  "servicesOffered": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsServicesOfferedValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsServicesOfferedEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "servicesNotOffered": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsServicesNotOfferedValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsServicesNotOfferedEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "serviceArea": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsServiceAreaValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsServiceAreaEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "businessHours": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsBusinessHoursValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsBusinessHoursEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "brandsWorkedWith": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsBrandsWorkedWithValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsBrandsWorkedWithEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "warrantyInfo": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsWarrantyInfoValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsWarrantyInfoEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "emergencyContactInfo": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsEmergencyContactInfoValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsEmergencyContactInfoEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "financingPolicy": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsFinancingPolicyValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsFinancingPolicyEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "pricingPolicy": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsPricingPolicyValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsPricingPolicyEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "maintenancePlanOfferings": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsMaintenancePlanOfferingsValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsMaintenancePlanOfferingsEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}),
+  "credentials": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsCredentialsValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsCredentialsEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+})
+}),
+  "missingFields": zod.array(zod.enum(['servicesOffered', 'servicesNotOffered', 'serviceArea', 'businessHours', 'brandsWorkedWith', 'warrantyInfo', 'emergencyContactInfo', 'financingPolicy', 'pricingPolicy', 'maintenancePlanOfferings', 'credentials']))
 })
 
 
@@ -550,6 +676,7 @@ export const GetAdminBusinessResponse = zod.object({
   "agentName": zod.string().nullable(),
   "serviceArea": zod.string().nullable(),
   "businessType": zod.string().nullable(),
+  "servicesOffered": zod.string().nullable(),
   "majorIssueExamples": zod.string().nullable(),
   "personalityToneDescription": zod.string().nullable(),
   "servicesNotOffered": zod.string().nullable(),

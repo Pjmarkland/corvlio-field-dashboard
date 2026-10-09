@@ -9,6 +9,7 @@ export type OnboardingForm = {
   ownerEmail: string;
   serviceArea: string;
   receptionistTone: string;
+  servicesOffered: string;
   servicesNotOffered: string;
   majorIssueExamples: string;
   pricingPolicy: string;
@@ -36,6 +37,7 @@ export const initialForm: OnboardingForm = {
   ownerEmail: '',
   serviceArea: '',
   receptionistTone: 'Friendly and professional',
+  servicesOffered: '',
   servicesNotOffered: '',
   majorIssueExamples: '',
   pricingPolicy: '',
@@ -47,8 +49,8 @@ export const initialForm: OnboardingForm = {
   credentials: '',
   ownerAvailability: '',
   emergencyContact: '',
-  businessHours: DEFAULT_BUSINESS_HOURS,
-  timeZone: DEFAULT_TIME_ZONE,
+  businessHours: '',
+  timeZone: '',
   privacyAccepted: false,
   termsAccepted: false,
   serviceAgreementAccepted: false,
@@ -111,6 +113,7 @@ export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
     ownerEmail: 'owner@example.com',
     serviceArea: 'Example City and Example County (fictional sample area)',
     receptionistTone: toneOptions[0].value,
+    servicesOffered: 'Fictional sample only: residential sink leaks, faucet repairs, and drain clearing in Example City.',
     servicesNotOffered: 'Sample only: no commercial plumbing, excavation, or work outside Example City.',
     majorIssueExamples: 'Fictional sample only: an active leak that cannot be contained, a sewage backup, or a complete loss of water.',
     pricingPolicy: 'Sample only: do not guess at prices; explain that the business will confirm costs.',

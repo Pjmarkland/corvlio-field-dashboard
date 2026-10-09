@@ -8,6 +8,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 export const WEBSITE_ENRICHMENT_FIELDS = [
   "businessType",
+  "servicesOffered",
   "majorIssueExamples",
   "servicesNotOffered",
   "pricingPolicy",

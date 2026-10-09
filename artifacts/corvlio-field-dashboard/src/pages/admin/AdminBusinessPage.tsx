@@ -10,6 +10,7 @@ const ANSWER_FIELDS: Array<{ key: keyof AdminOnboardingAnswers; label: string }>
   { key: 'agentName', label: 'Receptionist name' },
   { key: 'serviceArea', label: 'Service area' },
   { key: 'businessType', label: 'Business type' },
+  { key: 'servicesOffered', label: 'Services offered' },
   { key: 'majorIssueExamples', label: 'Major issue examples' },
   { key: 'personalityToneDescription', label: 'Personality and tone' },
   { key: 'servicesNotOffered', label: 'Services not offered' },

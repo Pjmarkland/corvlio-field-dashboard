@@ -16,6 +16,8 @@ export interface AdminOnboardingAnswers {
   /** @nullable */
   businessType: string | null;
   /** @nullable */
+  servicesOffered: string | null;
+  /** @nullable */
   majorIssueExamples: string | null;
   /** @nullable */
   personalityToneDescription: string | null;

@@ -5,18 +5,19 @@ import {
   GetBusinessProfileResponse,
   UpdateBusinessProfileBody,
   UpdateBusinessProfileResponse,
+  PreviewBusinessWebsiteBody,
+  PreviewBusinessWebsiteResponse,
 } from "@workspace/api-zod";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
 import {
-  claimWebsiteEnrichment,
   findBusinessByClerkUserId,
   updateBusiness,
   updateOwnedBusiness,
   WEBSITE_ENRICHMENT_FIELDS,
   type WebsiteEnrichmentField,
 } from "../lib/businessDirectory";
-import { enrichBusinessFromWebsite } from "../lib/websiteEnrichment";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_TIME_ZONE, parseBusinessHours, validTimeZone } from "../lib/businessHours";
+import { normalizeWebsiteUrl, previewBusinessWebsite, unavailableWebsitePreview, UnsafeWebsiteUrlError } from "../lib/websiteEnrichment";
+import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
 import { recordOperationalFailure } from "../lib/operationalFailures";
 import { runNotificationOutboxNow } from "../lib/notificationService";
@@ -35,6 +36,7 @@ const BUSINESS_PROFILE_COLUMN_BY_FIELD: Record<BusinessProfileField, string> = {
   businessName: "businessName",
   agentName: "agentName",
   businessType: "businessType",
+  servicesOffered: "servicesOffered",
   businessWebsiteUrl: "businessWebsiteUrl",
   ownerEmail: "ownerEmail",
   serviceArea: "serviceArea",
@@ -56,6 +58,7 @@ const ENRICHMENT_FIELD_BY_PROFILE_FIELD: Partial<
   Record<BusinessProfileField, WebsiteEnrichmentField>
 > = {
   businessType: "businessType",
+  servicesOffered: "servicesOffered",
   majorIssueExamples: "majorIssueExamples",
   servicesNotOffered: "servicesNotOffered",
   pricingPolicy: "pricingPolicy",
@@ -73,11 +76,12 @@ function toBusinessProfile(business: OwnedBusiness) {
   return {
     ownerPhone: business.ownerPhone ?? null,
     leadAlertsEnabled: business.leadAlertsEnabled ?? true,
-    businessHours: business.businessHours ?? DEFAULT_BUSINESS_HOURS,
-    timeZone: business.timeZone ?? DEFAULT_TIME_ZONE,
+    businessHours: business.businessHours ?? "",
+    timeZone: business.timeZone ?? "",
     businessName: business.businessName,
     agentName: business.agentName,
     businessType: business.businessType,
+    servicesOffered: business.servicesOffered ?? null,
     businessWebsiteUrl: business.businessWebsiteUrl,
     ownerEmail: business.ownerEmail,
     serviceArea: business.serviceArea,
@@ -156,8 +160,8 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Owner phone must include a country code, for example +14155550123" });
     return;
   }
-  if ((body.data.businessHours !== undefined && !parseBusinessHours(body.data.businessHours))
-    || (body.data.timeZone !== undefined && !validTimeZone(body.data.timeZone.trim()))) {
+  if ((body.data.businessHours?.trim() && !parseBusinessHours(body.data.businessHours))
+    || (body.data.timeZone?.trim() && !validTimeZone(body.data.timeZone.trim()))) {
     res.status(400).json({ error: "Use valid business hours (Mon-Fri 09:00-17:00; Sat 10:00-14:00, or 24/7) and an IANA time zone" });
     return;
   }
@@ -206,7 +210,8 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
 
       const value = body.data[profileField];
       const normalizedValue = typeof value === "boolean" ? value : typeof value === "string" ? value.trim() : null;
-      const requiredValue = profileField === "businessName" || profileField === "ownerEmail";
+      const requiredValue = profileField === "businessName" || profileField === "ownerEmail"
+        || profileField === "businessHours" || profileField === "timeZone";
       Object.assign(changes, {
         [databaseField]: typeof normalizedValue === "boolean" || requiredValue ? normalizedValue : normalizedValue || null,
       });
@@ -253,13 +258,55 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
   }
 });
 
+const activeWebsitePreviews = new Set<string>();
+const websitePreviewAttempts = new Map<string, { count: number; expiresAt: number }>();
+
+router.post("/businesses/onboarding/website-preview", async (req, res): Promise<void> => {
+  setPrivateOwnerResponseHeaders(res);
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  const body = PreviewBusinessWebsiteBody.strict().safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Enter a valid public business website URL." }); return; }
+  const now = Date.now();
+  for (const [key, attempt] of websitePreviewAttempts) {
+    if (attempt.expiresAt <= now) websitePreviewAttempts.delete(key);
+  }
+  const attempt = websitePreviewAttempts.get(userId) ?? { count: 0, expiresAt: now + 60_000 };
+  if (activeWebsitePreviews.has(userId) || attempt.count >= 5) {
+    res.status(429).json({ error: "Please wait a moment before reading the website again." });
+    return;
+  }
+  attempt.count += 1;
+  websitePreviewAttempts.set(userId, attempt);
+  activeWebsitePreviews.add(userId);
+  try {
+    const url = normalizeWebsiteUrl(body.data.websiteUrl);
+    const existingBusiness = await findBusinessByClerkUserId(userId);
+    if (existingBusiness?.isSample) {
+      res.status(200).json(PreviewBusinessWebsiteResponse.parse(unavailableWebsitePreview()));
+      return;
+    }
+    res.status(200).json(PreviewBusinessWebsiteResponse.parse(await previewBusinessWebsite(url.toString())));
+  } catch (error) {
+    if (error instanceof UnsafeWebsiteUrlError) {
+      res.status(400).json({ error: "Use a public HTTP or HTTPS business website, without credentials or private network addresses." });
+    } else {
+      req.log.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Optional website preview did not complete");
+      res.status(200).json(PreviewBusinessWebsiteResponse.parse(unavailableWebsitePreview()));
+    }
+  } finally {
+    activeWebsitePreviews.delete(userId);
+  }
+});
+
 const OnboardBusinessBody = z.object({
-  businessHours: z.string().trim().max(500).refine(v => parseBusinessHours(v) !== null).optional(),
-  timeZone: z.string().trim().max(100).refine(validTimeZone).optional(),
+  businessHours: z.string().trim().max(500).refine(v => !v || parseBusinessHours(v) !== null).optional(),
+  timeZone: z.string().trim().max(100).refine(v => !v || validTimeZone(v)).optional(),
   isSample: z.boolean().optional(),
   businessName: z.string().min(1),
   agentName: z.string().trim().max(40).optional(),
   businessType: z.string().optional(),
+  servicesOffered: z.string().max(4000).optional(),
   businessWebsiteUrl: z.string().trim().max(2048).optional().or(z.literal("")),
   ownerEmail: z.string().email(),
   serviceArea: z.string().optional(),
@@ -275,6 +322,8 @@ const OnboardBusinessBody = z.object({
   credentials: z.string().optional(),
   ownerAvailability: z.string().optional(),
   emergencyContactInfo: z.string().optional(),
+  websiteScrapePreviewed: z.boolean().optional(),
+  websiteSuggestionsReviewed: z.boolean().optional(),
 });
 
 router.post("/businesses/onboard", async (req, res): Promise<void> => {
@@ -296,18 +345,27 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     res.status(400).json({ error: nameError });
     return;
   }
+  if (body.data.websiteScrapePreviewed && body.data.websiteSuggestionsReviewed !== true) {
+    res.status(400).json({ error: "Review the website suggestions and missing fields before saving." });
+    return;
+  }
+  if (body.data.businessWebsiteUrl && !isHttpUrl(body.data.businessWebsiteUrl)) {
+    res.status(400).json({ error: "Website must be a valid HTTP or HTTPS URL" });
+    return;
+  }
 
   const isSample = body.data.isSample === true
     || body.data.businessName.trim().toLowerCase().includes("fictional sample")
     || body.data.ownerEmail.toLowerCase() === "owner@example.com";
   const businessInfo = {
-    businessHours: body.data.businessHours,
-    timeZone: body.data.timeZone,
+    businessHours: body.data.businessHours ?? "",
+    timeZone: body.data.timeZone ?? "",
     isSample,
     clerkUserId: userId,
     businessName: body.data.businessName.trim(),
     agentName: body.data.agentName?.trim() || null,
     businessType: body.data.businessType,
+    servicesOffered: body.data.servicesOffered,
     ownerEmail: body.data.ownerEmail,
     serviceArea: body.data.serviceArea,
     personalityToneDescription: body.data.personalityToneDescription,
@@ -327,19 +385,6 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() || "";
   const websiteUrl = !isSample && rawWebsiteUrl.length <= 2048 ? rawWebsiteUrl || null : null;
 
-  const scheduleWebsiteEnrichment = (businessId: number, url: string) => {
-    void enrichBusinessFromWebsite(businessId, url)
-      .catch((error: unknown) => {
-        req.log.warn(
-          {
-            businessId,
-            errorName: error instanceof Error ? error.name : "UnknownError",
-          },
-          "Optional website enrichment did not complete",
-        );
-      });
-  };
-
   try {
     const existingBusiness = await findBusinessByClerkUserId(userId);
     const result = await saveBusinessWithOptionalPhone({
@@ -347,14 +392,6 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
       businessWebsiteUrl: websiteUrl,
       websiteEnrichmentAttemptedAt: null,
     });
-    if (websiteUrl && !result.business.isSample) {
-      void claimWebsiteEnrichment(result.business.id, websiteUrl).then((claimed) => {
-        if (claimed) scheduleWebsiteEnrichment(claimed.id, websiteUrl);
-      }).catch((error: unknown) => {
-        req.log.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Optional website enrichment could not be scheduled");
-      });
-    }
-
     if (result.phoneProvisioningPending) {
       const provisioningDetails = result.provisioningError instanceof Error
         ? result.provisioningError.message

@@ -99,6 +99,30 @@ paths:
           description: No business is configured for this account
         "502":
           description: Business profile could not be updated
+  /businesses/onboarding/website-preview:
+    post:
+      operationId: previewBusinessWebsite
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Preview public website facts without saving business data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebsitePreviewInput"
+      responses:
+        "200":
+          description: Suggestions for owner review, with unsupported fields marked missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsitePreview"
+        "400":
+          description: Invalid or non-public website URL
+        "401":
+          description: Authentication required
   /admin/call-quality:
     get:
       operationId: getAdminCallQuality
@@ -632,6 +656,8 @@ components:
           type: [string, "null"]
         businessType:
           type: [string, "null"]
+        servicesOffered:
+          type: [string, "null"]
         businessWebsiteUrl:
           type: [string, "null"]
         ownerEmail:
@@ -668,6 +694,7 @@ components:
         - businessName
         - agentName
         - businessType
+        - servicesOffered
         - businessWebsiteUrl
         - ownerEmail
         - serviceArea
@@ -695,11 +722,9 @@ components:
           type: boolean
         businessHours:
           type: string
-          minLength: 1
           maxLength: 500
         timeZone:
           type: string
-          minLength: 1
           maxLength: 100
         businessName:
           type: string
@@ -711,6 +736,9 @@ components:
         businessType:
           type: [string, "null"]
           maxLength: 200
+        servicesOffered:
+          type: [string, "null"]
+          maxLength: 4000
         businessWebsiteUrl:
           type: [string, "null"]
           maxLength: 2048
@@ -756,6 +784,72 @@ components:
         emergencyContactInfo:
           type: [string, "null"]
           maxLength: 4000
+    WebsitePreviewInput:
+      type: object
+      additionalProperties: false
+      properties:
+        websiteUrl:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required: [websiteUrl]
+    WebsitePreviewField:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: [string, "null"]
+          maxLength: 600
+        evidence:
+          type: [string, "null"]
+          maxLength: 400
+        sourceUrl:
+          type: [string, "null"]
+      required: [value, evidence, sourceUrl]
+    WebsitePreviewFields:
+      type: object
+      additionalProperties: false
+      properties:
+        servicesOffered:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        servicesNotOffered:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        serviceArea:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        businessHours:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        brandsWorkedWith:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        warrantyInfo:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        emergencyContactInfo:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        financingPolicy:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        pricingPolicy:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        maintenancePlanOfferings:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        credentials:
+          $ref: "#/components/schemas/WebsitePreviewField"
+      required: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
+    WebsitePreview:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [complete, partial, unavailable]
+        message:
+          type: string
+        fields:
+          $ref: "#/components/schemas/WebsitePreviewFields"
+        missingFields:
+          type: array
+          items:
+            type: string
+            enum: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
+      required: [status, message, fields, missingFields]
     NotificationPlatform:
       type: string
       enum: [ios, android]
@@ -1081,6 +1175,8 @@ components:
           type: [string, "null"]
         businessType:
           type: [string, "null"]
+        servicesOffered:
+          type: [string, "null"]
         majorIssueExamples:
           type: [string, "null"]
         personalityToneDescription:
@@ -1122,6 +1218,7 @@ components:
         - agentName
         - serviceArea
         - businessType
+        - servicesOffered
         - majorIssueExamples
         - personalityToneDescription
         - servicesNotOffered

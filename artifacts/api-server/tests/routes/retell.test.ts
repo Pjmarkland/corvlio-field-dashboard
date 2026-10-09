@@ -55,6 +55,7 @@ const OTHER_DYNAMIC_VARIABLE_KEYS = [
   "pricing_policy",
   "personality_tone_description",
   "services_not_offered",
+  "services_offered",
   "financing_policy",
   "brands_worked_with",
   "response_time_commitment",
@@ -332,6 +333,19 @@ describe("Retell pre-call dynamic variables", () => {
     expect(response.body.call_inbound.dynamic_variables.agent_name).toBe("Aria");
   });
 
+  it("passes reviewed services and preserves unknown hours rather than claiming the business is open", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({
+      servicesOffered: "Heating repair and installation",
+      businessHours: "",
+      timeZone: "",
+    }));
+    const response = await requestPreCall();
+    expect(response.body.call_inbound.dynamic_variables).toMatchObject({
+      services_offered: "Heating repair and installation",
+      business_hours: "", time_zone: "", business_is_open: "unknown", next_opening: "",
+    });
+  });
+
   it("returns every existing dynamic-variable key with safe optional-detail fallbacks", async () => {
     const response = await requestPreCall();
     const dynamicVariables = response.body.call_inbound.dynamic_variables;
@@ -356,8 +370,8 @@ describe("Retell pre-call dynamic variables", () => {
       credentials: "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.",
       owner_availability: "Not provided. Take the caller's details and tell them the owner will be notified.",
       emergency_contact_info: "Not provided. Take the caller's details and tell them the owner will be notified.",
-      business_hours: "Mon-Fri 09:00-17:00",
-      time_zone: "America/New_York",
+      business_hours: "",
+      time_zone: "",
       transfer_available: "false",
     });
   });

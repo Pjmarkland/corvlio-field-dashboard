@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   updateOwnedBusiness: vi.fn(),
   claimWebsiteEnrichment: vi.fn(),
   enrichBusinessFromWebsite: vi.fn(),
+  previewBusinessWebsite: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
 }));
@@ -28,6 +29,7 @@ vi.mock("../../src/lib/businessDirectory", () => ({
   updateOwnedBusiness: mocks.updateOwnedBusiness,
   WEBSITE_ENRICHMENT_FIELDS: [
     "businessType",
+    "servicesOffered",
     "majorIssueExamples",
     "servicesNotOffered",
     "pricingPolicy",
@@ -42,11 +44,13 @@ vi.mock("../../src/lib/businessDirectory", () => ({
   ],
 }));
 
-vi.mock("../../src/lib/websiteEnrichment", () => ({
-  enrichBusinessFromWebsite: mocks.enrichBusinessFromWebsite,
+vi.mock("../../src/lib/websiteEnrichment", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../src/lib/websiteEnrichment")>(),
+  previewBusinessWebsite: mocks.previewBusinessWebsite,
 }));
 
 import businessesRouter from "../../src/routes/businesses";
+import { unavailableWebsitePreview } from "../../src/lib/websiteEnrichment";
 
 let server: Server;
 let baseUrl: string;
@@ -129,6 +133,7 @@ beforeEach(() => {
     return business;
   });
   mocks.enrichBusinessFromWebsite.mockResolvedValue(undefined);
+  mocks.previewBusinessWebsite.mockResolvedValue(unavailableWebsitePreview());
   mocks.saveBusinessWithOptionalPhone.mockImplementation(async (input: Record<string, unknown>) => {
     const old = business;
     business = {
@@ -358,7 +363,7 @@ describe("business onboarding website enrichment", () => {
 
     expect(response.status).toBe(201);
     expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0]?.[0].agentName).toBe("Nova");
-    expect(mocks.enrichBusinessFromWebsite).toHaveBeenCalled();
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
   });
 
   it("saves successfully without a website and does not schedule enrichment", async () => {
@@ -401,10 +406,10 @@ describe("business onboarding website enrichment", () => {
 
     expect(response.status).toBe(201);
     expect(mocks.saveBusinessWithOptionalPhone).toHaveBeenCalledOnce();
-    await vi.waitFor(() => expect(mocks.logWarn).toHaveBeenCalled());
+    expect(mocks.previewBusinessWebsite).not.toHaveBeenCalled();
   });
 
-  it("schedules website enrichment only once for concurrent and repeated onboarding requests", async () => {
+  it("never schedules background scraping for concurrent or repeated onboarding requests", async () => {
     const body = {
       ...validBody,
       businessWebsiteUrl: "https://example.com",
@@ -423,7 +428,59 @@ describe("business onboarding website enrichment", () => {
     ]);
 
     expect(responses.map(({ status }) => status)).toEqual([200, 200, 200]);
-    await vi.waitFor(() => expect(mocks.enrichBusinessFromWebsite).toHaveBeenCalledOnce());
-    expect(mocks.claimWebsiteEnrichment).toHaveBeenCalledTimes(3);
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+    expect(mocks.claimWebsiteEnrichment).not.toHaveBeenCalled();
+  });
+  it("rejects saving website suggestions without review and saves edited services after review", async () => {
+    const body = { ...validBody, servicesOffered: "Owner-reviewed HVAC repair and installation", websiteScrapePreviewed: true };
+    expect((await onboard(body)).status).toBe(400);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+    expect((await onboard({ ...body, websiteSuggestionsReviewed: true, businessHours: "", timeZone: "" })).status).toBe(200);
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({
+      servicesOffered: body.servicesOffered, businessHours: "", timeZone: "",
+    });
+  });
+});
+
+describe("website preview endpoint", () => {
+  async function preview(websiteUrl: string) {
+    return fetch(`${baseUrl}/businesses/onboarding/website-preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ websiteUrl }),
+    });
+  }
+  it("requires authentication", async () => {
+    mocks.getAuth.mockReturnValue({ userId: null });
+    expect((await preview("https://example.com")).status).toBe(401);
+    expect(mocks.previewBusinessWebsite).not.toHaveBeenCalled();
+  });
+  it("returns suggestions without saving or provisioning anything", async () => {
+    const result = unavailableWebsitePreview();
+    result.status = "partial";
+    result.fields.servicesOffered = { value: "Heating repairs", evidence: "We provide heating repairs.", sourceUrl: "https://example.com/" };
+    result.missingFields = result.missingFields.filter(key => key !== "servicesOffered");
+    mocks.previewBusinessWebsite.mockResolvedValue(result);
+    const response = await preview("example.com");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fields: { servicesOffered: { value: "Heating repairs" } } });
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+    expect(mocks.updateBusiness).not.toHaveBeenCalled();
+    expect(mocks.updateOwnedBusiness).not.toHaveBeenCalled();
+  });
+  it("rejects private URLs before starting a scrape", async () => {
+    expect((await preview("http://169.254.169.254")).status).toBe(400);
+    expect(mocks.previewBusinessWebsite).not.toHaveBeenCalled();
+  });
+  it("returns a non-blocking manual fallback on fetch or extraction failure", async () => {
+    mocks.previewBusinessWebsite.mockRejectedValue(new Error("fetch timed out"));
+    const response = await preview("https://example.com");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "unavailable" });
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+  });
+  it("never scrapes an existing sample business", async () => {
+    business = { ...business, isSample: true };
+    expect((await preview("https://example.com")).status).toBe(200);
+    expect(mocks.previewBusinessWebsite).not.toHaveBeenCalled();
   });
 });

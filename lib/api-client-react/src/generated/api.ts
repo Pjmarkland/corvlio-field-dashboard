@@ -40,6 +40,8 @@ import type {
   NotificationStatus,
   OwnerDemoCapability,
   OwnerDemoConfirmation,
+  WebsitePreview,
+  WebsitePreviewInput,
   WelcomeEntry
 } from './api.schemas';
 
@@ -365,6 +367,77 @@ export const useUpdateBusinessProfile = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateBusinessProfileMutationOptions(options));
+    }
+
+export const getPreviewBusinessWebsiteUrl = () => {
+
+
+
+
+  return `/api/businesses/onboarding/website-preview`
+}
+
+/**
+ * @summary Preview public website facts without saving business data
+ */
+export const previewBusinessWebsite = async (websitePreviewInput: WebsitePreviewInput, options?: Parameters<typeof customFetch>[1]): Promise<WebsitePreview> => {
+
+  return customFetch<WebsitePreview>(getPreviewBusinessWebsiteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(websitePreviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewBusinessWebsiteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBusinessWebsite>>, TError,{data: BodyType<WebsitePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBusinessWebsite>>, TError,{data: BodyType<WebsitePreviewInput>}, TContext> => {
+
+const mutationKey = ['previewBusinessWebsite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBusinessWebsite>>, {data: BodyType<WebsitePreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewBusinessWebsite(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBusinessWebsiteMutationResult = NonNullable<Awaited<ReturnType<typeof previewBusinessWebsite>>>
+    export type PreviewBusinessWebsiteMutationBody = BodyType<WebsitePreviewInput>
+    export type PreviewBusinessWebsiteMutationError = ErrorType<void>
+
+    /**
+ * @summary Preview public website facts without saving business data
+ */
+export const usePreviewBusinessWebsite = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBusinessWebsite>>, TError,{data: BodyType<WebsitePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBusinessWebsite>>,
+        TError,
+        {data: BodyType<WebsitePreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewBusinessWebsiteMutationOptions(options));
     }
 
 export const getGetAdminCallQualityUrl = () => {

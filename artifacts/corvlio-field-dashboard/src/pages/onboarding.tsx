@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetLeadsQueryKey } from '@workspace/api-client-react';
+import { getGetLeadsQueryKey, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
+import { WebsiteOnboardingPreview } from '@/components/WebsiteOnboardingPreview';
 import { validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
 import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSignOut } from '@/hooks/useSignOut';
 import { applySampleBusiness, initialForm, responseTimeOptions, sampleCallPreview, toneOptions, type OnboardingForm } from './onboardingSample';
+import { applyWebsiteSuggestions, getReadinessGaps, normalizeWebsiteInput, removeUneditedWebsiteSuggestions } from './onboardingWebsite';
 
 export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -344,21 +346,72 @@ function OnboardingPage() {
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [sampleResetKey, setSampleResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const websiteMutation = usePreviewBusinessWebsite();
+  const [websitePreview, setWebsitePreview] = useState<WebsitePreview | null>(null);
+  const [websiteReviewed, setWebsiteReviewed] = useState(false);
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const websiteRequest = useRef(0);
+  const beforeWebsiteSuggestions = useRef<OnboardingForm | null>(null);
+  const readinessGaps = getReadinessGaps(form);
+  const needsWebsiteReview = websitePreview !== null && websitePreview.status !== 'unavailable';
   const [submission, setSubmission] = useState<
     { kind: 'success' | 'error'; message: string } | null
   >(null);
   const updateField = <K extends keyof OnboardingForm>(key: K, value: OnboardingForm[K]) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    if (key === 'businessWebsiteUrl') {
+      websiteRequest.current += 1;
+      setForm((current) => ({
+        ...(websitePreview && beforeWebsiteSuggestions.current
+          ? removeUneditedWebsiteSuggestions(current, beforeWebsiteSuggestions.current, websitePreview)
+          : current), [key]: value,
+      }));
+      setWebsitePreview(null);
+      setWebsiteReviewed(false);
+      setWebsiteError(null);
+    } else {
+      setForm((current) => ({ ...current, [key]: value }));
+    }
+  };
+  const resetWebsitePreview = () => {
+    websiteRequest.current += 1;
+    setWebsitePreview(null);
+    setWebsiteReviewed(false);
+    setWebsiteError(null);
+  };
+  const handleWebsitePreview = async () => {
+    if (form.isSample || !form.businessWebsiteUrl.trim() || websiteMutation.isPending) return;
+    const requestId = ++websiteRequest.current;
+    const websiteUrl = normalizeWebsiteInput(form.businessWebsiteUrl);
+    setWebsiteError(null);
+    setWebsiteReviewed(false);
+    try {
+      const preview = await websiteMutation.mutateAsync({ data: { websiteUrl } });
+      if (requestId !== websiteRequest.current) return;
+      setForm((current) => {
+        const baseline = websitePreview && beforeWebsiteSuggestions.current
+          ? removeUneditedWebsiteSuggestions(current, beforeWebsiteSuggestions.current, websitePreview) : current;
+        beforeWebsiteSuggestions.current = { ...baseline };
+        return { ...applyWebsiteSuggestions(baseline, preview), businessWebsiteUrl: websiteUrl };
+      });
+      setWebsitePreview(preview);
+    } catch {
+      if (requestId !== websiteRequest.current) return;
+      setWebsiteError('We could not read that website. Use a public HTTP or HTTPS URL, or continue by completing the fields manually. Your answers have not changed.');
+    }
   };
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting) return;
+    if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting || websiteMutation.isPending) return;
+    if (needsWebsiteReview && !websiteReviewed) {
+      setSubmission({ kind: 'error', message: 'Review the website suggestions and missing fields, then check the website review box before saving.' });
+      return;
+    }
     if (!form.receptionistTone.trim()) {
       setSubmission({ kind: 'error', message: 'Choose or enter a personality and tone for your AI receptionist.' });
       return;
     }
 
-    const coverageError = validateBusinessHours(form.businessHours) ?? validateTimeZone(form.timeZone);
+    const coverageError = validateBusinessHours(form.businessHours, true) ?? validateTimeZone(form.timeZone, true);
     if (coverageError) {
       setSubmission({ kind: 'error', message: coverageError });
       return;
@@ -377,7 +430,10 @@ function OnboardingPage() {
           businessName: form.businessName,
           agentName: form.agentName.trim() || undefined,
           businessType: form.businessType,
-          businessWebsiteUrl: form.businessWebsiteUrl,
+          servicesOffered: form.servicesOffered,
+          businessWebsiteUrl: normalizeWebsiteInput(form.businessWebsiteUrl),
+          websiteScrapePreviewed: needsWebsiteReview,
+          websiteSuggestionsReviewed: websiteReviewed,
           ownerEmail: form.ownerEmail,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
@@ -509,12 +565,21 @@ function OnboardingPage() {
                   value={form.businessWebsiteUrl}
                   onChange={(value) => updateField('businessWebsiteUrl', value)}
                   placeholder="https://www.yourbusiness.com"
-                  hint="Optional. We may use public details to fill fields you leave blank; your answers always take priority."
+                   hint="Optional. Read the site now to suggest answers for your review. Nothing is saved automatically."
                 />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
-                <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required />
+                <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" />
               </div>
+              {!form.isSample ? <div className="mt-4">
+                <button type="button" onClick={() => void handleWebsitePreview()} disabled={!form.businessWebsiteUrl.trim() || websiteMutation.isPending || isSubmitting} data-testid="button-scrape-website" className="min-h-11 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-50">
+                  {websiteMutation.isPending ? 'Reading website…' : 'Read website & suggest answers'}
+                </button>
+                <p className="mt-2 text-xs text-muted-foreground">Reads only this site and up to three linked about, services, or contact pages. Review every suggestion before saving.</p>
+                {websiteError ? <p role="status" className="mt-2 text-xs text-destructive" data-testid="website-preview-error">{websiteError}</p> : null}
+                {websitePreview ? <WebsiteOnboardingPreview preview={websitePreview} /> : null}
+              </div> : null}
               <SampleBusinessHelper onApply={() => {
+                resetWebsitePreview();
                 setForm((current) => applySampleBusiness(current));
                 setSampleResetKey((current) => current + 1);
               }} />
@@ -522,6 +587,7 @@ function OnboardingPage() {
                 <p className="font-semibold">Sample business — no real phone number or website scraping.</p>
                 <p className="mt-1 text-muted-foreground">Submitting saves a demo profile only. Edit these details freely; it stays a sample.</p>
                 <button type="button" className="mt-2 min-h-11 font-semibold text-primary underline" onClick={() => {
+                   resetWebsitePreview();
                   setForm((current) => ({ ...initialForm, agentName: current.agentName, privacyAccepted: current.privacyAccepted, termsAccepted: current.termsAccepted, serviceAgreementAccepted: current.serviceAgreementAccepted }));
                   setSampleResetKey((current) => current + 1);
                 }}>Start with my real business instead</button>
@@ -544,6 +610,7 @@ function OnboardingPage() {
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={Wrench} eyebrow="02 · The work" title="Set the boundaries before calls begin." description="Clear limits help the receptionist qualify the right jobs without making promises your team cannot keep." tone="warm" />
               <div className="space-y-5">
+                <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." />
                 <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." />
                 <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -568,8 +635,8 @@ function OnboardingPage() {
               <SectionHeading icon={Headphones} eyebrow="04 · When to reach you" title="Keep the handoff human." description="Tell us when an owner can step in, and where urgent callers should go after hours." tone="muted" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="ownerAvailability" label="Owner availability" value={form.ownerAvailability} onChange={(value) => updateField('ownerAvailability', value)} placeholder="Mon–Fri, 7am–5pm. I review new leads between jobs." multiline rows={4} />
-                <Field id="emergencyContact" label="Emergency contact information" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours line, dispatch instructions, or urgent-call guidance." multiline rows={4} />
-                <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} />
+                <Field id="emergencyContact" label="Emergency / after-hours policy" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours availability, dispatch instructions, or urgent-call guidance." multiline rows={4} />
+                <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank />
               </div>
             </section>
           </div>
@@ -587,8 +654,20 @@ function OnboardingPage() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
+              <div className="mb-5 border-b border-border pb-5" data-testid="agent-readiness-checklist">
+                <h3 className="text-sm font-bold">Agent readiness</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{readinessGaps.length ? 'These answers are still blank or brief. Add confirmed detail where possible so the receptionist can answer specifically. This does not block manual setup.' : 'The key answers have useful detail. Review accuracy before saving.'}</p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {readinessGaps.map((gap) => <li key={gap.key} className="rounded-md border border-border bg-muted px-2 py-1 text-xs">{gap.label} · {gap.state}</li>)}
+                </ul>
+                {readinessGaps.some((gap) => gap.key === 'businessHours' || gap.key === 'timeZone') ? <p className="mt-2 text-xs text-muted-foreground">Without confirmed hours and a time zone, the agent will not claim the business is currently open.</p> : null}
+              </div>
               <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Review & continue</p>
               <div className="space-y-4">
+                {needsWebsiteReview ? <label className="flex items-start gap-3 text-sm leading-relaxed">
+                  <input type="checkbox" checked={websiteReviewed} onChange={(event) => setWebsiteReviewed(event.target.checked)} data-testid="checkbox-website-review" className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" required />
+                  <span>I reviewed the website suggestions and missing fields, and corrected anything inaccurate.</span>
+                </label> : null}
                 <label className="flex items-start gap-3 text-sm leading-relaxed" htmlFor="privacyAccepted">
                   <input
                     id="privacyAccepted"
@@ -610,7 +689,7 @@ function OnboardingPage() {
                   <span>I agree to the <Link href="/client-agreement" className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary" data-testid="link-onboarding-client-service-agreement">Client Service Agreement</Link>.</span>
                 </label>
               </div>
-              <button type="submit" disabled={isSubmitting} data-testid="button-submit-onboarding" className={`mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity ${isSubmitting ? 'cursor-wait opacity-55' : 'hover:bg-primary-hover'}`}>
+              <button type="submit" disabled={isSubmitting || websiteMutation.isPending} data-testid="button-submit-onboarding" className={`mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity ${isSubmitting ? 'cursor-wait opacity-55' : 'hover:bg-primary-hover'}`}>
                 {isSubmitting ? 'Submitting…' : 'Submit setup'} {!isSubmitting ? <ArrowUpRight size={16} /> : null}
               </button>
               {submission ? (

@@ -27,7 +27,7 @@ export const llmDraftPatch = {
   begin_message: "Thanks for calling {{business_name}}. I'm {{agent_name}}, the AI receptionist. This call is recorded. How can I help?",
   default_dynamic_variables: {
     agent_name: "Aria", business_name: "our team", business_type: "", service_area: "",
-    major_issue_examples: "", personality_tone_description: "", services_not_offered: "",
+    major_issue_examples: "", personality_tone_description: "", services_offered: "", services_not_offered: "",
     pricing_policy: "", financing_policy: "", brands_worked_with: "", response_time_commitment: "",
     warranty_info: "", maintenance_plan_offerings: "", credentials: "", owner_availability: "",
     emergency_contact_info: "", business_hours: "Mon-Fri 09:00-17:00", time_zone: "America/New_York",
@@ -54,6 +54,7 @@ BUSINESS FACTS — USE ONLY WHAT IS PRESENT
 Business: {{business_name}}
 Business type: {{business_type}}
 Service area: {{service_area}}
+Services offered: {{services_offered}}
 Common issues/examples: {{major_issue_examples}}
 Services NOT offered: {{services_not_offered}}
 Preferred tone: {{personality_tone_description}}
