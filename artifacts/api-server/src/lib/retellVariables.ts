@@ -22,7 +22,7 @@ export function dynamicVariables(business: Business | null) {
     business_hours: business ? hours : "", time_zone: business ? timeZone : "",
     ...(business ? businessClock(hours, timeZone) : { current_local_time: "", business_is_open: "unknown", next_opening: "" }),
     transfer_available: "false", agent_name: agentName || "Aria",
-    business_name: business?.businessName ?? "", business_type: business?.businessType ?? "",
+    business_name: business?.businessName ?? "our team", business_type: business?.businessType ?? "",
     service_area: detail(business?.serviceArea, "Not provided. Do not guess whether an address is covered; take the caller's location and ask the owner to confirm."),
     major_issue_examples: detail(business?.majorIssueExamples, "Not provided. Do not guess which issues the business handles; record the caller's issue and pass it to the owner."),
     pricing_policy: detail(business?.pricingPolicy, "Not provided. Do not quote or estimate prices; say the owner will follow up with a quote."),

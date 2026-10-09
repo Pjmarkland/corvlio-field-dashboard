@@ -10,6 +10,7 @@ import { runNotificationOutboxNow } from "../lib/notificationService";
 import { persistAnalyzedCall } from "../lib/retellPersistence";
 import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
+import { recordOperationalFailure } from "../lib/operationalFailures";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -52,6 +53,23 @@ function callOutcome(call: RetellCall): string | null {
   return null;
 }
 
+function hasMeaningfulValue(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.some(hasMeaningfulValue);
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value).some(hasMeaningfulValue);
+  }
+  return false;
+}
+
+function isBlankCall(call: RetellCall): boolean {
+  return call.status?.trim().toLowerCase() === "error"
+    || (call.duration_ms !== undefined && call.duration_ms <= 0)
+    || !hasMeaningfulValue(call.call_analysis);
+}
+
 function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   const apiKey = process.env[RETELL_API_KEY_ENV];
   if (!apiKey || !signatureHeader) return false;
@@ -75,16 +93,45 @@ function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undef
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
+async function recordPostCallFailure(
+  req: Parameters<Parameters<typeof router.post>[1]>[0],
+  input: {
+    summary: string;
+    details: string;
+    businessId?: number;
+    businessName?: string;
+  },
+): Promise<void> {
+  try {
+    const rawBody = req.rawBody ?? Buffer.from("");
+    const eventKey = `retell-post-call:${createHash("sha256").update(rawBody).digest("hex")}`;
+    const inserted = await recordOperationalFailure({
+      eventKey,
+      source: "post_call_webhook",
+      ...input,
+    });
+    if (inserted) {
+      void runNotificationOutboxNow().catch((error) => {
+        req.log.error(
+          { error: error instanceof Error ? error.message : "Unknown outbox error" },
+          "Could not deliver the post-call failure alert immediately",
+        );
+      });
+    }
+  } catch (error) {
+    req.log.error(
+      { error: error instanceof Error ? error.message : "Unknown operational failure error" },
+      "Could not record the failed post-call webhook for admin review",
+    );
+  }
+}
+
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   const signature = req.get("x-retell-signature");
-  if (signature !== undefined) {
-    if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
-      req.log.warn("Rejected Retell pre-call webhook with invalid signature");
-      res.status(401).json({ error: "Invalid Retell signature" });
-      return;
-    }
-  } else {
-    req.log.warn("Retell pre-call signature missing; allowing during compatibility rollout");
+  if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
+    req.log.warn("Rejected Retell pre-call webhook with missing or invalid signature");
+    res.status(401).json({ error: "Invalid Retell signature" });
+    return;
   }
   const body = RetellPreCallWebhookBody.safeParse(req.body);
   if (!body.success) {
@@ -98,6 +145,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     body.data.to_number,
   );
   if (!phoneNumber) {
+    req.log.warn("Retell pre-call webhook has no destination number; using generic message fallback");
     res.json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
     return;
   }
@@ -111,6 +159,9 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
         lookupTimer.unref();
       }),
     ]);
+    if (!business) {
+      req.log.warn("No business matched the inbound number; using generic message fallback");
+    }
     res.json({
       call_inbound: {
         dynamic_variables: dynamicVariables(business ?? null),
@@ -146,6 +197,10 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const body = RetellPostCallWebhookBody.safeParse(req.body);
   if (!body.success) {
     req.log.warn({ error: body.error.flatten() }, "Invalid Retell post-call webhook payload");
+    await recordPostCallFailure(req, {
+      summary: "Post-call webhook payload was invalid",
+      details: "The signed payload did not match the expected Retell post-call shape.",
+    });
     res.status(400).json({ error: "Invalid Retell post-call webhook payload" });
     return;
   }
@@ -156,9 +211,36 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   }
 
   const call = body.data.call;
+  if (!call) {
+    req.log.warn("Retell post-call webhook is missing the call object");
+    await recordPostCallFailure(req, {
+      summary: "Post-call webhook is missing its call object",
+      details: "The signed payload did not contain a call object.",
+    });
+    res.status(400).json({ error: "Retell call object is required" });
+    return;
+  }
+  if (isBlankCall(call)) {
+    req.log.info(
+      {
+        callId: call.call_id ?? null,
+        status: call.status ?? null,
+        durationMs: call.duration_ms ?? null,
+        hasCallAnalysis: hasMeaningfulValue(call.call_analysis),
+      },
+      "Ignoring error, zero-duration, or empty-analysis Retell call",
+    );
+    res.sendStatus(204);
+    return;
+  }
+
   const phoneNumber = call ? callPhoneNumber(call) : null;
-  if (!call || !phoneNumber) {
+  if (!phoneNumber) {
     req.log.warn("Retell call_analyzed webhook is missing call phone numbers");
+    await recordPostCallFailure(req, {
+      summary: "Post-call webhook is missing a phone number",
+      details: "The signed call could not be matched because it had no destination number.",
+    });
     res.status(400).json({ error: "Retell call phone number is required" });
     return;
   }
@@ -206,10 +288,15 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
 
     res.sendStatus(204);
   } catch (error) {
+    const details = error instanceof Error ? error.message : "Unknown Retell post-call processing error";
     req.log.error(
-      { error: error instanceof Error ? error.message : "Unknown Retell post-call error" },
+      { error: details },
       "Retell post-call processing failed",
     );
+    await recordPostCallFailure(req, {
+      summary: "Post-call webhook processing failed",
+      details,
+    });
     res.status(500).json({ error: "Unable to process Retell post-call webhook" });
   }
 });

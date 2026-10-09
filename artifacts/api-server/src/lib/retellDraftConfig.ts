@@ -26,7 +26,7 @@ export const llmDraftPatch = {
   model_temperature: 0.3,
   begin_message: "Thanks for calling {{business_name}}. I'm {{agent_name}}, the AI receptionist. This call is recorded. How can I help?",
   default_dynamic_variables: {
-    agent_name: "Aria", business_name: "the business", business_type: "", service_area: "",
+    agent_name: "Aria", business_name: "our team", business_type: "", service_area: "",
     major_issue_examples: "", personality_tone_description: "", services_not_offered: "",
     pricing_policy: "", financing_policy: "", brands_worked_with: "", response_time_commitment: "",
     warranty_info: "", maintenance_plan_offerings: "", credentials: "", owner_availability: "",
@@ -76,6 +76,9 @@ Do not read this list aloud. Briefly answer relevant questions using only suppli
 
 OPENING
 The first message already identifies you as AI and discloses recording. Do not repeat the greeting. Let the caller explain.
+
+NO-BUSINESS FALLBACK
+If {{business_name}} is "our team", the inbound number is unknown, or business lookup details are unavailable, do not go silent or refuse the call. The standard greeting still applies. Take a short message by asking for the reason for calling, the caller's name, and the best callback number, one question at a time. Confirm a callback number if they give one. Do not invent a business name, business facts, hours, transfer option, or callback promise. Tell the caller you will pass the message to the team.
 
 TONE — DELIVERY ONLY
 Selected style: {{receptionist_tone_style}}

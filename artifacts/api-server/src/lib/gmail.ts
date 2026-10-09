@@ -132,3 +132,60 @@ export async function sendLeadNotificationEmail(input: {
   }
   return true;
 }
+
+export async function sendAdminOperationalFailureEmail(input: {
+  source: string;
+  summary: string;
+  details: string;
+  businessId: number | null;
+  businessName: string | null;
+  occurredAt: string;
+}): Promise<boolean> {
+  const recipients = [...new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)),
+  )];
+  if (recipients.length === 0) return false;
+
+  const accessToken = await getAccessToken();
+  if (!accessToken) return false;
+
+  const messageBody = [
+    "A Corvlio call or lead pipeline failure needs review.",
+    "",
+    `Source: ${input.source}`,
+    `Failure: ${input.summary}`,
+    `Business: ${input.businessName || "Unknown"}${input.businessId === null ? "" : ` (ID ${input.businessId})`}`,
+    `Details: ${input.details}`,
+    `Occurred at: ${input.occurredAt}`,
+    "",
+    "Review the internal /admin activity page for this failure.",
+  ].join("\r\n");
+  const rawMessage = [
+    `To: ${recipients.join(", ")}`,
+    "Subject: Corvlio call pipeline failure",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    messageBody,
+  ].join("\r\n");
+
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    signal: AbortSignal.timeout(15_000),
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ raw: encodeBase64Url(rawMessage) }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Gmail API admin failure alert failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`,
+    );
+  }
+  return true;
+}

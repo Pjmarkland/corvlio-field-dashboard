@@ -23,3 +23,4 @@ export * from "./businesses";
 export * from "./leads";
 export * from "./retellCallRecords";
 export * from "./provisioningAttempts";
+export * from "./operationalFailures";

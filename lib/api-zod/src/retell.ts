@@ -16,6 +16,7 @@ export const RetellCallSchema = z
     }).passthrough()).optional(),
     start_timestamp: z.number().finite().optional(),
     duration_ms: z.number().finite().optional(),
+    status: z.string().optional(),
     disconnection_reason: z.string().optional(),
     to_number: z.string().optional(),
     from_number: z.string().optional(),
