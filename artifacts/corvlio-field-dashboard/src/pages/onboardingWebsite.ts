@@ -1,6 +1,21 @@
 import type { WebsitePreview, WebsitePreviewFields } from '@workspace/api-client-react';
 import type { OnboardingForm } from './onboardingSample';
 
+export type WebsiteFieldKey = Exclude<keyof WebsitePreviewFields, 'businessHoursSuggestion'>;
+export type HoursDecision = { status: 'pending' | 'used' | 'rejected'; value: string };
+export const initialHoursDecision: HoursDecision = { status: 'pending', value: '' };
+
+export function acceptHoursSuggestion(current: OnboardingForm, suggestion: string): { form: OnboardingForm; decision: HoursDecision } {
+  return { form: { ...current, businessHours: suggestion }, decision: { status: 'used', value: suggestion } };
+}
+export function rejectHoursSuggestion(suggestion: string): HoursDecision {
+  return { status: 'rejected', value: suggestion };
+}
+// Clears accepted hours only if the owner has not edited them since accepting.
+export function clearUneditedAcceptedHours(current: OnboardingForm, decision: HoursDecision): OnboardingForm {
+  return decision.status === 'used' && current.businessHours === decision.value ? { ...current, businessHours: '' } : current;
+}
+
 export const websiteFormFields = {
   servicesOffered: 'servicesOffered',
   servicesNotOffered: 'servicesNotOffered',
@@ -14,9 +29,9 @@ export const websiteFormFields = {
   maintenancePlanOfferings: 'maintenancePlans',
   credentials: 'credentials',
   otherPolicies: 'otherPolicies',
-} as const satisfies Record<keyof WebsitePreviewFields, keyof OnboardingForm>;
+} as const satisfies Record<WebsiteFieldKey, keyof OnboardingForm>;
 
-export const websiteFieldLabels: Record<keyof WebsitePreviewFields, string> = {
+export const websiteFieldLabels: Record<WebsiteFieldKey, string> = {
   servicesOffered: 'Services offered', servicesNotOffered: 'Services not offered',
   serviceArea: 'Service area', businessHours: 'Business hours',
   brandsWorkedWith: 'Brands', warrantyInfo: 'Warranty',
@@ -27,7 +42,7 @@ export const websiteFieldLabels: Record<keyof WebsitePreviewFields, string> = {
 
 export function applyWebsiteSuggestions(current: OnboardingForm, preview: WebsitePreview): OnboardingForm {
   const next = { ...current };
-  for (const key of Object.keys(websiteFormFields) as (keyof WebsitePreviewFields)[]) {
+  for (const key of Object.keys(websiteFormFields) as WebsiteFieldKey[]) {
     const formKey = websiteFormFields[key];
     const suggestion = preview.fields[key]?.value;
     // The owner's existing answers always win. Unsupported fields stay blank.
@@ -40,7 +55,7 @@ export function removeUneditedWebsiteSuggestions(
   current: OnboardingForm, before: OnboardingForm, preview: WebsitePreview,
 ): OnboardingForm {
   const next = { ...current };
-  for (const key of Object.keys(websiteFormFields) as (keyof WebsitePreviewFields)[]) {
+  for (const key of Object.keys(websiteFormFields) as WebsiteFieldKey[]) {
     const formKey = websiteFormFields[key];
     if (!before[formKey].trim() && current[formKey] === preview.fields[key]?.value) {
       next[formKey] = before[formKey];

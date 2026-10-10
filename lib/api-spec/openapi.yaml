@@ -909,6 +909,8 @@ components:
           $ref: "#/components/schemas/WebsitePreviewField"
         businessHours:
           $ref: "#/components/schemas/WebsitePreviewField"
+        businessHoursSuggestion:
+          $ref: "#/components/schemas/WebsiteHoursSuggestion"
         brandsWorkedWith:
           $ref: "#/components/schemas/WebsitePreviewField"
         warrantyInfo:
@@ -926,6 +928,21 @@ components:
         otherPolicies:
           $ref: "#/components/schemas/WebsitePreviewField"
       required: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
+    WebsiteHoursSuggestion:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: [string, "null"]
+          maxLength: 600
+        evidence:
+          type: [string, "null"]
+          maxLength: 400
+        sourceUrl:
+          type: [string, "null"]
+        warning:
+          type: [string, "null"]
+      required: [value, evidence, sourceUrl, warning]
     WebsitePreview:
       type: object
       additionalProperties: false

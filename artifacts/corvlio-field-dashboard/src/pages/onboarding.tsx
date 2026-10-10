@@ -13,7 +13,7 @@ import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSignOut } from '@/hooks/useSignOut';
 import { applySampleBusiness, initialForm, responseTimeOptions, sampleCallPreview, toneOptions, type OnboardingForm } from './onboardingSample';
-import { applyWebsiteSuggestions, getReadinessGaps, normalizeWebsiteInput, removeUneditedWebsiteSuggestions } from './onboardingWebsite';
+import { acceptHoursSuggestion, applyWebsiteSuggestions, clearUneditedAcceptedHours, getReadinessGaps, initialHoursDecision, normalizeWebsiteInput, rejectHoursSuggestion, removeUneditedWebsiteSuggestions, type HoursDecision } from './onboardingWebsite';
 
 export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -350,6 +350,7 @@ function OnboardingPage() {
   const [websitePreview, setWebsitePreview] = useState<WebsitePreview | null>(null);
   const [websiteReviewed, setWebsiteReviewed] = useState(false);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [hoursDecision, setHoursDecision] = useState<HoursDecision>(initialHoursDecision);
   const [servicesDeferred, setServicesDeferred] = useState(false);
   const [previewAttempted, setPreviewAttempted] = useState(false);
   const websiteRequest = useRef(0);
@@ -363,11 +364,13 @@ function OnboardingPage() {
   const updateField = <K extends keyof OnboardingForm>(key: K, value: OnboardingForm[K]) => {
     if (key === 'businessWebsiteUrl') {
       websiteRequest.current += 1;
-      setForm((current) => ({
+      const decision = hoursDecision;
+      setForm((current) => clearUneditedAcceptedHours({
         ...(websitePreview && beforeWebsiteSuggestions.current
           ? removeUneditedWebsiteSuggestions(current, beforeWebsiteSuggestions.current, websitePreview)
           : current), [key]: value,
-      }));
+      }, decision));
+      setHoursDecision(initialHoursDecision);
       setWebsitePreview(null);
       setWebsiteReviewed(false);
       setWebsiteError(null);
@@ -379,6 +382,7 @@ function OnboardingPage() {
   };
   const resetWebsitePreview = () => {
     websiteRequest.current += 1;
+    setHoursDecision(initialHoursDecision);
     setWebsitePreview(null);
     setWebsiteReviewed(false);
     setWebsiteError(null);
@@ -402,6 +406,7 @@ function OnboardingPage() {
         return { ...applyWebsiteSuggestions(baseline, preview), businessWebsiteUrl: websiteUrl };
       });
       setWebsitePreview(preview);
+      setHoursDecision((d) => d.value && d.value === preview.fields.businessHoursSuggestion?.value ? d : initialHoursDecision);
       setPreviewAttempted(true);
     } catch {
       if (requestId !== websiteRequest.current) return;
@@ -593,7 +598,12 @@ function OnboardingPage() {
                 </button>
                 <p className="mt-2 text-xs text-muted-foreground">Reads only this site and up to three linked about, services, or contact pages. Review every suggestion before saving.</p>
                 {websiteError ? <p role="status" className="mt-2 text-xs text-destructive" data-testid="website-preview-error">{websiteError}</p> : null}
-                {websitePreview ? <WebsiteOnboardingPreview preview={websitePreview} /> : null}
+                {websitePreview ? <WebsiteOnboardingPreview preview={websitePreview} hoursDecision={hoursDecision}
+                  onUseHours={(value) => { const r = acceptHoursSuggestion(form, value); setForm(r.form); setHoursDecision(r.decision); }}
+                  onRejectHours={(value) => {
+                    setForm((current) => clearUneditedAcceptedHours(current, hoursDecision));
+                    setHoursDecision(rejectHoursSuggestion(value));
+                  }} /> : null}
               </div> : null}
               <SampleBusinessHelper onApply={() => {
                 resetWebsitePreview();

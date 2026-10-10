@@ -8,12 +8,15 @@ import type { WebsitePreview, WebsitePreviewFields } from "@workspace/api-zod";
 import { parseBusinessHours } from "./businessHours";
 import { evidenceQuotes, exclusiveWork, faithfulValue, isWorkRefusal, normalizeText, readableHours } from "./websiteEvidence";
 import { websitePageText, type PageFacts } from "./websitePageText";
+import { areaExcerpts } from "./websiteAreas";
+import { extractionDiagnostic, type ExtractionObserver } from "./websiteDiagnostics";
+import { websiteModelResponse } from "./websiteModelResponse";
 
 const MAX_URL_LENGTH = 2_048;
 const MAX_HTML_BYTES = 2_000_000;
 const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 8_000;
-const TOTAL_TIMEOUT_MS = 110_000;
+const TOTAL_TIMEOUT_MS = 120_000;
 const MANUAL_MESSAGE = "We couldn't read this site automatically. Type your answers below.";
 
 export const WEBSITE_PREVIEW_FIELDS = [
@@ -27,15 +30,11 @@ export class UnsafeWebsiteUrlError extends Error {}
 type WebsitePage = {
   url: string;
   text: string;
+  visibleText?: string;
   links: Array<{ href: string; label: string }>;
   serviceText?: string;
   facts?: PageFacts;
   truncated?: boolean;
-};
-
-type FieldExtraction = {
-  value?: unknown;
-  evidence?: unknown;
 };
 
 export function isPublicIpAddress(address: string): boolean {
@@ -294,7 +293,9 @@ function normalizeEvidence(value: unknown): string | null {
   return normalized;
 }
 
-export async function extractBusinessDetails(pages: WebsitePage[], servicesOnly = false, deadline = Date.now() + TOTAL_TIMEOUT_MS): Promise<WebsitePreviewFields> {
+export async function extractBusinessDetails(pages: WebsitePage[], mode: boolean | "serviceArea" = false, deadline = Date.now() + TOTAL_TIMEOUT_MS, observer?: ExtractionObserver): Promise<WebsitePreviewFields> {
+  const target = mode === "serviceArea" ? "serviceArea" : mode ? "servicesOffered" : "full";
+  const requested = target === "full" ? WEBSITE_PREVIEW_FIELDS : [target as "servicesOffered" | "serviceArea"];
   const client = getOpenAIClient();
   if (!client) throw new Error("Website enrichment is unavailable");
 
@@ -302,7 +303,7 @@ export async function extractBusinessDetails(pages: WebsitePage[], servicesOnly 
     servicesOffered: "Short plain semicolon-separated list of explicitly offered WORK. Read headings, service cards, lists and menus as well as sentences. Copy exact service names from evidence. Never infer from trade or name.",
     servicesNotOffered: "ONLY explicit refusal of a kind of WORK, e.g. no commercial repairs. Residential-only means no commercial work. NEVER billing, insurance-payment, warranty, scheduling or payment-method exclusions; those belong in otherPolicies.",
     serviceArea: "Explicit cities/counties/regions/radius, including footer city lists, areas-we-serve sections and schema.org areaServed. An office address alone is NOT a service area.",
-    businessHours: "Explicit general day/time schedule from header, footer, contact or schema.org openingHours. Format Mon-Fri 09:00-17:00. NEVER turn 24/7, same-day or emergency claims into a business-hours schedule.",
+    businessHours: "ONLY explicit customer-visible general day/time schedules in header, footer, contact or hours sections. Format Mon-Fri 09:00-17:00. NEVER accept JSON-LD or hidden metadata hours, or turn 24/7/emergency claims into hours.",
     pricingPolicy: "Publicly stated service prices, starting prices, fees, estimates, or quoting rules.",
     financingPolicy: "Explicit financing, payment-plan, or credit terms.",
     brandsWorkedWith: "Brands the site explicitly says the business installs, services, or works with.",
@@ -313,7 +314,8 @@ export async function extractBusinessDetails(pages: WebsitePage[], servicesOnly 
     otherPolicies: "Other explicit billing, insurance payment, warranty limitations, scheduling or payment-method notes. Notes, NEVER services the business refuses.",
   };
 
-  const response = await client.chat.completions.create(
+  const result = await websiteModelResponse(async (shortPrompt) => {
+    const response = await client.chat.completions.create(
     {
       model: "gpt-5.6-terra",
       reasoning_effort: "low",
@@ -336,47 +338,44 @@ export async function extractBusinessDetails(pages: WebsitePage[], servicesOnly 
         {
           role: "user",
           content: JSON.stringify({
-             requestedFields: servicesOnly ? { servicesOffered: fieldGuidance.servicesOffered } : fieldGuidance,
-            websitePages: servicesOnly ? pages.map(page => ({
-              url: page.url, text: page.serviceText || page.text.slice(0, 16000),
-            })) : pages,
+            requestedFields: Object.fromEntries(requested.map(field => [field, fieldGuidance[field]])),
+            websitePages: pages.map(page => ({
+              url: page.url, text: (target === "servicesOffered" ? page.serviceText || page.visibleText || page.text
+                : target === "serviceArea" ? areaExcerpts(page.visibleText ?? page.text)
+                : page.text).slice(0, shortPrompt ? 4500 : target === "full" ? 28000 : 18000),
+            })),
             requiredShape: Object.fromEntries(
-              (servicesOnly ? ["servicesOffered"] : WEBSITE_PREVIEW_FIELDS).map((field) => [field, { value: null, evidence: null }]),
+              requested.map((field) => [field, { value: null, evidence: null }]),
             ),
           }),
         },
       ],
     },
-    { timeout: Math.min(35_000, Math.max(1, deadline - Date.now())), maxRetries: 0 },
+    { timeout: Math.min(shortPrompt ? 15_000 : target === "full" ? 25_000 : 20_000, Math.max(1, deadline - Date.now())), maxRetries: 0 },
   );
-
-  const content = response.choices[0]?.message.content;
-  if (!content) throw new Error("Website detail extraction returned no content");
-
-  const parsed: unknown = JSON.parse(content);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Website detail extraction returned an invalid shape");
-  }
-
-  const result = parsed as Record<string, FieldExtraction>;
+    return response.choices[0]?.message.content;
+  }, target, deadline, observer);
   const fields = emptyPreviewFields();
 
-  for (const field of WEBSITE_PREVIEW_FIELDS) {
+  for (const field of requested) {
+    const report = (reason: string, accepted = false, sourceUrl?: string) =>
+      extractionDiagnostic({ kind: "field", target, field, reason, accepted, sourceUrl }, observer);
     const value = normalizeExtractedValue(result[field]?.value);
     const quotes = evidenceQuotes(result[field]?.evidence);
     const evidence = normalizeEvidence(quotes.join(" […] "));
-    if (!value || !evidence) continue;
+    if (!value || !evidence) { report(!value ? "null_missing_or_invalid_value" : "missing_or_invalid_evidence"); continue; }
     // Public page-builder sample content is not a confirmed business policy.
-    if (/\blorem ipsum|ut elit tellus|sample text|placeholder text\b/i.test(evidence)) continue;
+    if (/\blorem ipsum|ut elit tellus|sample text|placeholder text\b/i.test(evidence)) { report("placeholder_content"); continue; }
 
     const sourcePage = pages.find((page) => quotes.every(quote =>
-      normalizeText(page.text).toLocaleLowerCase().includes(quote.toLocaleLowerCase())));
-    if (!sourcePage) continue;
+      normalizeText(field === "businessHours" ? page.visibleText ?? page.text : page.text).toLocaleLowerCase().includes(quote.toLocaleLowerCase())));
+    if (!sourcePage) { report(field === "businessHours" ? "hours_not_in_visible_text" : "evidence_not_found_on_one_page"); continue; }
     if (field === "servicesOffered") {
       const names = value.split(/\s*;\s*/).filter(name => name.length <= 90
         && !/[.!?]|\b(?:provides?|experts?|professional|best|reliable|trusted|quality|our|we|your|problems|materials)\b/i.test(name));
-      if (!names.length || faithfulValue(names.join("; "), quotes) !== names.join("; ")) continue;
+      if (!names.length || faithfulValue(names.join("; "), quotes) !== names.join("; ")) { report("services_not_literal_plain_names"); continue; }
       fields[field] = { value: names.join("; "), evidence, sourceUrl: sourcePage.url };
+      report("accepted_quote_verified", true, sourcePage.url);
       continue;
     }
     if (field === "maintenancePlanOfferings" || field === "pricingPolicy") {
@@ -388,23 +387,26 @@ export async function extractBusinessDetails(pages: WebsitePage[], servicesOnly 
         }
         return false;
       });
-      if (templateSection || /^(?:pricing plan\s*)?(?:best\s*)?maintenance plans?$/i.test(evidence)) continue;
+      if (templateSection || /^(?:pricing plan\s*)?(?:best\s*)?maintenance plans?$/i.test(evidence)) { report("template_pricing"); continue; }
     }
     if (field === "businessHours") {
       const schedule = readableHours(quotes.join("; "));
-      if (!schedule || !parseBusinessHours(schedule.value)) continue;
+      if (!schedule || !parseBusinessHours(schedule.value)) { report("invalid_visible_schedule"); continue; }
       fields[field] = { value: schedule.value, evidence, sourceUrl: sourcePage.url };
+      report("accepted_visible_schedule", true, sourcePage.url);
       continue;
     }
     if (field === "servicesNotOffered" && !quotes.every(isWorkRefusal)) {
       if (!fields.otherPolicies?.value && /\b(?:payment|insurance|billing|warranty|scheduling|credit|financing)\b/i.test(evidence)) {
         fields.otherPolicies = { value: quotes.join(" […] "), evidence, sourceUrl: sourcePage.url };
       }
+      report("not_a_refused_kind_of_work");
       continue;
     }
     const grounded = field === "servicesNotOffered"
       ? exclusiveWork(evidence) ?? faithfulValue(value, quotes) : faithfulValue(value, quotes);
     fields[field] = { value: grounded, evidence, sourceUrl: sourcePage.url };
+    report(grounded === value ? "accepted_quote_verified" : "accepted_evidence_instead_of_unsupported_paraphrase", true, sourcePage.url);
   }
 
   return fields;
@@ -417,10 +419,11 @@ function emptyPreviewFields(): WebsitePreviewFields {
     businessHours: blank(), brandsWorkedWith: blank(), warrantyInfo: blank(),
     emergencyContactInfo: blank(), financingPolicy: blank(), pricingPolicy: blank(),
     maintenancePlanOfferings: blank(), credentials: blank(), otherPolicies: blank(),
+    businessHoursSuggestion: { ...blank(), warning: null },
   };
 }
 
-export async function previewBusinessWebsite(websiteUrl: string): Promise<WebsitePreview> {
+export async function previewBusinessWebsite(websiteUrl: string, observer?: ExtractionObserver): Promise<WebsitePreview> {
   // Invalid/private URLs retain security errors. Network, HTML and AI failures allow manual setup.
   normalizeWebsiteUrl(websiteUrl);
   const deadline = Date.now() + TOTAL_TIMEOUT_MS;
@@ -440,16 +443,8 @@ export async function previewBusinessWebsite(websiteUrl: string): Promise<Websit
   }
   let fields = emptyPreviewFields();
   if (pages.some(page => page.text)) {
-    try { fields = await withDeadline(extractBusinessDetails(pages, false, deadline), deadline); }
+    try { fields = await withDeadline(extractBusinessDetails(pages, false, deadline, observer), deadline); }
     catch { degraded = true; }
-    for (const page of pages) {
-      for (const [field, fact] of [["businessHours", page.facts?.hours], ["serviceArea", page.facts?.area]] as const) {
-        if (fact && !fields[field].value && fact.value.length <= 600 && fact.evidence.length <= 400
-          && evidenceQuotes(fact.evidence).every(quote => normalizeText(page.text).includes(quote))) {
-          fields[field] = { ...fact, sourceUrl: page.url };
-        }
-      }
-    }
     if (!fields.servicesOffered.value && Date.now() < deadline) {
       const read = new Set(pages.map(page => page.url));
       const homeOrigin = new URL(pages[0].url).origin;
@@ -466,7 +461,7 @@ export async function previewBusinessWebsite(websiteUrl: string): Promise<Websit
         if (result.status === "fulfilled") pages.push(result.value); else degraded = true;
       }
       try {
-        const second = await withDeadline(extractBusinessDetails(pages, true, deadline), deadline);
+        const second = await withDeadline(extractBusinessDetails(pages, true, deadline, observer), deadline);
         if (second.servicesOffered.value) fields.servicesOffered = second.servicesOffered;
       } catch { degraded = true; }
       if (!fields.servicesOffered.value) {
@@ -474,7 +469,51 @@ export async function previewBusinessWebsite(websiteUrl: string): Promise<Websit
           .sort((a, b) => b.facts!.services!.value.length - a.facts!.services!.value.length)
           .find(page => evidenceQuotes(page.facts!.services!.evidence).every(quote =>
             normalizeText(page.text).includes(quote)));
-        if (best) fields.servicesOffered = { ...best.facts!.services!, sourceUrl: best.url };
+        if (best) {
+          fields.servicesOffered = { ...best.facts!.services!, sourceUrl: best.url };
+          extractionDiagnostic({ kind: "field", target: "fallback", field: "servicesOffered", accepted: true, reason: "literal_service_titles_quote_verified", sourceUrl: best.url }, observer);
+        }
+      }
+    }
+    if (!fields.serviceArea.value && Date.now() < deadline) {
+      const read = new Set(pages.map(page => page.url));
+      const origin = new URL(pages[0].url).origin;
+      const extras = new Set<string>();
+      for (const page of pages) for (const link of page.links) {
+        if (!/service.?areas?|areas.we.serve|locations?|coverage|cities|counties/i.test(`${link.label} ${link.href}`)) continue;
+        try {
+          const url = normalizeWebsiteUrl(new URL(link.href, page.url).toString());
+          if (url.origin === origin && !read.has(url.toString())) extras.add(url.toString());
+        } catch { /* same public-network checks apply to every targeted link */ }
+      }
+      const results = await Promise.allSettled([...extras].slice(0, 2).map(url => fetchWebsitePage(url, deadline)));
+      for (const result of results) {
+        if (result.status === "fulfilled") pages.push(result.value); else degraded = true;
+      }
+      extractionDiagnostic({ kind: "field", target: "serviceArea", field: "serviceArea", accepted: false,
+        reason: pages.some(page => /\b(?:serving|serve|areas|counties)\b/i.test(page.visibleText ?? page.text))
+          ? "null_with_visible_cue_targeted_retry" : "null_targeted_second_pass" }, observer);
+      try {
+        const second = await withDeadline(extractBusinessDetails(pages, "serviceArea", deadline, observer), deadline);
+        if (second.serviceArea.value) fields.serviceArea = second.serviceArea;
+      } catch { degraded = true; }
+    }
+    // Deterministic fallbacks are still available even when the model/deadline fails.
+    for (const page of pages) {
+      for (const [field, fact] of [["businessHours", page.facts?.hours], ["serviceArea", page.facts?.area]] as const) {
+        if (!fields[field].value && fact && fact.value.length <= 600 && fact.evidence.length <= 400
+          && evidenceQuotes(fact.evidence).every(quote => normalizeText(field === "businessHours" ? page.visibleText ?? page.text : page.text).includes(quote))) {
+          fields[field] = { ...fact, sourceUrl: page.url };
+          extractionDiagnostic({ kind: "field", target: "fallback", field, accepted: true, reason: "deterministic_fact_quote_verified", sourceUrl: page.url }, observer);
+        }
+      }
+    }
+    if (!fields.businessHours.value) {
+      const page = pages.find(page => page.facts?.hoursSuggestion
+        && evidenceQuotes(page.facts.hoursSuggestion.evidence).every(quote => normalizeText(page.text).includes(quote)));
+      if (page) {
+        fields.businessHoursSuggestion = { ...page.facts!.hoursSuggestion!, sourceUrl: page.url };
+        extractionDiagnostic({ kind: "field", target: "fallback", field: "businessHoursSuggestion", accepted: true, reason: "unconfirmed_hidden_metadata_only", sourceUrl: page.url }, observer);
       }
     }
   } else degraded = true;

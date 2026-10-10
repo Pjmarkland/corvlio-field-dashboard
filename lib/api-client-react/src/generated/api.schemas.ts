@@ -333,11 +333,29 @@ export interface WebsitePreviewField {
   sourceUrl: string | null;
 }
 
+export interface WebsiteHoursSuggestion {
+  /**
+     * @maxLength 600
+     * @nullable
+     */
+  value: string | null;
+  /**
+     * @maxLength 400
+     * @nullable
+     */
+  evidence: string | null;
+  /** @nullable */
+  sourceUrl: string | null;
+  /** @nullable */
+  warning: string | null;
+}
+
 export interface WebsitePreviewFields {
   servicesOffered: WebsitePreviewField;
   servicesNotOffered: WebsitePreviewField;
   serviceArea: WebsitePreviewField;
   businessHours: WebsitePreviewField;
+  businessHoursSuggestion?: WebsiteHoursSuggestion;
   brandsWorkedWith: WebsitePreviewField;
   warrantyInfo: WebsitePreviewField;
   emergencyContactInfo: WebsitePreviewField;

@@ -14,6 +14,7 @@ import {
   extractBusinessDetails, fetchWebsitePage, isPublicIpAddress, normalizeWebsiteUrl,
   previewBusinessWebsite, UnsafeWebsiteUrlError,
 } from "../../src/lib/websiteEnrichment";
+import { extractionDiagnostic, redactExtractionLog, type ExtractionDiagnostic } from "../../src/lib/websiteDiagnostics";
 
 type Page = { html?: string; status?: number; headers?: Record<string, string> };
 let pages: Record<string, Page>;
@@ -187,7 +188,8 @@ describe("saved HTML quality and recovery (no live requests)", () => {
     pages = { "/": { html: savedHtml("structured-hours") } };
     fixture.createExtraction.mockRejectedValue(new Error("Model timeout"));
     const result = await previewBusinessWebsite("https://example.com");
-    expect(result.fields.businessHours.value).toBe("Mon,Tue,Wed,Thu,Fri 08:00-17:00");
+    expect(result.fields.businessHours.value).toBeNull();
+    expect(result.fields.businessHoursSuggestion?.value).toBe("Mon,Tue,Wed,Thu,Fri 08:00-17:00");
     expect(result.fields.serviceArea.value).toBe("Fort Myers; Estero");
     expect(result.status).toBe("partial");
     expect(result.message).toBe("We couldn't read this site automatically. Type your answers below.");
@@ -195,7 +197,110 @@ describe("saved HTML quality and recovery (no live requests)", () => {
   it("reads the schema.org openingHours string without executing scripts", async () => {
     pages = { "/": { html: '<script type="application/ld+json">{"@type":"LocalBusiness","openingHours":"Mo-Fr 08:00-17:00"}</script><body>Welcome</body>' } };
     fixture.createExtraction.mockResolvedValue(extraction({}));
-    expect((await previewBusinessWebsite("https://example.com")).fields.businessHours.value).toBe("Mon-Fri 08:00-17:00");
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.businessHours.value).toBeNull();
+    expect(preview.fields.businessHoursSuggestion?.value).toBe("Mon-Fri 08:00-17:00");
+  });
+  it("rejects AI attempts to accept JSON-LD-only hours and warns about implausible hidden hours", async () => {
+    pages = { "/": { html: savedHtml("hidden-hours-unusual") } };
+    fixture.createExtraction.mockResolvedValue(extraction({
+      businessHours: { value: "Mon-Sun 12:00-23:59", evidence: "12:00-23:59" },
+    }));
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.businessHours.value).toBeNull();
+    expect(preview.fields.businessHoursSuggestion).toMatchObject({
+      value: "Mon,Tue,Wed,Thu,Fri,Sat,Sun 12:00-23:59",
+      warning: "These hours look unusual. Please confirm.", sourceUrl: "https://example.com/",
+    });
+    expect(preview.fields.businessHoursSuggestion?.evidence).toContain('"opens":"12:00"');
+  });
+  it("rejects a quote that matches only the hidden openingHours string, not visible text", async () => {
+    pages = { "/": { html: savedHtml("structured-string-hours") } };
+    fixture.createExtraction.mockResolvedValue(extraction({
+      businessHours: { value: "Mon-Fri 09:00-18:00", evidence: "Mo-Fr 09:00-18:00" },
+    }));
+    const events: ExtractionDiagnostic[] = [];
+    const preview = await previewBusinessWebsite("https://example.com", event => events.push(event));
+    expect(preview.fields.businessHours.value).toBeNull();
+    expect(preview.fields.businessHoursSuggestion?.value).toBe("Mon-Fri 09:00-18:00");
+    expect(events).toContainEqual(expect.objectContaining({ field: "businessHours", accepted: false, reason: "hours_not_in_visible_text" }));
+  });
+  it("prefills visible hours even when metadata agrees, without an unconfirmed duplicate", async () => {
+    pages = { "/": { html: savedHtml("structured-hours") + savedHtml("footer-hours") } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.businessHours).toMatchObject({ value: "Mon-Fri 08:00-17:00", sourceUrl: "https://example.com/" });
+    expect(preview.fields.businessHours.evidence).toContain("Monday - Friday 8:00am to 5:00pm");
+    expect(preview.fields.businessHoursSuggestion?.value).toBeNull();
+  });
+  it("finds the visible Lee, Collier and Charlotte counties sentence even if all model calls fail", async () => {
+    pages = { "/": { html: savedHtml("visible-counties") } };
+    fixture.createExtraction.mockRejectedValue(new Error("Model timed out"));
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.serviceArea).toEqual({
+      value: "Lee, Collier and Charlotte counties",
+      evidence: "Locally owned, licensed and insured plumbing service serving Lee, Collier and Charlotte counties.",
+      sourceUrl: "https://example.com/",
+    });
+  });
+  it("finds explicit county-labelled footer city lists without AI", async () => {
+    pages = { "/": { html: savedHtml("footer-counties") } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.serviceArea.value).toContain("Lee County: Cape Coral, Fort Myers, Estero");
+    expect(preview.fields.serviceArea.evidence).toContain("Lee County:");
+    expect(preview.fields.serviceArea.sourceUrl).toBe("https://example.com/");
+  });
+  it("finds footer city links beneath an explicit areas-we-serve heading", async () => {
+    pages = { "/": { html: savedHtml("footer-city-links") } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    const preview = await previewBusinessWebsite("https://example.com");
+    expect(preview.fields.serviceArea).toEqual({
+      value: "Fort Myers Estero Naples", evidence: "Areas we serve Fort Myers Estero Naples", sourceUrl: "https://example.com/",
+    });
+  });
+  it("runs a second targeted area pass after null and discovers same-site coverage links", async () => {
+    pages = { "/": { html: savedHtml("areas-home") }, "/coverage": { html: savedHtml("areas-coverage") } };
+    fixture.createExtraction.mockImplementation(async (request) => {
+      const payload = JSON.parse(request.messages[1].content);
+      return extraction(payload.requestedFields.serviceArea && Object.keys(payload.requestedFields).length === 1
+        ? { serviceArea: { value: "Oakland; Berkeley", evidence: "We serve Oakland and Berkeley." } } : {});
+    });
+    const events: ExtractionDiagnostic[] = [];
+    const preview = await previewBusinessWebsite("https://example.com", event => events.push(event));
+    expect(preview.fields.serviceArea).toMatchObject({ value: "Oakland; Berkeley", sourceUrl: "https://example.com/coverage" });
+    expect(fixture.request.mock.calls.map(([options]) => options.path)).toContain("/coverage");
+    expect(events).toContainEqual(expect.objectContaining({ reason: "null_with_visible_cue_targeted_retry" }));
+    expect(fixture.createExtraction.mock.calls.some(([request]) =>
+      Object.keys(JSON.parse(request.messages[1].content).requestedFields).join() === "serviceArea")).toBe(true);
+  });
+  it("retries invalid JSON once with a shorter prompt and records rejection reasons", async () => {
+    fixture.createExtraction.mockResolvedValueOnce({ choices: [{ message: { content: "not JSON" } }] })
+      .mockResolvedValueOnce(extraction({ credentials: { value: "Licensed", evidence: "Not on this page." } }));
+    const events: ExtractionDiagnostic[] = [];
+    await extractBusinessDetails([{ url: "https://example.com/", text: "A public page. ".repeat(1500), links: [] }], false,
+      Date.now() + 10000, event => events.push(event));
+    expect(fixture.createExtraction).toHaveBeenCalledTimes(2);
+    expect(fixture.createExtraction.mock.calls[1][0].messages[1].content.length)
+      .toBeLessThan(fixture.createExtraction.mock.calls[0][0].messages[1].content.length);
+    expect(events).toContainEqual(expect.objectContaining({ kind: "ai_failure", reason: "invalid_json", attempt: 1 }));
+    expect(events).toContainEqual(expect.objectContaining({ field: "credentials", accepted: false, reason: "evidence_not_found_on_one_page" }));
+  });
+  it("redacts diagnostics and never prints raw extraction logs in production", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const secret = "sk-sensitive-example";
+      vi.stubEnv("NODE_ENV", "development");
+      extractionDiagnostic({ kind: "model_response", target: "full", reason: "received", rawResponse: `{"password":"unsafe","value":"${secret}"}` });
+      expect(info).toHaveBeenCalledOnce();
+      expect(info.mock.calls[0][0]).not.toContain(secret);
+      expect(info.mock.calls[0][0]).not.toContain("unsafe");
+      expect(redactExtractionLog("https://example.com/?token=unsafe")).not.toContain("unsafe");
+      info.mockClear();
+      vi.stubEnv("NODE_ENV", "production");
+      extractionDiagnostic({ kind: "model_response", target: "full", reason: "received", rawResponse: secret });
+      expect(info).not.toHaveBeenCalled();
+    } finally { info.mockRestore(); vi.unstubAllEnvs(); }
   });
   it("never converts 24/7 emergency marketing to business hours", async () => {
     pages = { "/": { html: savedHtml("emergency-and-policies") } };

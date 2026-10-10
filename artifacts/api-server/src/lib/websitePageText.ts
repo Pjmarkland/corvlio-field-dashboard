@@ -1,8 +1,10 @@
 import type { CheerioAPI } from "cheerio";
 import { normalizeText, readableHours } from "./websiteEvidence";
+import { parseBusinessHours } from "./businessHours";
+import { visibleAreaFacts } from "./websiteAreas";
 
 export type StructuredFact = { value: string; evidence: string };
-export type PageFacts = { hours?: StructuredFact; area?: StructuredFact; services?: StructuredFact };
+export type PageFacts = { hours?: StructuredFact; hoursSuggestion?: StructuredFact & { warning: string | null }; area?: StructuredFact; services?: StructuredFact };
 
 /** Extract only the business properties needed here; no execution or linked resource loading. */
 export function websitePageText($: CheerioAPI, url: string) {
@@ -16,7 +18,8 @@ export function websitePageText($: CheerioAPI, url: string) {
       const hours = (Array.isArray(item.openingHours) ? item.openingHours : [item.openingHours])
         .filter((hour): hour is string => typeof hour === "string").join("; ");
       structured.push(hours);
-      facts.hours ??= readableHours(hours) ?? undefined;
+      const schedule = readableHours(hours);
+      if (schedule) facts.hoursSuggestion ??= { ...schedule, warning: null };
     }
     if (item.openingHoursSpecification) {
       const specs = Array.isArray(item.openingHoursSpecification) ? item.openingHoursSpecification : [item.openingHoursSpecification];
@@ -35,7 +38,7 @@ export function websitePageText($: CheerioAPI, url: string) {
       const evidence = JSON.stringify(item.openingHoursSpecification);
       structured.push(evidence);
       const schedule = readableHours(hours);
-      if (schedule && evidence.length <= 400) facts.hours ??= { value: schedule.value, evidence };
+      if (schedule && evidence.length <= 400) facts.hoursSuggestion ??= { value: schedule.value, evidence, warning: null };
     }
     if (item.areaServed) {
       const areas = (Array.isArray(item.areaServed) ? item.areaServed : [item.areaServed])
@@ -54,6 +57,10 @@ export function websitePageText($: CheerioAPI, url: string) {
     try { visit(JSON.parse($(element).text())); } catch { /* malformed schema is optional */ }
   });
   $("script, style, noscript, svg, iframe, template, form").remove();
+  $("[hidden],[aria-hidden=true],.sr-only,.visually-hidden").remove();
+  $("[style]").each((_, element) => {
+    if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test($(element).attr("style") ?? "")) $(element).remove();
+  });
   // Block boundaries prevent adjacent service cards becoming "RoofRepairRoofInstallation".
   $("h1,h2,h3,h4,h5,h6,p,li,div,section,br,td").after(" ");
   const snippets = (selector: string, cap: number) => {
@@ -84,9 +91,21 @@ export function websitePageText($: CheerioAPI, url: string) {
   if (titles.length) facts.services = { value: titles.join("; "), evidence: titles.join(" […] ") };
   const focused = [snippets("footer,[role=contentinfo]", 10000), snippets("header", 6000),
     serviceText, ...structured].filter(Boolean);
-  const body = normalizeText($("body").text() || $.text());
+  const body = normalizeText($("body").text());
+  const visibleFocused = [snippets("footer,[role=contentinfo]", 10000), snippets("header", 6000), serviceText];
+  const visibleText = [...visibleFocused, body].join("\n").slice(0, 60000);
   const text = [normalizeText($("title").first().text()), $('meta[name="description"]').attr("content") ?? "",
     ...focused, body.slice(0, 16000)].join("\n").slice(0, 40000);
-  facts.hours ??= readableHours(focused.join("\n") + "\n" + body) ?? undefined;
-  return { text, serviceText, facts };
+  facts.hours = readableHours(visibleText) ?? undefined;
+  facts.area = visibleAreaFacts($) ?? facts.area;
+  if (facts.hoursSuggestion) {
+    const openings = parseBusinessHours(facts.hoursSuggestion.value) ?? [];
+    const unusual = openings.some(opening => opening.start > 11 * 60 || opening.end % 1440 > 22 * 60)
+      || (new Set(openings.map(opening => opening.day)).size === 7
+        && openings.some(opening => opening.end % 1440 === 1439) && /24\s*\/\s*7/.test(visibleText));
+    facts.hoursSuggestion.warning = unusual ? "These hours look unusual. Please confirm." : null;
+    // Visible customer-facing hours take precedence, whether or not metadata agrees.
+    if (facts.hours) delete facts.hoursSuggestion;
+  }
+  return { text, visibleText, serviceText, facts };
 }

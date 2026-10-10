@@ -48,6 +48,7 @@ export * from './notificationStatusPoller';
 export * from './ownerDemoCapability';
 export * from './ownerDemoConfirmation';
 export * from './ownerDemoConfirmationScenario';
+export * from './websiteHoursSuggestion';
 export * from './websitePreview';
 export * from './websitePreviewField';
 export * from './websitePreviewFields';

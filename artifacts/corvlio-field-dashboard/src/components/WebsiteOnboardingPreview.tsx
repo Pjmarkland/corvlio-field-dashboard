@@ -1,8 +1,15 @@
-import type { WebsitePreview, WebsitePreviewFields } from '@workspace/api-client-react';
-import { websiteFieldLabels } from '@/pages/onboardingWebsite';
+import type { WebsitePreview } from '@workspace/api-client-react';
+import { websiteFieldLabels, type HoursDecision, type WebsiteFieldKey } from '@/pages/onboardingWebsite';
 
-export function WebsiteOnboardingPreview({ preview }: { preview: WebsitePreview }) {
-  const found = (Object.keys(preview.fields) as (keyof WebsitePreviewFields)[])
+export function WebsiteOnboardingPreview({ preview, hoursDecision, onUseHours, onRejectHours }: {
+  preview: WebsitePreview;
+  hoursDecision?: HoursDecision;
+  onUseHours?: (value: string) => void;
+  onRejectHours?: (value: string) => void;
+}) {
+  const hours = preview.fields.businessHoursSuggestion;
+  const showHours = !!hours?.value;
+  const found = (Object.keys(websiteFieldLabels) as WebsiteFieldKey[])
     .filter((key) => preview.fields[key]?.value);
   return <div className="mt-5 rounded-xl border border-primary/25 bg-primary/5 p-4" data-testid="website-preview-result" aria-live="polite">
     <h3 className="text-sm font-bold">{preview.status === 'unavailable' ? 'Continue manually' : 'Review website suggestions'}</h3>
@@ -17,6 +24,19 @@ export function WebsiteOnboardingPreview({ preview }: { preview: WebsitePreview 
         </li>)}
       </ul>
     </details> : null}
+    {showHours && hours?.value ? <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground" data-testid="website-hours-suggestion">
+      <p className="text-xs font-semibold">Unconfirmed hours — found in the site's hidden metadata, not shown to customers</p>
+      <p className="mt-1 text-xs" data-testid="text-hours-suggestion-value">Suggested hours: {hours.value}</p>
+      {hours.evidence ? <p className="mt-1 text-xs">“{hours.evidence}”</p> : null}
+      {hours.sourceUrl ? <a href={hours.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all text-xs text-primary underline">Source page</a> : null}
+      {hours.warning ? <p role="note" className="mt-2 text-xs font-semibold text-foreground" data-testid="text-hours-warning">{hours.warning}</p> : null}
+      {hoursDecision?.status === 'used' ? <p className="mt-2 text-xs" data-testid="status-hours-used">Using these hours. You can still edit them.</p>
+        : hoursDecision?.status === 'rejected' ? <p className="mt-2 text-xs" data-testid="status-hours-rejected">Not used. Business hours stay as you entered them.</p> : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={() => onUseHours?.(hours.value!)} data-testid="button-use-hours" className="min-h-11 rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary">Use these hours</button>
+        <button type="button" onClick={() => onRejectHours?.(hours.value!)} data-testid="button-reject-hours" className="min-h-11 rounded-xl border border-border bg-background px-3 text-xs font-semibold">Not right</button>
+      </div>
+    </div> : null}
     {preview.missingFields.length > 0 ? <div className="mt-3" data-testid="website-missing-fields">
       <p className="text-xs font-semibold">Not found clearly on the website — left blank unless you already answered:</p>
       <ul className="mt-2 flex flex-wrap gap-2">

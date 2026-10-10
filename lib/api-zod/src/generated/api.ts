@@ -187,6 +187,10 @@ export const previewBusinessWebsiteResponseFieldsBusinessHoursValueMax = 600;
 
 export const previewBusinessWebsiteResponseFieldsBusinessHoursEvidenceMax = 400;
 
+export const previewBusinessWebsiteResponseFieldsBusinessHoursSuggestionValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsBusinessHoursSuggestionEvidenceMax = 400;
+
 export const previewBusinessWebsiteResponseFieldsBrandsWorkedWithValueMax = 600;
 
 export const previewBusinessWebsiteResponseFieldsBrandsWorkedWithEvidenceMax = 400;
@@ -245,6 +249,12 @@ export const PreviewBusinessWebsiteResponse = zod.object({
   "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsBusinessHoursEvidenceMax).nullable(),
   "sourceUrl": zod.string().nullable()
 }),
+  "businessHoursSuggestion": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsBusinessHoursSuggestionValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsBusinessHoursSuggestionEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable(),
+  "warning": zod.string().nullable()
+}).optional(),
   "brandsWorkedWith": zod.object({
   "value": zod.string().max(previewBusinessWebsiteResponseFieldsBrandsWorkedWithValueMax).nullable(),
   "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsBrandsWorkedWithEvidenceMax).nullable(),

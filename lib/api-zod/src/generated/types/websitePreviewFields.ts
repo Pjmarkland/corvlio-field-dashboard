@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { WebsiteHoursSuggestion } from './websiteHoursSuggestion';
 import type { WebsitePreviewField } from './websitePreviewField';
 
 export interface WebsitePreviewFields {
@@ -12,6 +13,7 @@ export interface WebsitePreviewFields {
   servicesNotOffered: WebsitePreviewField;
   serviceArea: WebsitePreviewField;
   businessHours: WebsitePreviewField;
+  businessHoursSuggestion?: WebsiteHoursSuggestion;
   brandsWorkedWith: WebsitePreviewField;
   warrantyInfo: WebsitePreviewField;
   emergencyContactInfo: WebsitePreviewField;
