@@ -398,6 +398,96 @@ export const GetLeadsResponse = zod.object({
 
 
 /**
+ * @summary Read one lead belonging to the signed-in business
+ */
+
+
+
+export const GetLeadDetailParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const getLeadDetailResponseTwoDurationMsMin = 0;
+export const getLeadDetailResponseTwoDurationMsMultipleOf = 1;
+
+
+
+export const GetLeadDetailResponse = zod.object({
+  "tradeIntakeAnswers": zod.string().nullish(),
+  "callerId": zod.string().nullish(),
+  "callbackNumber": zod.string().nullish(),
+  "availability": zod.string().nullish(),
+  "transcript": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "issue": zod.string(),
+  "address": zod.string(),
+  "urgency": zod.enum(['urgent', 'normal', 'low']),
+  "status": zod.enum(['pending', 'contacted']),
+  "createdAt": zod.coerce.date(),
+  "contactedAt": zod.coerce.date().nullable()
+}).and(zod.object({
+  "callStartedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().min(getLeadDetailResponseTwoDurationMsMin).multipleOf(getLeadDetailResponseTwoDurationMsMultipleOf).nullable(),
+  "capturedUrgency": zod.string().nullable(),
+  "recordingUrl": zod.string().nullable(),
+  "privateNotes": zod.string().nullable(),
+  "contactedBy": zod.string().nullable()
+}))
+
+
+/**
+ * @summary Save private owner notes on an owned lead
+ */
+
+
+
+export const UpdateLeadNotesParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const updateLeadNotesBodyPrivateNotesMax = 10000;
+
+
+
+export const UpdateLeadNotesBody = zod.object({
+  "privateNotes": zod.string().max(updateLeadNotesBodyPrivateNotesMax)
+})
+
+export const updateLeadNotesResponseTwoDurationMsMin = 0;
+export const updateLeadNotesResponseTwoDurationMsMultipleOf = 1;
+
+
+
+export const UpdateLeadNotesResponse = zod.object({
+  "tradeIntakeAnswers": zod.string().nullish(),
+  "callerId": zod.string().nullish(),
+  "callbackNumber": zod.string().nullish(),
+  "availability": zod.string().nullish(),
+  "transcript": zod.string().nullish(),
+  "summary": zod.string().nullish(),
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "issue": zod.string(),
+  "address": zod.string(),
+  "urgency": zod.enum(['urgent', 'normal', 'low']),
+  "status": zod.enum(['pending', 'contacted']),
+  "createdAt": zod.coerce.date(),
+  "contactedAt": zod.coerce.date().nullable()
+}).and(zod.object({
+  "callStartedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().min(updateLeadNotesResponseTwoDurationMsMin).multipleOf(updateLeadNotesResponseTwoDurationMsMultipleOf).nullable(),
+  "capturedUrgency": zod.string().nullable(),
+  "recordingUrl": zod.string().nullable(),
+  "privateNotes": zod.string().nullable(),
+  "contactedBy": zod.string().nullable()
+}))
+
+
+/**
  * Updates one lead in the signed-in business owner's Google Sheet.
  * @summary Update a lead status
  */

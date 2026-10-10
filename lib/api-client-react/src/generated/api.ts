@@ -30,6 +30,8 @@ import type {
   CreateOwnerDemoCall200,
   HealthStatus,
   LeadAlertInbox,
+  LeadDetail,
+  LeadNotesInput,
   LeadStatusResult,
   LeadStatusUpdate,
   LeadWorkspace,
@@ -890,6 +892,155 @@ export function useGetLeads<TData = Awaited<ReturnType<typeof getLeads>>, TError
 
 
 
+
+export const getGetLeadDetailUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}`
+}
+
+/**
+ * @summary Read one lead belonging to the signed-in business
+ */
+export const getLeadDetail = async (leadId: string, options?: Parameters<typeof customFetch>[1]): Promise<LeadDetail> => {
+
+  return customFetch<LeadDetail>(getGetLeadDetailUrl(leadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLeadDetailQueryKey = (leadId: string,) => {
+    return [
+    `/api/leads/${leadId}`
+    ] as const;
+    }
+
+
+export const getGetLeadDetailQueryOptions = <TData = Awaited<ReturnType<typeof getLeadDetail>>, TError = ErrorType<void>>(leadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeadDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLeadDetailQueryKey(leadId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeadDetail>>> = ({ signal }) => getLeadDetail(leadId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: leadId !== null && leadId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLeadDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLeadDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getLeadDetail>>>
+export type GetLeadDetailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read one lead belonging to the signed-in business
+ */
+
+export function useGetLeadDetail<TData = Awaited<ReturnType<typeof getLeadDetail>>, TError = ErrorType<void>>(
+ leadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeadDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLeadDetailQueryOptions(leadId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateLeadNotesUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}/notes`
+}
+
+/**
+ * @summary Save private owner notes on an owned lead
+ */
+export const updateLeadNotes = async (leadId: string,
+    leadNotesInput: LeadNotesInput, options?: Parameters<typeof customFetch>[1]): Promise<LeadDetail> => {
+
+  return customFetch<LeadDetail>(getUpdateLeadNotesUrl(leadId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(leadNotesInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateLeadNotesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeadNotes>>, TError,{leadId: string;data: BodyType<LeadNotesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLeadNotes>>, TError,{leadId: string;data: BodyType<LeadNotesInput>}, TContext> => {
+
+const mutationKey = ['updateLeadNotes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLeadNotes>>, {leadId: string;data: BodyType<LeadNotesInput>}> = (props) => {
+          const {leadId,data} = props ?? {};
+
+          return  updateLeadNotes(leadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLeadNotesMutationResult = NonNullable<Awaited<ReturnType<typeof updateLeadNotes>>>
+    export type UpdateLeadNotesMutationBody = BodyType<LeadNotesInput>
+    export type UpdateLeadNotesMutationError = ErrorType<void>
+
+    /**
+ * @summary Save private owner notes on an owned lead
+ */
+export const useUpdateLeadNotes = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeadNotes>>, TError,{leadId: string;data: BodyType<LeadNotesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLeadNotes>>,
+        TError,
+        {leadId: string;data: BodyType<LeadNotesInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateLeadNotesMutationOptions(options));
+    }
 
 export const getUpdateLeadStatusUrl = (leadId: string,) => {
 

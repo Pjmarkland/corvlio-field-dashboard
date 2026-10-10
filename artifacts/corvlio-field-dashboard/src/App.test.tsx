@@ -268,34 +268,30 @@ describe('UnconfiguredAccountScreen sign-out escape hatch', () => {
     expect(screen.getByRole('heading', { name: 'No business configured' })).toBeTruthy();
   });
 });
-describe('LeadDetail status actions', () => {
-  const lead = { id: 'L1', name: '', phone: '(415) 555-0123', issue: '', address: '1 Pier', urgency: 'normal' as const, status: 'pending' as const, createdAt: new Date().toISOString(), contactedAt: null };
-  it('uses the normalized spoken callback and shows caller ID, availability, summary and the expandable transcript', () => {
-    const { hook } = memoryLocation({ path: '/leads/L1' });
-    const onStatus = vi.fn();
-    const detailed = preferLeadCallback({ ...lead, phone: '+1-555-0101', callbackNumber: '+1-555-0188',
-      callerId: '+1-555-0101', availability: 'Afternoons', summary: 'Caller needs a pipe repaired.',
-      transcript: 'user: Please call me at the other number.' });
-    render(<TestRouter hook={hook}><Route path="/leads/:id"><DetailPage leads={[detailed]} onStatus={onStatus} savingLeadId={null} /></Route></TestRouter>);
-    expect(screen.getByTestId('button-detail-call-L1').getAttribute('href')).toBe('tel:+15550188');
-    expect(screen.getByTestId('link-info-phone').getAttribute('href')).toBe('tel:+15550188');
-    expect(screen.getByText('Caller ID')).toBeTruthy();
-    expect(screen.getByText('+1-555-0101')).toBeTruthy();
-    expect(screen.getByText('Afternoons')).toBeTruthy();
-    expect(screen.getByTestId('lead-summary').textContent).toBe(detailed.summary);
-    expect(screen.queryByTestId('lead-transcript')).toBeNull();
-    fireEvent.click(screen.getByTestId('button-toggle-transcript'));
-    expect(screen.getByTestId('lead-transcript').textContent).toBe(detailed.transcript);
-    expect(onStatus).not.toHaveBeenCalled();
+describe('LeadCard navigation', () => {
+  const lead = { id: 'L1', name: 'Ann Lee', phone: '(415) 555-0123', issue: 'Leak', address: '1 Pier', urgency: 'normal' as const, status: 'pending' as const, createdAt: new Date().toISOString(), contactedAt: null };
+  const renderCard = (onStatus = vi.fn()) => {
+    const { hook, history } = memoryLocation({ path: '/dashboard', record: true });
+    render(<TestRouter hook={hook}><LeadCard lead={lead} onStatus={onStatus} saving={false} /></TestRouter>);
+    return { history, onStatus };
+  };
+  it('opens detail when the card background is clicked', () => {
+    const { history } = renderCard();
+    fireEvent.click(screen.getByTestId('card-lead-L1'));
+    expect(history?.at(-1)).toBe('/leads/L1');
   });
-  it('never marks contacted from tel/sms, only from the explicit button', () => {
-    const onStatus = vi.fn();
-    const { hook } = memoryLocation({ path: '/leads/L1' });
-    render(<TestRouter hook={hook}><Route path="/leads/:id"><DetailPage leads={[lead]} onStatus={onStatus} savingLeadId={null} /></Route></TestRouter>);
-    fireEvent.click(screen.getByTestId('button-detail-call-L1'));
-    fireEvent.click(screen.getByTestId('button-detail-text-L1'));
-    expect(onStatus).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('button-mark-contacted-L1'));
+  it('name link is a focusable anchor to detail', () => {
+    renderCard();
+    const link = screen.getByTestId('link-lead-L1');
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe('/leads/L1');
+  });
+  it('does not navigate from call, text or status buttons', () => {
+    const { history, onStatus } = renderCard();
+    fireEvent.click(screen.getByTestId('button-call-L1'));
+    fireEvent.click(screen.getByTestId('button-text-L1'));
+    fireEvent.click(screen.getByTestId('button-toggle-status-L1'));
+    expect(history?.at(-1)).toBe('/dashboard');
     expect(onStatus).toHaveBeenCalledWith('L1', 'contacted');
   });
 });

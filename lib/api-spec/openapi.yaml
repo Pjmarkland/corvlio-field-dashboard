@@ -247,6 +247,68 @@ paths:
           description: Google Sheets rate limit reached
         "502":
           description: Google Sheets could not be read
+  /leads/{leadId}:
+    get:
+      operationId: getLeadDetail
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Read one lead belonging to the signed-in business
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Private lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetail"
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Lead could not be loaded
+  /leads/{leadId}/notes:
+    patch:
+      operationId: updateLeadNotes
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Save private owner notes on an owned lead
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadNotesInput"
+      responses:
+        "200":
+          description: Updated private lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetail"
+        "400":
+          description: Invalid notes
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Notes could not be saved
   /leads/{leadId}/status:
     patch:
       operationId: updateLeadStatus
@@ -580,6 +642,35 @@ components:
         - status
         - createdAt
         - contactedAt
+    LeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          properties:
+            callStartedAt:
+              type: [string, "null"]
+              format: date-time
+            durationMs:
+              type: [number, "null"]
+              multipleOf: 1
+              minimum: 0
+            capturedUrgency:
+              type: [string, "null"]
+            recordingUrl:
+              type: [string, "null"]
+            privateNotes:
+              type: [string, "null"]
+            contactedBy:
+              type: [string, "null"]
+          required: [callStartedAt, durationMs, capturedUrgency, recordingUrl, privateNotes, contactedBy]
+    LeadNotesInput:
+      type: object
+      additionalProperties: false
+      properties:
+        privateNotes:
+          type: string
+          maxLength: 10000
+      required: [privateNotes]
     WelcomeEntry:
       type: object
       properties:

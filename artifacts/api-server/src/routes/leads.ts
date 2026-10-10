@@ -135,6 +135,7 @@ router.patch("/leads/:leadId/status", async (req, res): Promise<void> => {
       .set({
         status: body.data.status,
         contactedAt: body.data.status === "contacted" ? new Date() : null,
+        contactedBy: body.data.status === "contacted" ? userId : null,
       })
       .where(and(
         eq(leadsTable.id, leadId),

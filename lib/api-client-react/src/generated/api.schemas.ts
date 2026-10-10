@@ -80,6 +80,29 @@ export interface Lead {
   contactedAt: string | null;
 }
 
+export type LeadDetail = Lead & ({
+  /** @nullable */
+  callStartedAt: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  durationMs: number | null;
+  /** @nullable */
+  capturedUrgency: string | null;
+  /** @nullable */
+  recordingUrl: string | null;
+  /** @nullable */
+  privateNotes: string | null;
+  /** @nullable */
+  contactedBy: string | null;
+});
+
+export interface LeadNotesInput {
+  /** @maxLength 10000 */
+  privateNotes: string;
+}
+
 export type WelcomeEntryNextPath = typeof WelcomeEntryNextPath[keyof typeof WelcomeEntryNextPath];
 
 

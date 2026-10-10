@@ -28,6 +28,8 @@ export * from './healthStatus';
 export * from './lead';
 export * from './leadAlertInbox';
 export * from './leadAlertInboxAlertsItem';
+export * from './leadDetail';
+export * from './leadNotesInput';
 export * from './leadStatus';
 export * from './leadStatusResult';
 export * from './leadStatusResultStatus';

@@ -28,6 +28,18 @@ beforeEach(() => {
   }));
 });
 describe("ended/analyzed reconciliation enriches one lead without losing richer data", () => {
+  it("saves a provider recording without overwriting owner notes or contacted actor", async () => {
+    lead.privateNotes = "Owner-only gate instructions";
+    lead.contactedBy = "owner-a";
+    await persistAnalyzedCall("test-call", {
+      businessId: 2, recordingUrl: "https://recordings.example.test/call.wav",
+      privateNotes: "Unexpected webhook note", contactedBy: "other",
+    }, { businessId: 2, retellCallId: "test-call" }, true);
+    expect(lead).toMatchObject({
+      recordingUrl: "https://recordings.example.test/call.wav",
+      privateNotes: "Owner-only gate instructions", contactedBy: "owner-a",
+    });
+  });
   it("a late ended event cannot replace an analyzed callback, issue, summary or contact status", async () => {
     await persistAnalyzedCall("test-call", { businessId: 2, callerId: "+15550000001", phoneNumber: "+15550000001",
       issueReason: "Partial call", summary: "Partial call", transcript: "user: Help" }, { businessId: 2, retellCallId: "test-call" }, false);

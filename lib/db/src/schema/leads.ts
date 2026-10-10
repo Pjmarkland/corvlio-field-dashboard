@@ -13,6 +13,8 @@ export const leadsTable = pgTable("leads", {
   callbackNumber: text("callback_number"),
   transcript: text("transcript"),
   summary: text("summary"),
+  recordingUrl: text("recording_url"),
+  privateNotes: text("private_notes"),
   issueReason: text("issue_reason"),
   address: text("address"),
   urgencyLevel: text("urgency_level"),
@@ -20,6 +22,7 @@ export const leadsTable = pgTable("leads", {
   tradeIntakeAnswers: text("trade_intake_answers"),
   status: text("status").notNull().default("new"),
   contactedAt: timestamp("contacted_at", { withTimezone: true }),
+  contactedBy: text("contacted_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("leads_retell_call_id_unique").on(table.retellCallId)]);
 

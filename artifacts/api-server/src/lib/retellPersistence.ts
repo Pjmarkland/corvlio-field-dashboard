@@ -49,7 +49,7 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
         const [current] = await tx.select().from(leadsTable).where(eq(leadsTable.id, leadId));
         if (!current) throw new Error("Lead disappeared during reconciliation");
         const updates = Object.fromEntries(Object.entries(leadInput).filter(([field, value]) =>
-          !["businessId", "id", "retellCallId", "status", "contactedAt", "createdAt"].includes(field)
+          !["businessId", "id", "retellCallId", "status", "contactedAt", "contactedBy", "privateNotes", "createdAt"].includes(field)
           && value !== null && value !== undefined && value !== ""));
         // An out-of-order call_ended must never replace a spoken callback with caller ID.
         if (!leadInput.callbackNumber && current.callbackNumber) updates.phoneNumber = current.callbackNumber;

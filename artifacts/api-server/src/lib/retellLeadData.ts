@@ -40,7 +40,16 @@ export function extractRetellLead(call: RetellCall) {
     tradeIntakeAnswers: analysisValue(data, "trade_intake_answers", "trade_questions", "intake_answers")
       ?.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 2).join("\n").slice(0, 2000) || null,
     transcript, summary,
+    recordingUrl: safeRecordingUrl(call.recording_url),
   };
+}
+
+function safeRecordingUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 8192) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
 }
 
 export function capturedInfo(call: RetellCall, analysisComplete: boolean) {

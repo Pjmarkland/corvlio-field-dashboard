@@ -192,7 +192,8 @@ describe("Retell webhook safety", () => {
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
-      ...call, call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
+      ...call, recording_url: "https://recordings.example.test/call-partial.wav",
+      call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
         "USER NAME": "Sam", ISSUE: "Leaking pipe", ADDRESS: "12 Test St", URGENCY: "today", AVAILABILITY: "afternoon",
         callback_number: "+15551230000",
       } },
@@ -200,7 +201,8 @@ describe("Retell webhook safety", () => {
     expect(mocks.persistAnalyzedCall.mock.calls[0]).toEqual([
       "call-partial", expect.objectContaining({ callerName: "Sam", issueReason: "Leaking pipe", address: "12 Test St",
         urgencyLevel: "today", availability: "afternoon", callerId: "+15559990000", callbackNumber: "+15551230000",
-        phoneNumber: "+15551230000", transcript: call.transcript, summary: "Sam has a leaking pipe." }),
+        phoneNumber: "+15551230000", transcript: call.transcript, summary: "Sam has a leaking pipe.",
+        recordingUrl: "https://recordings.example.test/call-partial.wav" }),
       expect.any(Object), true, true,
     ]);
   });

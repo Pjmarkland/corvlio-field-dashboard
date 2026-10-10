@@ -3,6 +3,13 @@ import { extractRetellLead } from "../../src/lib/retellLeadData";
 import { agentDraftPatch, llmDraftPatch } from "../../src/lib/retellDraftConfig";
 
 describe("voice lead extraction compatibility", () => {
+  it("stores an existing provider recording URL, without inventing or fetching a recording", () => {
+    expect(extractRetellLead({ recording_url: "https://recordings.example.test/call.wav" }).recordingUrl)
+      .toBe("https://recordings.example.test/call.wav");
+    for (const value of [undefined, null, "", "javascript:alert(1)", "http://recordings.example.test/call.wav", "https://user:pass@example.test/audio"]) {
+      expect(extractRetellLead({ recording_url: value }).recordingUrl).toBeNull();
+    }
+  });
   it.each([
     { "User name": "Sam", Issue: "Leaking pipe", Address: "12 Test St", Urgency: "today", Availability: "afternoon", User_phone: "+15551230000" },
     { caller_name: "Sam", issue_reason: "Leaking pipe", address: "12 Test St", urgency_level: "today", availability: "afternoon", callback_number: "+15551230000" },

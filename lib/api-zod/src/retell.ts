@@ -10,6 +10,7 @@ export const RetellCallSchema = z
   .object({
     call_id: z.string().optional(),
     transcript: z.string().optional(),
+    recording_url: z.string().nullish(),
     transcript_object: z.array(z.object({
       role: z.string(),
       content: z.string(),
