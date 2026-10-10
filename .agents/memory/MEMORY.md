@@ -17,3 +17,4 @@
 - [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.
 - [Private lead notes](private-lead-notes.md) — owner-written notes are internal business data, not caller intake or provider context.
 - [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
+- [Billing policy boundary](billing-policy-boundary.md) — approved flag-only billing overrides differ from the agreement; development/test only, no live rollout.

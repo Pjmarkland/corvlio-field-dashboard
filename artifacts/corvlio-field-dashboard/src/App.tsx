@@ -49,6 +49,9 @@ import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
 import AdminOverviewPage from '@/pages/admin/AdminOverviewPage';
 import AdminActivityPage from '@/pages/admin/AdminActivityPage';
+import BillingPage from '@/pages/billing';
+import AdminBillingPage from '@/pages/admin/AdminBillingPage';
+import { useBillingAvailability } from '@/hooks/useBilling';
 import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
 import {
   ArrowLeft,
@@ -590,6 +593,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
 }
 
 function SettingsPage({ businessName, retellPhoneNumber }: { businessName: string; retellPhoneNumber: string | null }) {
+  const { enabled: billingOn } = useBillingAvailability();
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
@@ -600,6 +604,7 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
     <section className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="mb-4 flex items-center gap-2 font-bold"><ShieldCheck size={17} /> Account controls</h2>
       <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
+      {billingOn ? <Link href="/billing" data-testid="link-settings-billing" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Billing</span><ChevronRight size={16} /></Link> : null}
       <Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link>
       <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button>
     </section>
@@ -800,6 +805,14 @@ function AdminActivityRoute() {
   return <AdminGuard><AdminActivityPage /></AdminGuard>;
 }
 
+function AdminBillingRoute() {
+  return <AdminGuard><AdminBillingPage /></AdminGuard>;
+}
+
+function BillingRoute() {
+  return <><Show when="signed-in"><BillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
+}
+
 function AdminBusinessRoute() {
   return <AdminGuard><AdminBusinessPage /></AdminGuard>;
 }
@@ -833,7 +846,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {

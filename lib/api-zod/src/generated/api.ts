@@ -885,3 +885,251 @@ export const GetAdminActivityResponse = zod.object({
 })
 
 
+export const GetBillingAvailabilityResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+export const GetOwnerBillingResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "account": zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+}),
+  "usage": zod.object({
+  "count": zod.number(),
+  "limit": zod.number().nullable(),
+  "start": zod.string(),
+  "end": zod.string()
+}),
+  "plans": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "callLimit": zod.number().nullable()
+})),
+  "policy": zod.object({
+  "cancellationNoticeDays": zod.number(),
+  "failedPaymentGraceBusinessDays": zod.number(),
+  "startupEligibilityBusinessAgeMonths": zod.number(),
+  "startupTransitionMonths": zod.number()
+}),
+  "timeline": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "actor": zod.string().nullable(),
+  "detail": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+
+
+export const CreateBillingCheckoutBody = zod.object({
+  "plan": zod.enum(['startup', 'starter', 'professional', 'managed'])
+})
+
+export const CreateBillingCheckoutResponse = zod.object({
+  "url": zod.string()
+})
+
+
+export const CreateBillingPortalResponse = zod.object({
+  "url": zod.string()
+})
+
+
+export const UpgradeBillingPlanBody = zod.object({
+  "plan": zod.enum(['startup', 'starter', 'professional', 'managed'])
+})
+
+export const UpgradeBillingPlanResponse = zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+})
+
+
+export const CancelBillingResponse = zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+})
+
+
+export const ResumeBillingResponse = zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+})
+
+
+export const GetAdminBillingResponseItem = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "account": zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+}),
+  "usage": zod.object({
+  "count": zod.number(),
+  "limit": zod.number().nullable(),
+  "start": zod.string(),
+  "end": zod.string()
+}),
+  "plans": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "callLimit": zod.number().nullable()
+})),
+  "policy": zod.object({
+  "cancellationNoticeDays": zod.number(),
+  "failedPaymentGraceBusinessDays": zod.number(),
+  "startupEligibilityBusinessAgeMonths": zod.number(),
+  "startupTransitionMonths": zod.number()
+}),
+  "timeline": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "actor": zod.string().nullable(),
+  "detail": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+export const GetAdminBillingResponse = zod.array(GetAdminBillingResponseItem)
+
+
+export const SetStartupEligibilityParams = zod.object({
+  "businessId": zod.coerce.number().int()
+})
+
+export const SetStartupEligibilityBody = zod.object({
+  "eligible": zod.boolean()
+})
+
+export const SetStartupEligibilityResponse = zod.object({
+  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "status": zod.string(),
+  "customerId": zod.string().nullable(),
+  "subscriptionId": zod.string().nullable(),
+  "periodStart": zod.string().nullable(),
+  "periodEnd": zod.string().nullable(),
+  "paidPeriodEnd": zod.string().nullable(),
+  "pastDueSince": zod.string().nullable(),
+  "graceEndsAt": zod.string().nullable(),
+  "needsAdminReview": zod.boolean(),
+  "cancelAt": zod.string().nullable(),
+  "cancelRequestedAt": zod.string().nullable(),
+  "cancelRequestedBy": zod.string().nullable(),
+  "startupEligible": zod.boolean(),
+  "startupTransitionAt": zod.string().nullable(),
+  "setupPaid": zod.boolean(),
+  "usageFlags": zod.array(zod.number()),
+  "lastEvent": zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "created": zod.number()
+}).nullable()
+})
+
+

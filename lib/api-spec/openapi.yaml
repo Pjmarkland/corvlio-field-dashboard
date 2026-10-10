@@ -531,6 +531,56 @@ paths:
                 $ref: "#/components/schemas/AdminActivity"
         "404":
           description: Not found or administrator access is unavailable
+  /billing/availability:
+    get:
+      operationId: getBillingAvailability
+      responses:
+        "200": {description: Billing capability, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAvailability"}}}}
+  /billing:
+    get:
+      operationId: getOwnerBilling
+      responses:
+        "200": {description: Owner billing, content: {application/json: {schema: {$ref: "#/components/schemas/BillingSnapshot"}}}}
+  /billing/checkout:
+    post:
+      operationId: createBillingCheckout
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/BillingPlanInput"}}}}
+      responses:
+        "200": {description: Hosted Checkout, content: {application/json: {schema: {$ref: "#/components/schemas/BillingRedirect"}}}}
+  /billing/portal:
+    post:
+      operationId: createBillingPortal
+      responses:
+        "200": {description: Hosted Portal, content: {application/json: {schema: {$ref: "#/components/schemas/BillingRedirect"}}}}
+  /billing/upgrade:
+    post:
+      operationId: upgradeBillingPlan
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/BillingPlanInput"}}}}
+      responses:
+        "200": {description: Owner upgrade, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /billing/cancel:
+    post:
+      operationId: cancelBilling
+      responses:
+        "200": {description: Written cancellation, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /billing/resume:
+    post:
+      operationId: resumeBilling
+      responses:
+        "200": {description: Resume before effective date, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /admin/billing:
+    get:
+      operationId: getAdminBilling
+      responses:
+        "200": {description: Admin billing, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/BillingSnapshot"}}}}}
+  /admin/billing/{businessId}/startup:
+    patch:
+      operationId: setStartupEligibility
+      parameters:
+        - {in: path, name: businessId, required: true, schema: {type: integer}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/StartupEligibilityInput"}}}}
+      responses:
+        "200": {description: Admin eligibility, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
 components:
   securitySchemes:
     clerkSession:
@@ -542,6 +592,101 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    BillingAvailability:
+      type: object
+      properties:
+        enabled: {type: boolean}
+      required: [enabled]
+    BillingPlanInput:
+      type: object
+      additionalProperties: false
+      properties:
+        plan: {type: string, enum: [startup, starter, professional, managed]}
+      required: [plan]
+    StartupEligibilityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        eligible: {type: boolean}
+      required: [eligible]
+    BillingRedirect:
+      type: object
+      properties:
+        url: {type: string}
+      required: [url]
+    BillingAccount:
+      type: object
+      properties:
+        plan: {type: [string, "null"], enum: [startup, starter, professional, managed, null]}
+        status: {type: string}
+        customerId: {type: [string, "null"]}
+        subscriptionId: {type: [string, "null"]}
+        periodStart: {type: [string, "null"]}
+        periodEnd: {type: [string, "null"]}
+        paidPeriodEnd: {type: [string, "null"]}
+        pastDueSince: {type: [string, "null"]}
+        graceEndsAt: {type: [string, "null"]}
+        needsAdminReview: {type: boolean}
+        cancelAt: {type: [string, "null"]}
+        cancelRequestedAt: {type: [string, "null"]}
+        cancelRequestedBy: {type: [string, "null"]}
+        startupEligible: {type: boolean}
+        startupTransitionAt: {type: [string, "null"]}
+        setupPaid: {type: boolean}
+        usageFlags: {type: array, items: {type: number}}
+        lastEvent:
+          type: [object, "null"]
+          properties:
+            id: {type: string}
+            type: {type: string}
+            created: {type: number}
+          required: [id, type, created]
+      required: [plan, status, customerId, subscriptionId, periodStart, periodEnd, paidPeriodEnd, pastDueSince, graceEndsAt, needsAdminReview, cancelAt, cancelRequestedAt, cancelRequestedBy, startupEligible, startupTransitionAt, setupPaid, usageFlags, lastEvent]
+    BillingSnapshot:
+      type: object
+      properties:
+        businessId: {type: number}
+        businessName: {type: string}
+        account: {$ref: "#/components/schemas/BillingAccount"}
+        usage:
+          type: object
+          properties:
+            count: {type: number}
+            limit: {type: [number, "null"]}
+            start: {type: string}
+            end: {type: string}
+          required: [count, limit, start, end]
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              label: {type: string}
+              monthlyCents: {type: number}
+              setupCents: {type: number}
+              callLimit: {type: [number, "null"]}
+            required: [id, label, monthlyCents, setupCents, callLimit]
+        policy:
+          type: object
+          properties:
+            cancellationNoticeDays: {type: number}
+            failedPaymentGraceBusinessDays: {type: number}
+            startupEligibilityBusinessAgeMonths: {type: number}
+            startupTransitionMonths: {type: number}
+          required: [cancellationNoticeDays, failedPaymentGraceBusinessDays, startupEligibilityBusinessAgeMonths, startupTransitionMonths]
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              type: {type: string}
+              actor: {type: [string, "null"]}
+              detail: {type: string}
+              createdAt: {type: string}
+            required: [id, type, actor, detail, createdAt]
+      required: [businessId, businessName, account, usage, plans, policy, timeline]
     HealthStatus:
       type: object
       properties:

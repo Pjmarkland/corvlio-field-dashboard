@@ -9,10 +9,12 @@ import leadDetailsRouter from "./leadDetails";
 import welcomeRouter from "./welcome";
 import ownerDemoRouter from "./ownerDemo";
 import leadAlertsRouter from "./leadAlerts";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(billingRouter);
 router.use(adminRouter);
 router.use(businessesRouter);
 router.use(leadsRouter);

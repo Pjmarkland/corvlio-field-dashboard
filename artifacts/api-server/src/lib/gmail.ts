@@ -78,6 +78,25 @@ function normalizedRecipient(ownerEmail: string | null | undefined): string | nu
   return recipient;
 }
 
+/** Reuses the existing OAuth email path; plain text only, no card information. */
+export async function sendBillingNotificationEmail(recipientInput: string | null, title: string, body: string): Promise<boolean> {
+  const recipient = normalizedRecipient(recipientInput);
+  if (!recipient) return false;
+  const accessToken = await getAccessToken();
+  if (!accessToken) return false;
+  const raw = [
+    `To: ${recipient}`, "Subject: Corvlio billing notice", "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8", "", title, "", body,
+  ].join("\r\n");
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    signal: AbortSignal.timeout(15_000), method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ raw: encodeBase64Url(raw) }),
+  });
+  if (!response.ok) throw new Error(`Billing email delivery failed (${response.status})`);
+  return true;
+}
+
 export async function sendLeadNotificationEmail(input: {
   ownerEmail: string | null | undefined;
   callerName: string | null;

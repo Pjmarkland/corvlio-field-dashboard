@@ -1,4 +1,5 @@
 import app from "./app";
+import { startBillingWorker, stopBillingWorker } from "./billing/worker";
 import { closeApnsSession } from "./lib/apnsAdapter";
 import { refreshBusinessPhoneCache } from "./lib/businessDirectory";
 import { logger } from "./lib/logger";
@@ -34,6 +35,7 @@ const server = app.listen(port, (err) => {
       );
     });
   startLeadNotificationPoller();
+  startBillingWorker();
 });
 
 async function shutdown(signal: string) {
@@ -41,6 +43,7 @@ async function shutdown(signal: string) {
   // Stop scheduling new poll cycles and wait for any in-flight cycle to finish
   // before closing the HTTP server so DB connections are not torn mid-transaction.
   await stopLeadNotificationPoller();
+  await stopBillingWorker();
   closeApnsSession();
   server.close((error) => {
     if (error) {

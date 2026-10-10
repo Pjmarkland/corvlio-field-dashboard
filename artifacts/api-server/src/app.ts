@@ -6,6 +6,7 @@ import { publishableKeyFromHost } from "@clerk/shared/keys";
 import type { IncomingMessage } from "node:http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { billingWebhook } from "./billing/webhook";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -13,6 +14,8 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
+// Stripe must receive its unmodified Buffer before the global JSON parser.
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingWebhook);
 
 app.use(
   pinoHttp({

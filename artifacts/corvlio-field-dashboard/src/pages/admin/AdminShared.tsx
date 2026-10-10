@@ -3,6 +3,9 @@ import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, L
 import { Link, useLocation } from 'wouter';
 
 import type { AdminBusinessSummary } from '@workspace/api-client-react';
+import { useBillingAvailability } from '@/hooks/useBilling';
+
+const BILLING_NAV = { href: '/admin/billing', label: 'Billing', icon: BarChart3 };
 
 export const ADMIN_NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -61,6 +64,8 @@ export function isNotFoundError(error: unknown) {
 
 export function AdminShell({ children, title, eyebrow, action }: { children: ReactNode; title: string; eyebrow: string; action?: ReactNode }) {
   const [location] = useLocation();
+  const { enabled: billingOn } = useBillingAvailability();
+  const navItems = billingOn ? [...ADMIN_NAV, BILLING_NAV] : ADMIN_NAV;
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -77,7 +82,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
         </Link>
         <div className="admin-label mb-3 px-2">Workspace</div>
         <nav className="space-y-1" aria-label="Founder console navigation">
-          {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
+          {navItems.map(({ href, label, icon: Icon }) => {
             const active = href === '/admin' ? location === href : location.startsWith(href);
             return (
               <Link key={href} href={href} data-testid={`link-admin-nav-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`admin-link flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c] hover:bg-[#e3eae2] hover:text-[#244d3f]'}`}>
@@ -103,7 +108,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
             {action}
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-[#dfe4dc]/80 px-5 py-2 lg:hidden sm:px-8" aria-label="Mobile founder console navigation">
-            {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
+            {navItems.map(({ href, label, icon: Icon }) => {
               const active = href === '/admin' ? location === href : location.startsWith(href);
               return <Link key={href} href={href} data-testid={`link-admin-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c]'}`}><Icon size={13} className="mr-1.5 inline-block" />{label}</Link>;
             })}

@@ -5,6 +5,131 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface BillingAvailability {
+  enabled: boolean;
+}
+
+export type BillingPlanInputPlan = typeof BillingPlanInputPlan[keyof typeof BillingPlanInputPlan];
+
+
+export const BillingPlanInputPlan = {
+  startup: 'startup',
+  starter: 'starter',
+  professional: 'professional',
+  managed: 'managed',
+} as const;
+
+export interface BillingPlanInput {
+  plan: BillingPlanInputPlan;
+}
+
+export interface StartupEligibilityInput {
+  eligible: boolean;
+}
+
+export interface BillingRedirect {
+  url: string;
+}
+
+/**
+ * @nullable
+ */
+export type BillingAccountPlan = typeof BillingAccountPlan[keyof typeof BillingAccountPlan] | null;
+
+
+export const BillingAccountPlan = {
+  startup: 'startup',
+  starter: 'starter',
+  professional: 'professional',
+  managed: 'managed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BillingAccountLastEvent = {
+  id: string;
+  type: string;
+  created: number;
+} | null;
+
+export interface BillingAccount {
+  /** @nullable */
+  plan: BillingAccountPlan;
+  status: string;
+  /** @nullable */
+  customerId: string | null;
+  /** @nullable */
+  subscriptionId: string | null;
+  /** @nullable */
+  periodStart: string | null;
+  /** @nullable */
+  periodEnd: string | null;
+  /** @nullable */
+  paidPeriodEnd: string | null;
+  /** @nullable */
+  pastDueSince: string | null;
+  /** @nullable */
+  graceEndsAt: string | null;
+  needsAdminReview: boolean;
+  /** @nullable */
+  cancelAt: string | null;
+  /** @nullable */
+  cancelRequestedAt: string | null;
+  /** @nullable */
+  cancelRequestedBy: string | null;
+  startupEligible: boolean;
+  /** @nullable */
+  startupTransitionAt: string | null;
+  setupPaid: boolean;
+  usageFlags: number[];
+  /** @nullable */
+  lastEvent: BillingAccountLastEvent;
+}
+
+export type BillingSnapshotUsage = {
+  count: number;
+  /** @nullable */
+  limit: number | null;
+  start: string;
+  end: string;
+};
+
+export type BillingSnapshotPlansItem = {
+  id: string;
+  label: string;
+  monthlyCents: number;
+  setupCents: number;
+  /** @nullable */
+  callLimit: number | null;
+};
+
+export type BillingSnapshotPolicy = {
+  cancellationNoticeDays: number;
+  failedPaymentGraceBusinessDays: number;
+  startupEligibilityBusinessAgeMonths: number;
+  startupTransitionMonths: number;
+};
+
+export type BillingSnapshotTimelineItem = {
+  id: string;
+  type: string;
+  /** @nullable */
+  actor: string | null;
+  detail: string;
+  createdAt: string;
+};
+
+export interface BillingSnapshot {
+  businessId: number;
+  businessName: string;
+  account: BillingAccount;
+  usage: BillingSnapshotUsage;
+  plans: BillingSnapshotPlansItem[];
+  policy: BillingSnapshotPolicy;
+  timeline: BillingSnapshotTimelineItem[];
+}
+
 export interface HealthStatus {
   status: string;
 }
