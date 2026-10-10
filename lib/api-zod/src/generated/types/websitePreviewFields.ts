@@ -19,4 +19,5 @@ export interface WebsitePreviewFields {
   pricingPolicy: WebsitePreviewField;
   maintenancePlanOfferings: WebsitePreviewField;
   credentials: WebsitePreviewField;
+  otherPolicies?: WebsitePreviewField;
 }

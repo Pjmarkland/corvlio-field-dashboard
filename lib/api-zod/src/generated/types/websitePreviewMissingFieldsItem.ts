@@ -21,4 +21,5 @@ export const WebsitePreviewMissingFieldsItem = {
   pricingPolicy: 'pricingPolicy',
   maintenancePlanOfferings: 'maintenancePlanOfferings',
   credentials: 'credentials',
+  otherPolicies: 'otherPolicies',
 } as const;

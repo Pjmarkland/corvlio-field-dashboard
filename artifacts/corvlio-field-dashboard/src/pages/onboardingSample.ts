@@ -11,6 +11,7 @@ export type OnboardingForm = {
   receptionistTone: string;
   servicesOffered: string;
   servicesNotOffered: string;
+  otherPolicies: string;
   majorIssueExamples: string;
   pricingPolicy: string;
   financingPolicy: string;
@@ -39,6 +40,7 @@ export const initialForm: OnboardingForm = {
   receptionistTone: 'Friendly and professional',
   servicesOffered: '',
   servicesNotOffered: '',
+  otherPolicies: '',
   majorIssueExamples: '',
   pricingPolicy: '',
   financingPolicy: '',

@@ -215,6 +215,10 @@ export const previewBusinessWebsiteResponseFieldsCredentialsValueMax = 600;
 
 export const previewBusinessWebsiteResponseFieldsCredentialsEvidenceMax = 400;
 
+export const previewBusinessWebsiteResponseFieldsOtherPoliciesValueMax = 600;
+
+export const previewBusinessWebsiteResponseFieldsOtherPoliciesEvidenceMax = 400;
+
 
 
 export const PreviewBusinessWebsiteResponse = zod.object({
@@ -275,9 +279,14 @@ export const PreviewBusinessWebsiteResponse = zod.object({
   "value": zod.string().max(previewBusinessWebsiteResponseFieldsCredentialsValueMax).nullable(),
   "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsCredentialsEvidenceMax).nullable(),
   "sourceUrl": zod.string().nullable()
-})
 }),
-  "missingFields": zod.array(zod.enum(['servicesOffered', 'servicesNotOffered', 'serviceArea', 'businessHours', 'brandsWorkedWith', 'warrantyInfo', 'emergencyContactInfo', 'financingPolicy', 'pricingPolicy', 'maintenancePlanOfferings', 'credentials']))
+  "otherPolicies": zod.object({
+  "value": zod.string().max(previewBusinessWebsiteResponseFieldsOtherPoliciesValueMax).nullable(),
+  "evidence": zod.string().max(previewBusinessWebsiteResponseFieldsOtherPoliciesEvidenceMax).nullable(),
+  "sourceUrl": zod.string().nullable()
+}).optional()
+}),
+  "missingFields": zod.array(zod.enum(['servicesOffered', 'servicesNotOffered', 'serviceArea', 'businessHours', 'brandsWorkedWith', 'warrantyInfo', 'emergencyContactInfo', 'financingPolicy', 'pricingPolicy', 'maintenancePlanOfferings', 'credentials', 'otherPolicies']))
 })
 
 

@@ -13,6 +13,7 @@ export const websiteFormFields = {
   pricingPolicy: 'pricingPolicy',
   maintenancePlanOfferings: 'maintenancePlans',
   credentials: 'credentials',
+  otherPolicies: 'otherPolicies',
 } as const satisfies Record<keyof WebsitePreviewFields, keyof OnboardingForm>;
 
 export const websiteFieldLabels: Record<keyof WebsitePreviewFields, string> = {
@@ -21,14 +22,14 @@ export const websiteFieldLabels: Record<keyof WebsitePreviewFields, string> = {
   brandsWorkedWith: 'Brands', warrantyInfo: 'Warranty',
   emergencyContactInfo: 'Emergency / after-hours policy', financingPolicy: 'Financing',
   pricingPolicy: 'Pricing / estimates', maintenancePlanOfferings: 'Maintenance plans',
-  credentials: 'Credentials',
+  credentials: 'Credentials', otherPolicies: 'Other policies (notes)',
 };
 
 export function applyWebsiteSuggestions(current: OnboardingForm, preview: WebsitePreview): OnboardingForm {
   const next = { ...current };
   for (const key of Object.keys(websiteFormFields) as (keyof WebsitePreviewFields)[]) {
     const formKey = websiteFormFields[key];
-    const suggestion = preview.fields[key].value;
+    const suggestion = preview.fields[key]?.value;
     // The owner's existing answers always win. Unsupported fields stay blank.
     if (!current[formKey].trim() && suggestion) next[formKey] = suggestion;
   }
@@ -41,7 +42,7 @@ export function removeUneditedWebsiteSuggestions(
   const next = { ...current };
   for (const key of Object.keys(websiteFormFields) as (keyof WebsitePreviewFields)[]) {
     const formKey = websiteFormFields[key];
-    if (!before[formKey].trim() && current[formKey] === preview.fields[key].value) {
+    if (!before[formKey].trim() && current[formKey] === preview.fields[key]?.value) {
       next[formKey] = before[formKey];
     }
   }

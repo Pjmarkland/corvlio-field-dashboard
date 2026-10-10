@@ -345,6 +345,7 @@ export interface WebsitePreviewFields {
   pricingPolicy: WebsitePreviewField;
   maintenancePlanOfferings: WebsitePreviewField;
   credentials: WebsitePreviewField;
+  otherPolicies?: WebsitePreviewField;
 }
 
 export type WebsitePreviewStatus = typeof WebsitePreviewStatus[keyof typeof WebsitePreviewStatus];
@@ -371,6 +372,7 @@ export const WebsitePreviewMissingFieldsItem = {
   pricingPolicy: 'pricingPolicy',
   maintenancePlanOfferings: 'maintenancePlanOfferings',
   credentials: 'credentials',
+  otherPolicies: 'otherPolicies',
 } as const;
 
 export interface WebsitePreview {

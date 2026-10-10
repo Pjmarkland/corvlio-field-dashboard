@@ -29,6 +29,14 @@ describe('website suggestions and readiness', () => {
     expect(restored.servicesOffered).toBe('');
     expect(restored.serviceArea).toBe('Owner corrected this area');
   });
+  it('maps other policies as notes, never into services not offered', () => {
+    const p = preview();
+    p.fields.otherPolicies = { value: 'Cash discount available', evidence: 'Cash discount.', sourceUrl: null };
+    const form = applyWebsiteSuggestions(initialForm, p);
+    expect(form.otherPolicies).toBe('Cash discount available');
+    expect(form.servicesNotOffered).toBe('');
+    expect(websiteFormFields.otherPolicies).toBe('otherPolicies');
+  });
   it('identifies blank and thin answers, and updates after edits', () => {
     const gaps = getReadinessGaps({ ...initialForm, pricingPolicy: 'Call us', brandsWorkedWith: 'Carrier, Trane' });
     expect(gaps).toContainEqual({ key: 'servicesOffered', label: 'Services offered', state: 'blank' });

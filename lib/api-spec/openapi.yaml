@@ -923,6 +923,8 @@ components:
           $ref: "#/components/schemas/WebsitePreviewField"
         credentials:
           $ref: "#/components/schemas/WebsitePreviewField"
+        otherPolicies:
+          $ref: "#/components/schemas/WebsitePreviewField"
       required: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
     WebsitePreview:
       type: object
@@ -939,7 +941,7 @@ components:
           type: array
           items:
             type: string
-            enum: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
+            enum: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials, otherPolicies]
       required: [status, message, fields, missingFields]
     NotificationPlatform:
       type: string

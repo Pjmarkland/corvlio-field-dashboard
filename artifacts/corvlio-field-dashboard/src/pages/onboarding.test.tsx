@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { BusinessTypeField, PresetChoiceField, SampleBusinessHelper } from './onboarding';
+import { ServicesNotOfferedWarning, ServicesOfferedPrompt } from '@/components/WebsiteOnboardingPreview';
 import { applySampleBusiness, initialForm } from './onboardingSample';
 
 const toneChoices = [
@@ -165,5 +166,18 @@ describe('BusinessTypeField', () => {
     fireEvent.change(screen.getByTestId('select-business-type'), { target: { value: 'Other' } });
     expect((screen.getByTestId('select-business-type') as HTMLSelectElement).value).toBe('Other');
     expect((screen.getByTestId('input-business-type-other') as HTMLInputElement).value).toBe('HVAC');
+  });
+});
+describe('services prompts', () => {
+  it('shows the refusal warning', () => {
+    render(<ServicesNotOfferedWarning />);
+    expect(screen.getByText('Your receptionist will politely decline these requests. Remove anything that is not a service you refuse.')).toBeTruthy();
+  });
+  it('shows the services prompt and explicit deferral', () => {
+    const change = vi.fn();
+    render(<ServicesOfferedPrompt deferred={false} onDeferredChange={change} />);
+    expect(screen.getByText('Tell us what you do in one or two sentences. Your receptionist uses this to answer callers.')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('I’ll add this later'));
+    expect(change).toHaveBeenCalledWith(true);
   });
 });

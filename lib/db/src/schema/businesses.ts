@@ -25,6 +25,8 @@ export const businessesTable = pgTable("businesses", {
   majorIssueExamples: text("major_issue_examples"),
   personalityToneDescription: text("personality_tone_description"),
   servicesNotOffered: text("services_not_offered"),
+  // Owner-reviewed notes only; deliberately excluded from Retell intake variables.
+  otherPolicies: text("other_policies"),
   pricingPolicy: text("pricing_policy"),
   financingPolicy: text("financing_policy"),
   brandsWorkedWith: text("brands_worked_with"),

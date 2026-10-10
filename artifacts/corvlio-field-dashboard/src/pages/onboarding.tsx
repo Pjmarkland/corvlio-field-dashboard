@@ -7,7 +7,7 @@ import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
-import { WebsiteOnboardingPreview } from '@/components/WebsiteOnboardingPreview';
+import { ServicesOfferedPrompt, ServicesNotOfferedWarning, WebsiteOnboardingPreview } from '@/components/WebsiteOnboardingPreview';
 import { validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
 import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -350,10 +350,13 @@ function OnboardingPage() {
   const [websitePreview, setWebsitePreview] = useState<WebsitePreview | null>(null);
   const [websiteReviewed, setWebsiteReviewed] = useState(false);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [servicesDeferred, setServicesDeferred] = useState(false);
+  const [previewAttempted, setPreviewAttempted] = useState(false);
   const websiteRequest = useRef(0);
   const beforeWebsiteSuggestions = useRef<OnboardingForm | null>(null);
   const readinessGaps = getReadinessGaps(form);
-  const needsWebsiteReview = websitePreview !== null && websitePreview.status !== 'unavailable';
+  const needsWebsiteReview = websitePreview !== null && websitePreview.status !== 'unavailable'
+    && Object.values(websitePreview.fields).some((field) => field?.value);
   const [submission, setSubmission] = useState<
     { kind: 'success' | 'error'; message: string } | null
   >(null);
@@ -368,6 +371,8 @@ function OnboardingPage() {
       setWebsitePreview(null);
       setWebsiteReviewed(false);
       setWebsiteError(null);
+      setServicesDeferred(false);
+      setPreviewAttempted(false);
     } else {
       setForm((current) => ({ ...current, [key]: value }));
     }
@@ -377,6 +382,8 @@ function OnboardingPage() {
     setWebsitePreview(null);
     setWebsiteReviewed(false);
     setWebsiteError(null);
+    setServicesDeferred(false);
+    setPreviewAttempted(false);
   };
   const handleWebsitePreview = async () => {
     if (form.isSample || !form.businessWebsiteUrl.trim() || websiteMutation.isPending) return;
@@ -384,6 +391,7 @@ function OnboardingPage() {
     const websiteUrl = normalizeWebsiteInput(form.businessWebsiteUrl);
     setWebsiteError(null);
     setWebsiteReviewed(false);
+    setServicesDeferred(false);
     try {
       const preview = await websiteMutation.mutateAsync({ data: { websiteUrl } });
       if (requestId !== websiteRequest.current) return;
@@ -394,8 +402,10 @@ function OnboardingPage() {
         return { ...applyWebsiteSuggestions(baseline, preview), businessWebsiteUrl: websiteUrl };
       });
       setWebsitePreview(preview);
+      setPreviewAttempted(true);
     } catch {
       if (requestId !== websiteRequest.current) return;
+      setPreviewAttempted(true);
       setWebsiteError('We could not read that website. Use a public HTTP or HTTPS URL, or continue by completing the fields manually. Your answers have not changed.');
     }
   };
@@ -404,6 +414,10 @@ function OnboardingPage() {
     if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting || websiteMutation.isPending) return;
     if (needsWebsiteReview && !websiteReviewed) {
       setSubmission({ kind: 'error', message: 'Review the website suggestions and missing fields, then check the website review box before saving.' });
+      return;
+    }
+    if (previewAttempted && !form.servicesOffered.trim() && !servicesDeferred) {
+      setSubmission({ kind: 'error', message: 'Describe what you do, or check I’ll add this later, before finishing.' });
       return;
     }
     if (!form.receptionistTone.trim()) {
@@ -433,6 +447,9 @@ function OnboardingPage() {
           servicesOffered: form.servicesOffered,
           businessWebsiteUrl: normalizeWebsiteInput(form.businessWebsiteUrl),
           websiteScrapePreviewed: needsWebsiteReview,
+          websitePreviewAttempted: previewAttempted,
+          servicesOfferedDeferred: previewAttempted && !form.servicesOffered.trim() && servicesDeferred,
+          otherPolicies: form.otherPolicies,
           websiteSuggestionsReviewed: websiteReviewed,
           ownerEmail: form.ownerEmail,
           serviceArea: form.serviceArea,
@@ -611,8 +628,11 @@ function OnboardingPage() {
               <SectionHeading icon={Wrench} eyebrow="02 · The work" title="Set the boundaries before calls begin." description="Clear limits help the receptionist qualify the right jobs without making promises your team cannot keep." tone="warm" />
               <div className="space-y-5">
                 <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." />
+                {previewAttempted && !form.servicesOffered.trim() ? <ServicesOfferedPrompt deferred={servicesDeferred} onDeferredChange={setServicesDeferred} /> : null}
                 <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." />
                 <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
+                {form.servicesNotOffered.trim() ? <ServicesNotOfferedWarning /> : null}
+                <Field id="otherPolicies" label="Other policies (notes)" value={form.otherPolicies} onChange={(value) => updateField('otherPolicies', value)} placeholder="Optional notes about policies not covered above." multiline rows={3} hint="Notes only. These are not treated as services you refuse." />
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field id="pricingPolicy" label="Pricing policy" value={form.pricingPolicy} onChange={(value) => updateField('pricingPolicy', value)} placeholder="Diagnostic visits start at $129; quote after inspection." multiline rows={4} />
                   <Field id="financingPolicy" label="Financing policy" value={form.financingPolicy} onChange={(value) => updateField('financingPolicy', value)} placeholder="Financing is available for jobs over $1,000 through our office." multiline rows={4} />

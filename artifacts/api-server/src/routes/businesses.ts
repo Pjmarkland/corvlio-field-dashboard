@@ -283,7 +283,7 @@ router.post("/businesses/onboarding/website-preview", async (req, res): Promise<
     const url = normalizeWebsiteUrl(body.data.websiteUrl);
     const existingBusiness = await findBusinessByClerkUserId(userId);
     if (existingBusiness?.isSample) {
-      res.status(200).json(PreviewBusinessWebsiteResponse.parse(unavailableWebsitePreview()));
+      res.status(200).json(PreviewBusinessWebsiteResponse.parse(unavailableWebsitePreview("unavailable")));
       return;
     }
     res.status(200).json(PreviewBusinessWebsiteResponse.parse(await previewBusinessWebsite(url.toString())));
@@ -312,6 +312,7 @@ const OnboardBusinessBody = z.object({
   serviceArea: z.string().optional(),
   personalityToneDescription: z.string().optional(),
   servicesNotOffered: z.string().optional(),
+  otherPolicies: z.string().trim().max(4000).optional(),
   majorIssueExamples: z.string().optional(),
   pricingPolicy: z.string().optional(),
   financingPolicy: z.string().optional(),
@@ -324,6 +325,8 @@ const OnboardBusinessBody = z.object({
   emergencyContactInfo: z.string().optional(),
   websiteScrapePreviewed: z.boolean().optional(),
   websiteSuggestionsReviewed: z.boolean().optional(),
+  websitePreviewAttempted: z.boolean().optional(),
+  servicesOfferedDeferred: z.boolean().optional(),
 });
 
 router.post("/businesses/onboard", async (req, res): Promise<void> => {
@@ -349,6 +352,11 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Review the website suggestions and missing fields before saving." });
     return;
   }
+  if (body.data.websitePreviewAttempted && !body.data.servicesOffered?.trim()
+    && body.data.servicesOfferedDeferred !== true) {
+    res.status(400).json({ error: "Tell us what you do, or choose I'll add this later before saving." });
+    return;
+  }
   if (body.data.businessWebsiteUrl && !isHttpUrl(body.data.businessWebsiteUrl)) {
     res.status(400).json({ error: "Website must be a valid HTTP or HTTPS URL" });
     return;
@@ -370,6 +378,7 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     serviceArea: body.data.serviceArea,
     personalityToneDescription: body.data.personalityToneDescription,
     servicesNotOffered: body.data.servicesNotOffered,
+    otherPolicies: body.data.otherPolicies,
     majorIssueExamples: body.data.majorIssueExamples,
     pricingPolicy: body.data.pricingPolicy,
     financingPolicy: body.data.financingPolicy,

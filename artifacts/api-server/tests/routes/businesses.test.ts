@@ -440,6 +440,20 @@ describe("business onboarding website enrichment", () => {
       servicesOffered: body.servicesOffered, businessHours: "", timeZone: "",
     });
   });
+  it("requires services or explicit deferral after preview, including an empty failed preview", async () => {
+    const body = { ...validBody, websitePreviewAttempted: true, servicesOffered: "" };
+    expect((await onboard(body)).status).toBe(400);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+    expect((await onboard({ ...body, servicesOfferedDeferred: true })).status).toBe(200);
+  });
+  it("saves reviewed otherPolicies separately from refused work", async () => {
+    const otherPolicies = "We do not process payment through the insurance provider.";
+    expect((await onboard({ ...validBody, otherPolicies, servicesNotOffered: "",
+      servicesOffered: "Roof repair", websitePreviewAttempted: true,
+      websiteScrapePreviewed: true, websiteSuggestionsReviewed: true })).status).toBe(200);
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({ otherPolicies, servicesNotOffered: "" });
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+  });
 });
 
 describe("website preview endpoint", () => {
@@ -475,7 +489,7 @@ describe("website preview endpoint", () => {
     mocks.previewBusinessWebsite.mockRejectedValue(new Error("fetch timed out"));
     const response = await preview("https://example.com");
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ status: "unavailable" });
+    expect(await response.json()).toMatchObject({ status: "partial" });
     expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
   });
   it("never scrapes an existing sample business", async () => {

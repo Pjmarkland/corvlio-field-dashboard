@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 
 const fixture = vi.hoisted(() => ({
   lookup: vi.fn(), request: vi.fn(), createExtraction: vi.fn(),
@@ -16,6 +17,8 @@ import {
 
 type Page = { html?: string; status?: number; headers?: Record<string, string> };
 let pages: Record<string, Page>;
+const savedHtml = (name: string) => readFileSync(new URL(`../fixtures/websites/${name}.html`, import.meta.url), "utf8");
+const extraction = (fields: Record<string, unknown>) => ({ choices: [{ message: { content: JSON.stringify(fields) } }] });
 beforeEach(() => {
   vi.clearAllMocks();
   pages = {
@@ -100,12 +103,12 @@ describe("public-only website requests", () => {
     await expect(fetchWebsitePage("https://example.com")).rejects.toBeInstanceOf(UnsafeWebsiteUrlError);
     expect(fixture.request).toHaveBeenCalledOnce();
   });
-  it("limits redirect loops and oversized bodies", async () => {
+  it("limits redirect loops and truncates oversized bodies", async () => {
     pages["/"] = { status: 302, headers: { location: "/" } };
     await expect(fetchWebsitePage("https://example.com")).rejects.toThrow("redirected too many");
     expect(fixture.request).toHaveBeenCalledTimes(4);
-    pages["/"] = { html: "x".repeat(700_001) };
-    await expect(fetchWebsitePage("https://example.com")).rejects.toThrow("too large");
+    pages["/"] = { html: "<body>Readable services</body>" + "x".repeat(2_000_001), headers: { "content-length": "3000000" } };
+    expect((await fetchWebsitePage("https://example.com")).truncated).toBe(true);
   });
 });
 
@@ -135,5 +138,147 @@ describe("review-only extraction", () => {
     const request = fixture.createExtraction.mock.calls[0][0];
     expect(request.messages[0].content).toContain("untrusted data");
     expect(request.messages[0].content).toContain("Do not guess");
+  });
+});
+
+describe("saved HTML quality and recovery (no live requests)", () => {
+  it("discovers repair/install nav/footer links on a second services-only pass", async () => {
+    pages = { "/": { html: savedHtml("services-home") }, "/what-we-do/repairs": { html: savedHtml("services-repairs") } };
+    fixture.createExtraction.mockResolvedValueOnce(extraction({})).mockResolvedValueOnce(extraction({
+      servicesOffered: { value: "Drain cleaning; Water heater repair; Leak detection; Fixture installation",
+        evidence: ["Drain cleaning", "Water heater repair", "Leak detection", "Fixture installation"] },
+    }));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(fixture.request.mock.calls.map(([options]) => options.path)).toContain("/what-we-do/repairs");
+    expect(fixture.request.mock.calls.map(([options]) => options.headers.host)).not.toContain("external.example");
+    expect(result.fields.servicesOffered.value).toBe("Drain cleaning; Water heater repair; Leak detection; Fixture installation");
+    expect(result.fields.servicesOffered.sourceUrl).toBe("https://example.com/what-we-do/repairs");
+    expect(fixture.createExtraction.mock.calls[1][0].messages[1].content).toContain('"requestedFields":{"servicesOffered"');
+  });
+  it("retains literal service-card/list titles after AI timeout on the second pass", async () => {
+    pages = { "/": { html: savedHtml("services-home") }, "/what-we-do/repairs": { html: savedHtml("services-repairs") } };
+    fixture.createExtraction.mockRejectedValue(new Error("AI timed out"));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.fields.servicesOffered.value).toContain("Water heater repair");
+    expect(result.fields.servicesOffered.evidence).toContain("Water heater repair");
+    expect(result.fields.servicesOffered.sourceUrl).toBe("https://example.com/what-we-do/repairs");
+    expect(result.status).toBe("partial");
+  });
+  it("retries a paraphrased services paragraph as a short literal work list", async () => {
+    pages = { "/": { html: savedHtml("services-home") }, "/what-we-do/repairs": { html: savedHtml("services-repairs") } };
+    fixture.createExtraction.mockResolvedValueOnce(extraction({
+      servicesOffered: { value: "We provide local plumbing solutions.", evidence: "Welcome to our local team." },
+    })).mockResolvedValueOnce(extraction({
+      servicesOffered: { value: "Drain cleaning; Water heater repair", evidence: ["Drain cleaning", "Water heater repair"] },
+    }));
+    expect((await previewBusinessWebsite("https://example.com")).fields.servicesOffered.value).toBe("Drain cleaning; Water heater repair");
+  });
+  it("reads explicit weekday hours and city lists in the footer", async () => {
+    pages = { "/": { html: savedHtml("footer-hours") } };
+    fixture.createExtraction.mockResolvedValue(extraction({
+      serviceArea: { value: "Fort Myers; Estero; Naples", evidence: "Areas we serve Fort Myers Estero Naples" },
+    }));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.fields.businessHours).toMatchObject({ value: "Mon-Fri 08:00-17:00", sourceUrl: "https://example.com/" });
+    expect(result.fields.businessHours.evidence).toContain("Monday - Friday 8:00am to 5:00pm");
+    expect(result.fields.serviceArea.value).toBe("Fort Myers; Estero; Naples");
+  });
+  it("reads JSON-LD hours specifications and areaServed even when AI fails", async () => {
+    pages = { "/": { html: savedHtml("structured-hours") } };
+    fixture.createExtraction.mockRejectedValue(new Error("Model timeout"));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.fields.businessHours.value).toBe("Mon,Tue,Wed,Thu,Fri 08:00-17:00");
+    expect(result.fields.serviceArea.value).toBe("Fort Myers; Estero");
+    expect(result.status).toBe("partial");
+    expect(result.message).toBe("We couldn't read this site automatically. Type your answers below.");
+  });
+  it("reads the schema.org openingHours string without executing scripts", async () => {
+    pages = { "/": { html: '<script type="application/ld+json">{"@type":"LocalBusiness","openingHours":"Mo-Fr 08:00-17:00"}</script><body>Welcome</body>' } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    expect((await previewBusinessWebsite("https://example.com")).fields.businessHours.value).toBe("Mon-Fri 08:00-17:00");
+  });
+  it("never converts 24/7 emergency marketing to business hours", async () => {
+    pages = { "/": { html: savedHtml("emergency-and-policies") } };
+    fixture.createExtraction.mockResolvedValue(extraction({
+      businessHours: { value: "24/7", evidence: "24/7 same-day emergency service available." },
+      emergencyContactInfo: { value: "24/7 same-day emergency service available.", evidence: "24/7 same-day emergency service available." },
+    }));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.fields.businessHours.value).toBeNull();
+    expect(result.fields.emergencyContactInfo.value).not.toBeNull();
+  });
+  it("moves insurance billing into notes, never refused work", async () => {
+    pages = { "/": { html: savedHtml("emergency-and-policies") } };
+    fixture.createExtraction.mockResolvedValue(extraction({
+      servicesNotOffered: { value: "Insurance claims", evidence: "We do not process payment through the insurance provider." },
+    }));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.fields.servicesNotOffered.value).toBeNull();
+    expect(result.fields.otherPolicies?.value).toBe("We do not process payment through the insurance provider.");
+  });
+  it("retains explicit work refusals and does not invert residential-only into refusing residential", async () => {
+    for (const evidence of ["We do not service commercial buildings.", "Residential only."]) {
+      pages = { "/": { html: `<body>${evidence}</body>` } };
+      fixture.createExtraction.mockResolvedValue(extraction({ servicesNotOffered: { value: "Commercial work", evidence } }));
+      expect((await previewBusinessWebsite("https://example.com")).fields.servicesNotOffered.value).not.toBeNull();
+    }
+  });
+  it("removes a processing fee unsupported by the quote; permits two sourced quotes", async () => {
+    const text = "Free estimates are available. Card payments have a 3.5% processing fee.";
+    fixture.createExtraction.mockResolvedValueOnce(extraction({
+      pricingPolicy: { value: "Free estimates; 3.5% fee", evidence: "Free estimates are available." },
+    }));
+    const result = await extractBusinessDetails([{ url: "https://example.com", text, links: [] }]);
+    expect(result.pricingPolicy.value).not.toContain("3.5%");
+    fixture.createExtraction.mockResolvedValueOnce(extraction({
+      pricingPolicy: { value: "Free estimates; 3.5% processing fee", evidence: ["Free estimates are available.", "Card payments have a 3.5% processing fee."] },
+    }));
+    const supported = await extractBusinessDetails([{ url: "https://example.com", text, links: [] }]);
+    expect(supported.pricingPolicy.value).toContain("3.5%");
+    expect(supported.pricingPolicy.evidence).toContain("3.5%");
+  });
+  it("does not treat page-builder placeholder pricing as an actual maintenance plan", async () => {
+    const evidence = "Best Maintenance Plans Lorem ipsum dolor sit amet $49 / Sessions";
+    fixture.createExtraction.mockResolvedValue(extraction({ maintenancePlanOfferings: { value: "$49", evidence } }));
+    const fields = await extractBusinessDetails([{ url: "https://example.com", text: evidence, links: [] }]);
+    expect(fields.maintenancePlanOfferings.value).toBeNull();
+  });
+  it("rejects a template plan heading even when its quote leaves out adjacent filler", async () => {
+    fixture.createExtraction.mockResolvedValue(extraction({
+      maintenancePlanOfferings: { value: "Best Maintenance Plans", evidence: "Pricing Plan Best Maintenance Plans" },
+    }));
+    const fields = await extractBusinessDetails([{
+      url: "https://example.com", links: [],
+      text: "Pricing Plan Best Maintenance Plans Lorem ipsum dolor sit amet. Home Service $49 / Sessions",
+    }]);
+    expect(fields.maintenancePlanOfferings.value).toBeNull();
+  });
+  it("returns partial rather than an error for oversized HTML, keeping extracted facts", async () => {
+    pages = { "/": { html: savedHtml("footer-hours") + " ".repeat(2_000_001), headers: { "content-length": "3000000" } } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.status).toBe("partial");
+    expect(result.fields.businessHours.value).toBe("Mon-Fri 08:00-17:00");
+    expect(result.message).toBe("We couldn't read this site automatically. Type your answers below.");
+  });
+  it("returns partial/manual entry on timeout without invoking the AI", async () => {
+    fixture.lookup.mockRejectedValue(new Error("Website request timed out"));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.status).toBe("partial");
+    expect(result.message).toBe("We couldn't read this site automatically. Type your answers below.");
+    expect(result.fields.servicesOffered.value).toBeNull();
+    expect(fixture.createExtraction).not.toHaveBeenCalled();
+  });
+  it("preserves readable pages when another page fails", async () => {
+    pages = { "/": { html: savedHtml("footer-hours") + '<a href="/contact">Contact</a>' }, "/contact": { status: 503 } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    const result = await previewBusinessWebsite("https://example.com");
+    expect(result.status).toBe("partial");
+    expect(result.fields.businessHours.value).toBe("Mon-Fri 08:00-17:00");
+  });
+  it("returns empty services when no work is listed; never infers from the company name", async () => {
+    pages = { "/": { html: "<body><h1>Example Plumbing</h1><p>Welcome. Call our team.</p></body>" } };
+    fixture.createExtraction.mockResolvedValue(extraction({}));
+    expect((await previewBusinessWebsite("https://example.com")).fields.servicesOffered.value).toBeNull();
   });
 });
