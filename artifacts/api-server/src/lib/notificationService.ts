@@ -16,6 +16,7 @@ import { readGoogleSheetLeads } from "./googleSheets";
 import { logger } from "./logger";
 import { deliverLeadAlertEmails } from "./leadAlertEmail";
 import { deliverOperationalFailureAlerts } from "./operationalFailures";
+import { dispatchNotificationChannels } from "./notificationDispatch";
 
 const POLL_INTERVAL_MS = 60_000;
 const SHEETS_READ_TIMEOUT_MS = 55_000; // must be < POLLER_LEASE_MS
@@ -405,24 +406,16 @@ export async function runNotificationPollCycle(): Promise<void> {
   }
 }
 
-let outboxPromise: Promise<void> | null = null;
-let outboxRequested = false;
-
 export function runNotificationOutboxNow(): Promise<void> {
-  if (outboxPromise) { outboxRequested = true; return outboxPromise; }
-  outboxPromise = (async () => {
-    do {
-      outboxRequested = false;
-      await Promise.all([
-        deliverLeadAlertEmails(),
-        deliverOperationalFailureAlerts(),
-        processNotificationOutbox(),
-      ]);
-    } while (outboxRequested);
-  })().finally(() => {
-    outboxPromise = null;
-  });
-  return outboxPromise;
+  // Email owns its independent in-flight state. Do not hold the push poller's
+  // lease until a slow email batch completes, including on later retry ticks.
+  void dispatchNotificationChannels([
+    { name: "owner_email", deliver: deliverLeadAlertEmails },
+    { name: "admin_email", deliver: deliverOperationalFailureAlerts },
+  ]);
+  return dispatchNotificationChannels([
+    { name: "push", deliver: processNotificationOutbox },
+  ]);
 }
 
 // ─── Poller lifecycle ─────────────────────────────────────────────────────────

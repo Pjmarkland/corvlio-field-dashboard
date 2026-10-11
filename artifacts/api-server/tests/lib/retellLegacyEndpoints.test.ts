@@ -20,9 +20,13 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe("Retell legacy endpoint regression guard", () => {
-  it("does not reference retired list endpoints in API or operational scripts", () => {
+  it("does not reference retired list endpoints in API, shared libraries or operational scripts", () => {
     const root = fileURLToPath(new URL("../../", import.meta.url));
-    const paths = [...sourceFiles(join(root, "src")), ...sourceFiles(join(root, "../../scripts"))];
+    const paths = [
+      ...sourceFiles(join(root, "src")),
+      ...sourceFiles(join(root, "../../lib")),
+      ...sourceFiles(join(root, "../../scripts")),
+    ];
     const violations = paths.flatMap(path => {
       const endpoints = readFileSync(path, "utf8").match(/\/(?:v\d+\/)?list-[a-z-]+/g) ?? [];
       return endpoints.filter(endpoint => retiredPaths.has(endpoint)).map(endpoint => ({ path, endpoint }));

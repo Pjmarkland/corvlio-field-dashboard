@@ -78,6 +78,33 @@ function normalizedRecipient(ownerEmail: string | null | undefined): string | nu
   return recipient;
 }
 
+/** Keep actionable provider diagnostics without logging raw responses or tokens. */
+function gmailSendFailure(channel: string, status: number, responseBody: string): Error {
+  if (status === 401) cachedAccessToken = null;
+  let message = "", reason = "", consumer = "";
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      error?: { message?: string; errors?: Array<{ reason?: string }>;
+        details?: Array<{ reason?: string; metadata?: { consumer?: string } }> };
+    };
+    message = parsed.error?.message ?? "";
+    reason = parsed.error?.details?.find(detail => detail.reason)?.reason
+      ?? parsed.error?.errors?.[0]?.reason ?? "";
+    consumer = parsed.error?.details?.find(detail => detail.metadata?.consumer)?.metadata?.consumer ?? "";
+  } catch { /* A non-JSON response is reported by HTTP status, never raw content. */ }
+  const project = /projects\/(\d+)/.exec(consumer)?.[1] ?? /project\s+(\d+)/i.exec(message)?.[1];
+  let action = "Delivery failed; the persisted outbox will retry.";
+  if (status === 403 && (reason === "SERVICE_DISABLED" || reason === "accessNotConfigured"
+    || /Gmail API has not been used|Gmail API.*disabled/i.test(message))) {
+    action = `Gmail API is not enabled${project ? ` for Google Cloud project ${project}` : ""}. Enable gmail.googleapis.com in the OAuth project's API Library, then retry.`;
+  } else if (status === 401) {
+    action = "Cached access token discarded; the next attempt will refresh OAuth authorization.";
+  } else if (status === 403) {
+    action = "Google denied Gmail sending. Check the existing OAuth send permissions and Google account policy.";
+  }
+  return new Error(`Gmail API ${channel} failed (${status}): ${action}`);
+}
+
 /** Reuses the existing OAuth email path; plain text only, no card information. */
 export async function sendBillingNotificationEmail(recipientInput: string | null, title: string, body: string): Promise<boolean> {
   const recipient = normalizedRecipient(recipientInput);
@@ -145,9 +172,7 @@ export async function sendLeadNotificationEmail(input: {
   );
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(
-      `Gmail API send failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`,
-    );
+    throw gmailSendFailure("lead email", response.status, errorBody);
   }
   return true;
 }
@@ -202,9 +227,7 @@ export async function sendAdminOperationalFailureEmail(input: {
   });
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(
-      `Gmail API admin failure alert failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`,
-    );
+    throw gmailSendFailure("admin failure alert", response.status, errorBody);
   }
   return true;
 }

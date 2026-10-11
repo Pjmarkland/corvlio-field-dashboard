@@ -275,6 +275,20 @@ describe("Retell webhook safety", () => {
     expect(mocks.sendLeadNotificationEmail).not.toHaveBeenCalled();
     expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
   });
+  it("keeps the saved lead and acknowledges the webhook when notification delivery rejects", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.com" }));
+    mocks.persistAnalyzedCall.mockResolvedValueOnce({ id: 101, notify: true });
+    mocks.runNotificationOutboxNow.mockRejectedValueOnce(new Error("Gmail API disabled"));
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "call-email-failure", to_number: "+14155550123", from_number: "+15551234567",
+      call_analysis: { custom_analysis_data: { caller_name: "Test caller", issue_reason: "Test issue" } },
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.persistAnalyzedCall).toHaveBeenCalledOnce();
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+    expect(mocks.persistAnalyzedCall.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.runNotificationOutboxNow.mock.invocationCallOrder[0]);
+  });
   it("keeps post-call signature verification mandatory", async () => {
     const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
       method: "POST", headers: { "content-type": "application/json" }, body: '{"event":"call_analyzed"}',

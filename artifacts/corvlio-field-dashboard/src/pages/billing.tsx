@@ -59,9 +59,9 @@ function BillingContent() {
 
   const { account, usage, plans, policy, timeline } = data as BillingSnapshot;
   const current = plans.find((p) => p.id === account.plan);
-  const subscribed = Boolean(account.subscriptionId);
-  const cancelling = Boolean(account.cancelAt);
-  const effectiveCancellation = account.cancelAt ?? cancelResult;
+  const subscribed = Boolean(account.subscriptionId) && account.status !== 'canceled';
+  const cancelling = subscribed && Boolean(account.cancelAt);
+  const effectiveCancellation = subscribed ? account.cancelAt ?? cancelResult : null;
   const noNextCharge = effectiveCancellation && account.periodEnd && Date.parse(effectiveCancellation) <= Date.parse(account.periodEnd);
   const renewalBeforeCancellation = effectiveCancellation && account.periodEnd && Date.parse(effectiveCancellation) > Date.parse(account.periodEnd);
   const startupAssigned = isAssignedStartup(account);

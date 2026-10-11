@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
-  transaction: vi.fn(), select: vi.fn(), update: vi.fn(), send: vi.fn(), writes: [] as Record<string, unknown>[],
+  transaction: vi.fn(), select: vi.fn(), update: vi.fn(), send: vi.fn(), warn: vi.fn(), writes: [] as Record<string, unknown>[],
   tables: { events: { id: "event" }, business: { id: "business" }, lead: { id: "lead", businessId: "business" } },
 }));
 vi.mock("@workspace/db", () => ({
   db: m, notificationEventsTable: m.tables.events, businessesTable: m.tables.business, leadsTable: m.tables.lead,
 }));
 vi.mock("../../src/lib/gmail", () => ({ sendLeadNotificationEmail: m.send }));
+vi.mock("../../src/lib/logger", () => ({ logger: { warn: m.warn } }));
 import { deliverLeadAlertEmails } from "../../src/lib/leadAlertEmail";
 let event: Record<string, any>, business: Record<string, unknown>;
 beforeEach(() => {
@@ -45,10 +46,16 @@ describe("persisted immediate email outbox", () => {
     m.send.mockRejectedValue(new Error("Gmail unavailable")); await deliverLeadAlertEmails();
     expect(event.emailStatus).toBe("queued"); expect(event.emailAttempts).toBe(1);
     expect(event.emailNextAttemptAt.getTime()).toBeGreaterThan(Date.now());
+    expect(m.warn).toHaveBeenCalledWith({
+      source: "lead_gmail_notification", eventId: 1, businessId: 7,
+      attempt: 1, maxAttempts: 5, willRetry: true, error: "Gmail unavailable",
+    }, "Owner lead email failed; retry scheduled");
     await deliverLeadAlertEmails(); expect(m.send).toHaveBeenCalledOnce();
   });
   it("records a terminal failure after five attempts", async () => {
     event.emailAttempts = 4; m.send.mockResolvedValue(false); await deliverLeadAlertEmails();
     expect(event.emailStatus).toBe("failed"); expect(event.emailLastError).toContain("not configured");
+    expect(m.warn).toHaveBeenCalledWith(expect.objectContaining({ attempt: 5, willRetry: false }),
+      "Owner lead email failed; retries exhausted");
   });
 });

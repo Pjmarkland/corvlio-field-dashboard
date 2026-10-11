@@ -129,7 +129,8 @@ export class BillingService {
       if (s.subscriptionId && s.status !== "canceled") throw new BillingError("Use Upgrade for your existing subscription");
       const stripe = this.stripe(), prices = await ensurePlanPrices(stripe, planId);
       const needsSetup = !s.setupPaid || !config.policy.setupFeeOncePerBusiness;
-      const fingerprint = `${prices.monthly}:${needsSetup ? prices.setup : "no_setup"}`;
+      // Do not reuse a pre-card-only session with dynamically enabled methods.
+      const fingerprint = `${prices.monthly}:${needsSetup ? prices.setup : "no_setup"}:card_only`;
       if (s.pendingCheckout) {
         const pending = await stripe.checkout.sessions.retrieve(s.pendingCheckout.id);
         if (pending.status === "complete") throw new BillingError("Payment was submitted; wait for Stripe confirmation before starting another subscription");
@@ -149,7 +150,8 @@ export class BillingService {
         s.customerId = customer.id;
       }
       const session = await stripe.checkout.sessions.create({
-        mode: "subscription", customer: s.customerId, client_reference_id: String(businessId),
+        mode: "subscription", allowed_payment_method_types: ["card"],
+        customer: s.customerId, client_reference_id: String(businessId),
         line_items: [{ price: prices.monthly, quantity: 1 },
           ...(needsSetup ? [{ price: prices.setup, quantity: 1 }] : [])],
         subscription_data: { metadata: { business_id: String(businessId), corvlio_plan: planId } },
@@ -157,7 +159,7 @@ export class BillingService {
         success_url: billingUrl() + "?checkout=success", cancel_url: billingUrl() + "?checkout=cancel",
       // Reuse the same pending session on accidental repeated clicks; new monthly
       // bucket permits a fresh expired session without inventing a second customer.
-      }, { idempotencyKey: `corvlio_test_checkout_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}` });
+      }, { idempotencyKey: `corvlio_test_checkout_card_only_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}` });
       if (session.livemode || !session.url) throw new BillingError("No test Checkout URL returned", 502);
       s.pendingCheckout = { id: session.id, plan: planId, fingerprint };
       return { url: session.url };

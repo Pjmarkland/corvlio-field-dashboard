@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
   avail: { enabled: false, settled: true, disabled: true },
-  snapshot: vi.fn(), cancel: vi.fn(),
+  snapshot: vi.fn(), cancel: vi.fn(), checkout: vi.fn(),
   data: null as unknown,
 }));
 vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => m.avail }));
@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock('@workspace/api-client-react', () => ({
   getGetOwnerBillingQueryKey: () => ['b'],
   useGetOwnerBilling: () => { m.snapshot(); return { data: m.data, isLoading: false, isError: false, refetch: vi.fn(), dataUpdatedAt: 0 }; },
-  useCreateBillingCheckout: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateBillingCheckout: () => ({ mutate: m.checkout, isPending: false }),
   useCreateBillingPortal: () => ({ mutate: vi.fn(), isPending: false }),
   useUpgradeBillingPlan: () => ({ mutate: vi.fn(), isPending: false }),
   useResumeBilling: () => ({ mutate: vi.fn(), isPending: false }),
@@ -29,6 +29,28 @@ beforeEach(() => {
   m.data = { account, usage: { count: 63, limit: 100, start: '2025-06-01T00:00:00Z', end: '2025-07-01T00:00:00Z' }, plans: [{ id: 'starter', label: 'Starter', monthlyCents: 5000, setupCents: 0, callLimit: 100 }], policy: { cancellationNoticeDays: 30 }, timeline: [] };
 });
 describe('billing page', () => {
+  it('offers fresh Checkout after final cancellation despite a retained subscription ID and date', () => {
+    m.avail = { enabled: true, settled: true, disabled: false };
+    const snapshot = m.data as { account: Record<string, unknown> };
+    snapshot.account = { ...snapshot.account, status: 'canceled', cancelAt: '2025-06-01T00:00:00Z' };
+    render(<BillingPage />);
+    expect(screen.getByTestId('text-status').textContent).toBe('Status: canceled');
+    expect(screen.queryByTestId('button-manage-card')).toBeNull();
+    expect(screen.queryByTestId('section-cancel')).toBeNull();
+    expect(screen.queryByTestId('text-next-charge')).toBeNull();
+    expect(screen.queryByTestId('text-cancel-date')).toBeNull();
+    fireEvent.click(screen.getByTestId('button-checkout-starter'));
+    expect(m.checkout).toHaveBeenCalledWith({ data: { plan: 'starter' } }, expect.any(Object));
+  });
+  it('keeps management and resume available before scheduled cancellation becomes effective', () => {
+    m.avail = { enabled: true, settled: true, disabled: false };
+    const snapshot = m.data as { account: Record<string, unknown> };
+    snapshot.account = { ...snapshot.account, cancelAt: '2025-08-14T00:00:00Z' };
+    render(<BillingPage />);
+    expect(screen.getByTestId('button-manage-card')).toBeTruthy();
+    expect(screen.getByTestId('button-resume')).toBeTruthy();
+    expect(screen.queryByTestId('button-checkout-starter')).toBeNull();
+  });
   it('shows a renewal when notice extends beyond the current paid period', () => {
     m.avail = { enabled: true, settled: true, disabled: false };
     const snapshot = m.data as { account: Record<string, unknown> };

@@ -51,6 +51,20 @@ describe("Retell paginated list responses", () => {
       .mockRejectedValueOnce(new Error("Provider unavailable"));
     await expect(collectRetellListItems(request)).rejects.toThrow("Provider unavailable");
   });
+  it.each(["true", "false", null])("rejects a nonboolean has_more rather than truncating inventory: %j", async hasMore => {
+    await expect(collectRetellListItems(async () => ({ items: [{ phone_number: "+15550000001" }], has_more: hasMore })))
+      .rejects.toThrow("Invalid Retell list response");
+  });
+  it("rejects a malformed later page instead of returning the collected first page", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ items: [{ phone_number: "+15550000001" }], has_more: true, pagination_key: "next" })
+      .mockResolvedValueOnce([{ phone_number: "+15550000002" }]);
+    // Even supported array compatibility is first-page-only; mixing formats
+    // halfway through pagination must never look like a complete inventory.
+    await expect(collectRetellListItems(request, { allowLegacyArray: true }))
+      .rejects.toThrow("Invalid Retell list response");
+    expect(request.mock.calls.map(args => args[0])).toEqual([undefined, "next"]);
+  });
   it("preserves explicitly requested agent-version array compatibility", async () => {
     const request = vi.fn(async () => [{ version: 1, is_published: false }]);
     expect(await collectRetellListItems(request, { allowLegacyArray: true })).toEqual([{ version: 1, is_published: false }]);

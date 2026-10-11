@@ -154,6 +154,9 @@ describe("usage, Checkout, policy actions and isolation", () => {
     expect(f.sdk.customers.create).toHaveBeenCalledTimes(1);
     const params = f.sdk.checkout.sessions.create.mock.calls[0]![0] as unknown as { line_items: object[]; success_url: string };
     expect(params.line_items).toHaveLength(2); expect(params.success_url).toBe("https://billing.example.test/billing?checkout=success");
+    expect(f.sdk.checkout.sessions.create.mock.calls[0]![0]).toMatchObject({
+      mode: "subscription", allowed_payment_method_types: ["card"],
+    });
   });
   it("does not charge a paid setup fee again or create duplicate active subscriptions", async () => {
     const f = billingFixture(); f.subscribed();
@@ -165,6 +168,22 @@ describe("usage, Checkout, policy actions and isolation", () => {
   it("reuses an open Checkout instead of creating a second payable session", async () => {
     const f = billingFixture(); await f.service.checkout(1, "starter"); await f.service.checkout(1, "starter");
     expect(f.sdk.checkout.sessions.create).toHaveBeenCalledTimes(1);
+  });
+  it("expires a pre-card-only Checkout and uses a new idempotency namespace", async () => {
+    const f = billingFixture();
+    f.subscribed(1, { status: "canceled", pendingCheckout: {
+      id: "cs_old", plan: "starter", fingerprint: "previous_dynamic_methods",
+    } });
+    f.sdk.checkout.sessions.retrieve.mockResolvedValueOnce({
+      id: "cs_old", status: "open", url: "https://checkout.stripe.com/old-session", livemode: false,
+    });
+    await f.service.checkout(1, "starter");
+    expect(f.sdk.checkout.sessions.expire).toHaveBeenCalledWith("cs_old");
+    expect(f.sdk.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ allowed_payment_method_types: ["card"] }),
+      expect.objectContaining({ idempotencyKey: expect.stringContaining("checkout_card_only_") }),
+    );
+    expect(f.state().pendingCheckout?.fingerprint).toMatch(/:card_only$/);
   });
   it("expires the previous open Checkout when a different plan is chosen", async () => {
     const f = billingFixture(); await f.service.checkout(1, "starter"); await f.service.checkout(1, "professional");

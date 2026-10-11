@@ -3,6 +3,7 @@ import { and, eq, lte, sql } from "drizzle-orm";
 import { sendLeadNotificationEmail } from "./gmail";
 import { recordOperationalFailure } from "./operationalFailures";
 import { runNotificationOutboxNow } from "./notificationService";
+import { logger } from "./logger";
 
 // Historical events default to skipped; only new real-lead events are queued.
 export async function deliverLeadAlertEmails() {
@@ -36,6 +37,11 @@ export async function deliverLeadAlertEmails() {
         return null;
       } catch (error) {
         const details = error instanceof Error ? error.message : "Email delivery failed";
+        logger.warn({
+          source: "lead_gmail_notification", eventId: event.id, businessId: business.id,
+          attempt: attempts, maxAttempts: 5, willRetry: attempts < 5,
+          error: details.slice(0, 300),
+        }, attempts >= 5 ? "Owner lead email failed; retries exhausted" : "Owner lead email failed; retry scheduled");
         await tx.update(notificationEventsTable).set({
           emailStatus: attempts >= 5 ? "failed" : "queued", emailAttempts: attempts,
           emailNextAttemptAt: new Date(Date.now() + 2 ** attempts * 60_000),
