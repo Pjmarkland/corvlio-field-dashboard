@@ -1,4 +1,5 @@
 import { Redirect } from 'wouter';
+import { Capacitor } from '@capacitor/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetAdminBillingQueryKey, useGetAdminBilling, useSetStartupEligibility } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
@@ -6,6 +7,11 @@ import { billingDate, errorText, usageText } from '@/lib/billingFormat';
 import { AdminEmpty, AdminError, AdminLoading, AdminShell } from './AdminShared';
 
 export default function AdminBillingPage() {
+  if (Capacitor.isNativePlatform()) return <Redirect to="/dashboard" />;
+  return <WebAdminBillingPage />;
+}
+
+function WebAdminBillingPage() {
   const { enabled, disabled } = useBillingAvailability();
   if (disabled) return <Redirect to="/admin" />;
   if (!enabled) return null;

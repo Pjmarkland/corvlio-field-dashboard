@@ -19,3 +19,4 @@
 - [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
 - [Billing policy boundary](billing-policy-boundary.md) — approved flag-only billing overrides differ from the agreement; development/test only, no live rollout.
 - [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
+- [Native reviewer boundaries](native-reviewer-boundaries.md) — exclude native payment surfaces; keep manually seeded App Store review data isolated from real customers.

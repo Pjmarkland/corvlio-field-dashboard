@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 
 function ClientAgreementPage() {
+  const native = Capacitor.isNativePlatform();
   useEffect(() => {
     const previousTitle = document.title;
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -40,14 +42,14 @@ function ClientAgreementPage() {
             <p>Client must have authority to enter this Agreement and the legal right to route the phone number(s) used. Client will provide accurate business information and promptly update it; maintain call forwarding to the Corvlio number; not disable the AI-disclosure or recording notice required by Fla. Stat. § 934.03; review and follow up on Intakes promptly; use the Service only lawfully; and keep dashboard credentials confidential.</p>
           </section>
 
-          <section>
+          {!native && <section>
             <h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">3. Fees and Payment</h2>
             <p>Client subscribes to a published plan (Startup, Starter, Professional, Managed), billed monthly in advance. The setup fee is due at signing and non-refundable once configuration begins; monthly fees are non-refundable and not prorated. Call volume over the plan allotment moves Client to the next tier, no per-call overage charge. A failed payment gives Client five business days to cure before suspension; overdue amounts accrue a 1.5% monthly late fee (or the legal maximum if lower).</p>
-          </section>
+          </section>}
 
           <section>
             <h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">4. Term and Termination</h2>
-            <p>Month-to-month, ending with thirty days&apos; written notice from either Party. Company may suspend or terminate immediately for material breach, including using the Service unlawfully, to harass or defraud callers, in violation of this Agreement, or in a way Company reasonably believes creates legal or reputational risk. On termination, Client gets at least fifteen days to export Intake Information before Company deletes it within thirty days after, except where legal retention applies. Call recordings are kept thirty days post-termination and provided only on written request for a $100 fee.</p>
+            <p>Month-to-month, ending with thirty days&apos; written notice from either Party. Company may suspend or terminate immediately for material breach, including using the Service unlawfully, to harass or defraud callers, in violation of this Agreement, or in a way Company reasonably believes creates legal or reputational risk. On termination, Client gets at least fifteen days to export Intake Information before Company deletes it within thirty days after, except where legal retention applies. Call recordings are kept thirty days post-termination and provided only on written request{native ? '.' : ' for a $100 fee.'}</p>
           </section>
 
           <section>

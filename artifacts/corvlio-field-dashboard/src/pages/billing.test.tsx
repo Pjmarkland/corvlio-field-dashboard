@@ -5,7 +5,9 @@ const m = vi.hoisted(() => ({
   avail: { enabled: false, settled: true, disabled: true },
   snapshot: vi.fn(), cancel: vi.fn(), checkout: vi.fn(),
   data: null as unknown,
+  native: false,
 }));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => m.native } }));
 vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => m.avail }));
 vi.mock('wouter', () => ({
   Link: ({ children, href, ...r }: { children: React.ReactNode; href: string }) => <a href={href} {...r}>{children}</a>,
@@ -26,9 +28,22 @@ import BillingPage from './billing';
 const account = { plan: 'starter', status: 'active', subscriptionId: 'sub', periodEnd: '2025-07-01T00:00:00Z', startupEligible: false, cancelAt: null, graceEndsAt: null };
 beforeEach(() => {
   vi.clearAllMocks();
+  m.native = false;
   m.data = { account, usage: { count: 63, limit: 100, start: '2025-06-01T00:00:00Z', end: '2025-07-01T00:00:00Z' }, plans: [{ id: 'starter', label: 'Starter', monthlyCents: 5000, setupCents: 0, callLimit: 100 }], policy: { cancellationNoticeDays: 30 }, timeline: [] };
 });
 describe('billing page', () => {
+  it.each(['ios', 'android'])('blocks native %s direct billing/portal entry even if availability says enabled', () => {
+    m.native = true;
+    m.avail = { enabled: true, settled: true, disabled: false };
+    window.history.replaceState({}, '', '/billing?portal=1');
+    render(<BillingPage />);
+    expect(screen.getByTestId('redirect').textContent).toBe('/dashboard');
+    expect(m.snapshot).not.toHaveBeenCalled();
+    expect(m.checkout).not.toHaveBeenCalled();
+    expect(screen.queryByText('Billing')).toBeNull();
+    expect(screen.queryByTestId('section-billing-current')).toBeNull();
+    window.history.replaceState({}, '', '/');
+  });
   it('offers fresh Checkout after final cancellation despite a retained subscription ID and date', () => {
     m.avail = { enabled: true, settled: true, disabled: false };
     const snapshot = m.data as { account: Record<string, unknown> };

@@ -810,6 +810,7 @@ function AdminBillingRoute() {
 }
 
 function BillingRoute() {
+  if (Capacitor.isNativePlatform()) return <Redirect to="/dashboard" />;
   return <><Show when="signed-in"><BillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
 }
 

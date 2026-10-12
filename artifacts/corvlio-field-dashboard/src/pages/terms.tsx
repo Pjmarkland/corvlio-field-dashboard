@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
 
 function TermsPage() {
+  const native = Capacitor.isNativePlatform();
   useEffect(() => {
     const previousTitle = document.title;
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -44,18 +46,18 @@ function TermsPage() {
             <p className="mt-3"><strong className="text-foreground">2.3 Callbacks:</strong> Client is solely responsible for following up on Intakes.</p>
           </section>
 
-          <section>
+          {!native && <section>
             <h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">3. FEES AND PAYMENT</h2>
             <p><strong className="text-foreground">3.1 Pricing:</strong> fees per Corvlio&apos;s published tiers (Startup, Starter, Professional, Managed).</p>
             <p className="mt-3"><strong className="text-foreground">3.2 Setup Fee:</strong> non-refundable once build work begins.</p>
             <p className="mt-3"><strong className="text-foreground">3.3 Billing:</strong> monthly in advance; call volume over the plan allotment moves Client to the next tier, no per-call overage charge.</p>
             <p className="mt-3"><strong className="text-foreground">3.4 Late Payment:</strong> Corvlio may suspend the Service if payment isn&apos;t received within a reasonable period after notice.</p>
-          </section>
+          </section>}
 
           <section>
             <h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">4. TERM AND TERMINATION</h2>
             <p><strong className="text-foreground">4.1</strong> Month-to-month from go-live date.</p>
-            <p className="mt-3"><strong className="text-foreground">4.2</strong> Either party may cancel with thirty (30) days&apos; written notice; Client owes fees through the notice period.</p>
+            <p className="mt-3"><strong className="text-foreground">4.2</strong> Either party may cancel with thirty (30) days&apos; written notice{native ? '.' : '; Client owes fees through the notice period.'}</p>
             <p className="mt-3"><strong className="text-foreground">4.3</strong> Upon termination Corvlio stops routing calls and will export Client&apos;s Intake records on request.</p>
             <p className="mt-3"><strong className="text-foreground">4.4 Suspension for Misuse:</strong> Corvlio may suspend or terminate immediately, upon notice, if Client uses the Service unlawfully, to harass or defraud callers, in violation of these Terms, or in a way Corvlio reasonably believes creates legal or reputational risk.</p>
           </section>

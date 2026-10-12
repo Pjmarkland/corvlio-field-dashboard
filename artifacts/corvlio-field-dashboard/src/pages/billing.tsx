@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Link, Redirect } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,6 +13,11 @@ import { billingDate, errorText, isAssignedStartup, money, periodLabel, usageTex
 const MAX_POLLS = 6;
 
 export default function BillingPage() {
+  if (Capacitor.isNativePlatform()) return <Redirect to="/dashboard" />;
+  return <WebBillingPage />;
+}
+
+function WebBillingPage() {
   const { enabled, disabled } = useBillingAvailability();
   if (disabled) return <Redirect to="/dashboard" />;
   if (!enabled) return null;
