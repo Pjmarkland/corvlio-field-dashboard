@@ -19,6 +19,86 @@ tags:
   - name: admin
     description: Read-only founder administration operations
 paths:
+  /billing/native-summary:
+    get:
+      operationId: getNativeBillingSummary
+      tags: [billing]
+      security:
+        - clerkSession: []
+      summary: Read-only owner billing summary without prices or payment actions
+      responses:
+        "200":
+          description: Persisted billing information; never contacts Stripe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NativeBillingSummary"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business owned by this account
+        "503":
+          description: Summary temporarily unavailable
+  /account/me:
+    delete:
+      operationId: deleteMyAccount
+      tags: [businesses]
+      summary: Delete the authenticated account and owned app data
+      security: [{ ClerkSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountDeletionInput" }
+      responses:
+        "200":
+          description: App data and identity deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDeletionResult" }
+        "202":
+          description: App data deleted; identity deletion queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDeletionResult" }
+        "400": { description: Invalid confirmation }
+        "401": { description: Authentication required }
+        "403": { description: Unsafe request origin }
+        "409": { description: Subscription or ownership conflict; contact support }
+        "503": { description: Cannot safely start deletion }
+  /admin/pending-releases:
+    get:
+      operationId: getPendingRetellReleases
+      tags: [admin]
+      security: [{ ClerkSession: [] }]
+      responses:
+        "200":
+          description: Minimal resource records for manual review and release
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PendingRetellRelease" }
+        "404": { description: Not authorized }
+  /admin/pending-releases/{releaseId}/complete:
+    post:
+      operationId: completePendingRetellRelease
+      tags: [admin]
+      security: [{ ClerkSession: [] }]
+      parameters:
+        - in: path
+          name: releaseId
+          required: true
+          schema: { type: number, multipleOf: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManualReleaseInput" }
+      responses:
+        "204": { description: Recorded manual review/release; no Retell API call }
+        "400": { description: Invalid confirmation }
+        "404": { description: Not authorized or unknown record }
   /user/welcome:
     post:
       operationId: claimWelcome
@@ -592,11 +672,47 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    AccountDeletionInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, enum: [DELETE] }
+    AccountDeletionResult:
+      type: object
+      required: [status, message]
+      properties:
+        status: { type: string, enum: [completed, pending] }
+        message: { type: string }
+    ManualReleaseInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, enum: [MANUALLY RELEASED] }
+    PendingRetellRelease:
+      type: object
+      required: [id, businessId, businessName, phoneNumber, agentId, provisioningStatus, createdAt]
+      properties:
+        id: { type: number, multipleOf: 1 }
+        businessId: { type: [number, "null"], multipleOf: 1 }
+        businessName: { type: string }
+        phoneNumber: { type: [string, "null"] }
+        agentId: { type: [string, "null"] }
+        provisioningStatus: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
     BillingAvailability:
       type: object
       properties:
         enabled: {type: boolean}
       required: [enabled]
+    NativeBillingSummary:
+      type: object
+      properties:
+        planName: { type: [string, "null"] }
+        status: { type: string, enum: [active, past_due, canceled, not_subscribed] }
+        nextChargeDate: { type: [string, "null"], format: date-time }
+        billingEnabled: { type: boolean }
+        hasStripeCustomer: { type: boolean }
+      required: [planName, status, nextChargeDate, billingEnabled, hasStripeCustomer]
     BillingPlanInput:
       type: object
       additionalProperties: false

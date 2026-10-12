@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import { clerkDeletionWebhook } from "./routes/clerkWebhook";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
@@ -16,6 +17,8 @@ import {
 const app: Express = express();
 // Stripe must receive its unmodified Buffer before the global JSON parser.
 app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingWebhook);
+// Raw bytes are mandatory for Clerk/Svix signature verification; before JSON/auth.
+app.post("/api/webhooks/clerk", express.raw({ type: "application/json", limit: "256kb" }), clerkDeletionWebhook);
 
 app.use(
   pinoHttp({

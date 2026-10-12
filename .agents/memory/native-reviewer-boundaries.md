@@ -3,16 +3,23 @@ name: Native billing and reviewer boundaries
 description: User-required native payment exclusion and isolated App Store reviewer data.
 ---
 
-Keep all Stripe billing, subscription, upgrade, Checkout, and customer-portal
-surfaces out of native Capacitor iOS and Android builds, including direct routes.
-Preserve the regular web/PWA billing experience and the production billing guard.
+Native Capacitor iOS/Android Settings may show a read-only billing summary:
+plan name, subscription status and a known next charge date, with no prices,
+plan comparison, checkout, upgrade actions or payment forms. “Manage billing”
+opens the existing Stripe customer portal in the OS external browser, never an
+in-app browser. When billing is disabled or no Stripe customer exists, show
+“Billing is managed on our website” with an external website billing link.
+Direct native payment and plan-selection routes remain blocked. Preserve the
+regular web/PWA billing experience and the existing production billing guard.
 
-**Why:** The user explicitly requested "hide Stripe checkout in the iOS build"
-and extended that exclusion to both native platforms for App Store review.
+**Why:** The user replaced the earlier blanket native billing exclusion with
+this trust-focused read-only experience: “I want it very professional and so the
+user trust.” They explicitly prohibited publishing, redeployment, Secrets or
+deployment-setting changes, or enabling production billing.
 
-**How to apply:** Future billing entry points need native exclusion even if
-cached server availability says enabled. Native legal pages must not reintroduce
-the product's financial copy.
+**How to apply:** Keep native purchase routes excluded even if cached server
+availability says enabled. Summary reads must not activate billing, write
+accounts or call Stripe. Native legal pages must not reintroduce financial copy.
 
 Reviewer demo data is manually seeded, isolated from real businesses and calls,
 and attached only to an existing Clerk identity. Never provision a phone, create

@@ -32,6 +32,11 @@ vi.mock('@/hooks/usePushNotifications', () => ({
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: mockToast }),
 }));
+vi.mock('@/components/AccountDeletionPanel', () => ({
+  default: () => null,
+  DeletedAccountSignOut: () => null,
+  deletionSignOutMarker: 'mock-deletion-signout-marker',
+}));
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -240,17 +245,13 @@ describe('UnconfiguredAccountScreen sign-out escape hatch', () => {
     expect(screen.getByRole('heading', { name: 'No business configured' })).toBeTruthy();
   });
 
-  it('keeps the screen and shows an error toast when alert revocation fails', async () => {
+  it('continues signing out when alert revocation fails', async () => {
     mockRevoke.mockRejectedValue(new Error('Push service unavailable'));
     render(<UnconfiguredAccountScreen />);
 
     fireEvent.click(screen.getByTestId('button-sign-out-unconfigured'));
 
-    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'destructive',
-      title: 'Could not disable push alerts',
-    })));
-    expect(mockSignOut).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledOnce());
     expect(screen.getByRole('heading', { name: 'No business configured' })).toBeTruthy();
   });
 

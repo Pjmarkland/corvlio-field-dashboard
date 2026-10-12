@@ -7,8 +7,22 @@ import { billingEnabled } from "../billing/stripeClient";
 import { billingService } from "../billing/runtime";
 import { billingStore } from "../billing/store";
 import { BillingError } from "../billing/policy";
+import { readNativeBillingSummary } from "../billing/nativeSummary";
 
 const router: IRouter = Router();
+// Read-only exception BEFORE the unchanged payment gate. This cannot enable billing.
+router.get("/billing/native-summary", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const userId = getAuth(req).userId;
+  if (!userId) { res.sendStatus(401); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.sendStatus(404); return; }
+    res.json(await readNativeBillingSummary(business.id));
+  } catch {
+    res.status(503).json({ error: "Billing details are temporarily unavailable." });
+  }
+});
 router.get("/billing/availability", (_req, res) => {
   res.set("Cache-Control", "no-store").json({ enabled: billingEnabled() });
 });

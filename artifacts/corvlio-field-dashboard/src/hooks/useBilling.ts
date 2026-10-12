@@ -2,7 +2,7 @@ import { useUser } from '@clerk/react';
 import { Capacitor } from '@capacitor/core';
 import { useGetBillingAvailability, getGetBillingAvailabilityQueryKey } from '@workspace/api-client-react';
 
-/** Billing UI is visible only when the signed-in availability check explicitly says enabled. */
+/** Payment UI gate. Native read-only Settings uses a separate summary, never this gate. */
 export function useBillingAvailability() {
   const { isSignedIn } = useUser();
   const native = Capacitor.isNativePlatform();

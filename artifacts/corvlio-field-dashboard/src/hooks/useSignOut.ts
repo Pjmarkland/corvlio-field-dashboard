@@ -23,14 +23,8 @@ export function useSignOut(
     try {
       await revoke();
     } catch {
-      setIsSigningOut(false);
-      toast({
-        variant: 'destructive',
-        title: 'Could not disable push alerts',
-        description:
-          'Alerts may still arrive on this device. Please tap Retry on the Push alerts row, then sign out again.',
-      });
-      return;
+      // Push registration cleanup is best-effort; it must never trap a user here.
+      console.warn('Push alert unregister failed during sign-out; continuing to sign out.');
     }
     try {
       await signOut();

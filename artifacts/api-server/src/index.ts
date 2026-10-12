@@ -1,4 +1,5 @@
 import app from "./app";
+import { startAccountDeletionWorker, stopAccountDeletionWorker } from "./lib/accountDeletionWorker";
 import { startBillingWorker, stopBillingWorker } from "./billing/worker";
 import { closeApnsSession } from "./lib/apnsAdapter";
 import { refreshBusinessPhoneCache } from "./lib/businessDirectory";
@@ -36,6 +37,7 @@ const server = app.listen(port, (err) => {
     });
   startLeadNotificationPoller();
   startBillingWorker();
+  startAccountDeletionWorker();
 });
 
 async function shutdown(signal: string) {
@@ -44,6 +46,7 @@ async function shutdown(signal: string) {
   // before closing the HTTP server so DB connections are not torn mid-transaction.
   await stopLeadNotificationPoller();
   await stopBillingWorker();
+  await stopAccountDeletionWorker();
   closeApnsSession();
   server.close((error) => {
     if (error) {

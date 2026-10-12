@@ -48,6 +48,8 @@ import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
 import AdminOverviewPage from '@/pages/admin/AdminOverviewPage';
+import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/AccountDeletionPanel';
+import NativeBillingSection from '@/components/NativeBillingSection';
 import AdminActivityPage from '@/pages/admin/AdminActivityPage';
 import BillingPage from '@/pages/billing';
 import AdminBillingPage from '@/pages/admin/AdminBillingPage';
@@ -601,13 +603,17 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
     <PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />
     <BusinessProfileEditor key={user?.id ?? 'signed-out'} businessName={businessName} retellPhoneNumber={retellPhoneNumber} />
     <ReceptionistControls key={`controls-${user?.id}`} />
+    <NativeBillingSection key={`native-billing-${user?.id}`} />
     <section className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="mb-4 flex items-center gap-2 font-bold"><ShieldCheck size={17} /> Account controls</h2>
       <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
       {billingOn ? <Link href="/billing" data-testid="link-settings-billing" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Billing</span><ChevronRight size={16} /></Link> : null}
       <Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link>
+      <Link href="/terms" data-testid="link-settings-terms" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Terms of Service</span><ChevronRight size={16} /></Link>
+      <a href="mailto:hello@corvlio.com" data-testid="link-settings-support" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Support / Contact</span><ExternalLink size={15} /></a>
       <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button>
     </section>
+    <AccountDeletionPanel />
   </>;
 }
 
@@ -646,6 +652,7 @@ export function UnconfiguredAccountScreen({
           <a href="mailto:hello@corvlio.com?subject=Connect%20my%20Corvlio%20business" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground" data-testid="link-configure-business">Contact Corvlio <ArrowUpRight size={16} /></a>
           <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-unconfigured" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-bold text-foreground disabled:cursor-wait disabled:opacity-60"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={16} /></button>
         </div>
+        <AccountDeletionPanel />
       </div>
     </div>
   );
@@ -686,6 +693,7 @@ function PrivacyPage() {
           <section><h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">Who can see lead data</h2><p>Lead data is collected on behalf of the client business that received the call. It is shown only to that business’s authorized account. We do not sell lead data or share it with third parties for marketing or advertising.</p></section>
           <section><h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">Google services</h2><p>When Google syncing is used, Corvlio uses Google APIs to transfer and store lead data securely in the connected Google services. We use that access only to provide the requested sync and storage features.</p></section>
           <section><h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">Security and retention</h2><p>We use reasonable safeguards designed to protect account and lead information from unauthorized access, loss, or misuse. We keep information only for as long as it is needed to operate the service, meet client needs, or satisfy legal obligations.</p></section>
+          <section><h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">Account deletion</h2><p>Account deletion exists in-app. Use Delete account in Settings, or on the unconfigured-account screen if you have not completed setup. Confirmation is irreversible and removes your app data and Clerk identity. Retell phone and agent resources are not released automatically: minimal resource details are retained for manual review and removed from the release record after an admin confirms completion. Minimal deletion identifiers are retained to finish retries and prevent deleted data from being recreated.</p></section>
           <section><h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">Your questions and choices</h2><p>Business owners can contact us to ask about their account information or the lead data handled for their business. Requests involving a caller’s lead information may need to be handled through the client business that received the call.</p></section>
           <section className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">Privacy questions</p><h2 className="mt-2 text-xl font-800">Contact Corvlio</h2><p className="mt-2 text-sm leading-relaxed text-sidebar-foreground/65">Questions about this policy or how information is handled?</p><a href="mailto:hello@corvlio.com" data-testid="link-privacy-email" className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">hello@corvlio.com <ArrowUpRight size={16} /></a></section>
         </div>
@@ -699,6 +707,9 @@ function HomeRedirect() {
 }
 
 function SignInPage() {
+  if (new URLSearchParams(window.location.search).get('accountDeleted') === '1') {
+    return <DeletedAccountSignOut />;
+  }
   return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} /></div>;
 }
 

@@ -9,6 +9,64 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read-only owner billing summary without prices or payment actions
+ */
+export const GetNativeBillingSummaryResponse = zod.object({
+  "planName": zod.string().nullable(),
+  "status": zod.enum(['active', 'past_due', 'canceled', 'not_subscribed']),
+  "nextChargeDate": zod.coerce.date().nullable(),
+  "billingEnabled": zod.boolean(),
+  "hasStripeCustomer": zod.boolean()
+})
+
+
+/**
+ * @summary Delete the authenticated account and owned app data
+ */
+export const DeleteMyAccountBody = zod.object({
+  "confirmation": zod.enum(['DELETE'])
+})
+
+export const DeleteMyAccountResponse = zod.object({
+  "status": zod.enum(['completed', 'pending']),
+  "message": zod.string()
+})
+
+
+export const getPendingRetellReleasesResponseIdMultipleOf = 1;
+
+export const getPendingRetellReleasesResponseBusinessIdMultipleOf = 1;
+
+
+
+export const GetPendingRetellReleasesResponseItem = zod.object({
+  "id": zod.number().multipleOf(getPendingRetellReleasesResponseIdMultipleOf),
+  "businessId": zod.number().multipleOf(getPendingRetellReleasesResponseBusinessIdMultipleOf).nullable(),
+  "businessName": zod.string(),
+  "phoneNumber": zod.string().nullable(),
+  "agentId": zod.string().nullable(),
+  "provisioningStatus": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const GetPendingRetellReleasesResponse = zod.array(GetPendingRetellReleasesResponseItem)
+
+
+export const completePendingRetellReleasePathReleaseIdMultipleOf = 1;
+
+
+
+export const CompletePendingRetellReleaseParams = zod.object({
+  "releaseId": zod.coerce.number().multipleOf(completePendingRetellReleasePathReleaseIdMultipleOf)
+})
+
+export const CompletePendingRetellReleaseBody = zod.object({
+  "confirmation": zod.enum(['MANUALLY RELEASED'])
+})
+
+export const CompletePendingRetellReleaseResponse = zod.void()
+
+
+/**
  * @summary Claim the verified new user's one-time welcome screen
  */
 export const ClaimWelcomeResponse = zod.object({

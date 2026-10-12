@@ -3,9 +3,11 @@ import { createServer, type Server } from "node:http";
 import Stripe from "stripe";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
+  nativeSummary: vi.fn(),
   enabled: true, signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
   resume: vi.fn(), checkout: vi.fn(), upgrade: vi.fn(), portal: vi.fn(), eligibility: vi.fn(), businesses: vi.fn(),
 }));
+vi.mock("../../src/billing/nativeSummary", () => ({ readNativeBillingSummary: m.nativeSummary }));
 vi.mock("../../src/billing/stripeClient", () => ({
   billingEnabled: () => m.enabled, getBillingStripe: () => ({ webhooks: { constructEvent: m.signature } }),
 }));
@@ -47,6 +49,39 @@ beforeEach(() => {
 });
 afterAll(() => vi.unstubAllEnvs());
 const ownerHeaders = { "x-test-owner": "owner-a", "content-type": "application/json" };
+describe("native read-only summary and unchanged payment gate", () => {
+  it("returns owner information while disabled, without enabling the portal or checkout", async () => {
+    m.enabled = false;
+    m.nativeSummary.mockResolvedValue({ planName: "Starter", status: "active", nextChargeDate: null,
+      billingEnabled: false, hasStripeCustomer: true });
+    const response = await fetch(`${base}/billing/native-summary`, { headers: { "x-test-owner": "owner-a" } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect((await response.json()).billingEnabled).toBe(false);
+    expect(m.nativeSummary).toHaveBeenCalledWith(1);
+    for (const path of ["portal", "checkout", "upgrade"]) {
+      expect((await fetch(`${base}/billing/${path}`, { method: "POST", headers: { "x-test-owner": "owner-a" } })).status).toBe(404);
+    }
+    expect(m.portal).not.toHaveBeenCalled(); expect(m.checkout).not.toHaveBeenCalled();
+    expect(m.snapshot).not.toHaveBeenCalled();
+  });
+  it("requires authentication and an owned business", async () => {
+    expect((await fetch(`${base}/billing/native-summary`)).status).toBe(401);
+    expect((await fetch(`${base}/billing/native-summary`, { headers: { "x-test-owner": "not-an-owner" } })).status).toBe(404);
+    expect(m.nativeSummary).not.toHaveBeenCalled();
+  });
+  it("ignores injected business IDs and selects only the authenticated owner", async () => {
+    m.nativeSummary.mockResolvedValue({ planName: "Managed" });
+    await fetch(`${base}/billing/native-summary?businessId=1&userId=owner-a`, { headers: { "x-test-owner": "owner-b" } });
+    expect(m.nativeSummary).toHaveBeenCalledWith(2);
+  });
+  it("returns a neutral error when stored information is unavailable", async () => {
+    m.nativeSummary.mockRejectedValue(new Error("mock storage unavailable"));
+    const response = await fetch(`${base}/billing/native-summary`, { headers: { "x-test-owner": "owner-a" } });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Billing details are temporarily unavailable." });
+  });
+});
 describe("billing authorization and feature flag", () => {
   it("flag off exposes only availability, no billing data or SDK calls", async () => {
     m.enabled = false;

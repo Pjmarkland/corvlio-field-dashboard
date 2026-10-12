@@ -10,8 +10,14 @@ import welcomeRouter from "./welcome";
 import ownerDemoRouter from "./ownerDemo";
 import leadAlertsRouter from "./leadAlerts";
 import billingRouter from "./billing";
+import accountRouter from "./account";
+import pendingReleasesRouter from "./pendingReleases";
+import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
 
 const router: IRouter = Router();
+router.use(accountDeletionGuard);
+router.use(accountRouter);
+router.use(pendingReleasesRouter);
 
 router.use(healthRouter);
 router.use(billingRouter);

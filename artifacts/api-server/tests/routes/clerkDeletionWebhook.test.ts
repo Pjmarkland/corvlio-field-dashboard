@@ -1,0 +1,13 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+const m = vi.hoisted(() => ({ verify: vi.fn(), deletion: vi.fn() }));
+vi.mock("@clerk/express/webhooks", () => ({ verifyWebhook: m.verify }));
+vi.mock("../../src/lib/accountDeletion", () => ({ deleteAccount: m.deletion, AccountDeletionError: class extends Error {} }));
+vi.mock("../../src/lib/logger", () => ({ logger: { error: vi.fn() } }));
+import { clerkDeletionWebhook } from "../../src/routes/clerkWebhook";
+afterEach(() => vi.unstubAllEnvs());
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("CLERK_WEBHOOK_SIGNING_SECRET", "mock-test-only"); m.verify.mockResolvedValue({ type: "user.deleted", data: { id: "user_fixture" } }); m.deletion.mockResolvedValue("completed"); });
+const res = () => { const r: any = { status: vi.fn(), json: vi.fn(), sendStatus: vi.fn() }; r.status.mockReturnValue(r); return r; };
+it("fails closed when webhook is not configured", async () => { vi.stubEnv("CLERK_WEBHOOK_SIGNING_SECRET", ""); const r = res(); await clerkDeletionWebhook({} as any, r, vi.fn()); expect(r.status).toHaveBeenCalledWith(503); expect(m.deletion).not.toHaveBeenCalled(); });
+it("rejects forged signatures before cleanup", async () => { m.verify.mockRejectedValue(new Error("bad signature")); const r = res(); await clerkDeletionWebhook({} as any, r, vi.fn()); expect(r.status).toHaveBeenCalledWith(401); expect(m.deletion).not.toHaveBeenCalled(); });
+it("only cleans the identity from a verified user.deleted event", async () => { const r = res(); await clerkDeletionWebhook({} as any, r, vi.fn()); expect(m.deletion).toHaveBeenCalledWith("user_fixture", undefined, true); expect(r.sendStatus).toHaveBeenCalledWith(204); });
+it("ignores unrelated verified events", async () => { m.verify.mockResolvedValue({ type: "user.created", data: { id: "user_fixture" } }); const r = res(); await clerkDeletionWebhook({} as any, r, vi.fn()); expect(m.deletion).not.toHaveBeenCalled(); });

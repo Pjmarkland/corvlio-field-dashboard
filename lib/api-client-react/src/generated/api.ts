@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountDeletionInput,
+  AccountDeletionResult,
   AdminActivity,
   AdminBusinessDetail,
   AdminCallQuality,
@@ -40,6 +42,8 @@ import type {
   LeadStatusResult,
   LeadStatusUpdate,
   LeadWorkspace,
+  ManualReleaseInput,
+  NativeBillingSummary,
   NotificationDevice,
   NotificationDeviceRegistration,
   NotificationOutboxEvent,
@@ -47,6 +51,7 @@ import type {
   NotificationStatus,
   OwnerDemoCapability,
   OwnerDemoConfirmation,
+  PendingRetellRelease,
   StartupEligibilityInput,
   WebsitePreview,
   WebsitePreviewInput,
@@ -79,6 +84,291 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetNativeBillingSummaryUrl = () => {
+
+
+
+
+  return `/api/billing/native-summary`
+}
+
+/**
+ * @summary Read-only owner billing summary without prices or payment actions
+ */
+export const getNativeBillingSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<NativeBillingSummary> => {
+
+  return customFetch<NativeBillingSummary>(getGetNativeBillingSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNativeBillingSummaryQueryKey = () => {
+    return [
+    `/api/billing/native-summary`
+    ] as const;
+    }
+
+
+export const getGetNativeBillingSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getNativeBillingSummary>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNativeBillingSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNativeBillingSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNativeBillingSummary>>> = ({ signal }) => getNativeBillingSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNativeBillingSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNativeBillingSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getNativeBillingSummary>>>
+export type GetNativeBillingSummaryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read-only owner billing summary without prices or payment actions
+ */
+
+export function useGetNativeBillingSummary<TData = Awaited<ReturnType<typeof getNativeBillingSummary>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNativeBillingSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNativeBillingSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteMyAccountUrl = () => {
+
+
+
+
+  return `/api/account/me`
+}
+
+/**
+ * @summary Delete the authenticated account and owned app data
+ */
+export const deleteMyAccount = async (accountDeletionInput: AccountDeletionInput, options?: Parameters<typeof customFetch>[1]): Promise<AccountDeletionResult> => {
+
+  return customFetch<AccountDeletionResult>(getDeleteMyAccountUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(accountDeletionInput)
+  }
+);}
+
+
+
+
+
+export const getDeleteMyAccountMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyAccount>>, TError,{data: BodyType<AccountDeletionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMyAccount>>, TError,{data: BodyType<AccountDeletionInput>}, TContext> => {
+
+const mutationKey = ['deleteMyAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMyAccount>>, {data: BodyType<AccountDeletionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  deleteMyAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMyAccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMyAccount>>>
+    export type DeleteMyAccountMutationBody = BodyType<AccountDeletionInput>
+    export type DeleteMyAccountMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete the authenticated account and owned app data
+ */
+export const useDeleteMyAccount = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyAccount>>, TError,{data: BodyType<AccountDeletionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMyAccount>>,
+        TError,
+        {data: BodyType<AccountDeletionInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteMyAccountMutationOptions(options));
+    }
+
+export const getGetPendingRetellReleasesUrl = () => {
+
+
+
+
+  return `/api/admin/pending-releases`
+}
+
+export const getPendingRetellReleases = async ( options?: Parameters<typeof customFetch>[1]): Promise<PendingRetellRelease[]> => {
+
+  return customFetch<PendingRetellRelease[]>(getGetPendingRetellReleasesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPendingRetellReleasesQueryKey = () => {
+    return [
+    `/api/admin/pending-releases`
+    ] as const;
+    }
+
+
+export const getGetPendingRetellReleasesQueryOptions = <TData = Awaited<ReturnType<typeof getPendingRetellReleases>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPendingRetellReleases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPendingRetellReleasesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPendingRetellReleases>>> = ({ signal }) => getPendingRetellReleases({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPendingRetellReleases>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPendingRetellReleasesQueryResult = NonNullable<Awaited<ReturnType<typeof getPendingRetellReleases>>>
+export type GetPendingRetellReleasesQueryError = ErrorType<void>
+
+
+
+export function useGetPendingRetellReleases<TData = Awaited<ReturnType<typeof getPendingRetellReleases>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPendingRetellReleases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPendingRetellReleasesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCompletePendingRetellReleaseUrl = (releaseId: number,) => {
+
+
+
+
+  return `/api/admin/pending-releases/${releaseId}/complete`
+}
+
+export const completePendingRetellRelease = async (releaseId: number,
+    manualReleaseInput: ManualReleaseInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getCompletePendingRetellReleaseUrl(releaseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(manualReleaseInput)
+  }
+);}
+
+
+
+
+
+export const getCompletePendingRetellReleaseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePendingRetellRelease>>, TError,{releaseId: number;data: BodyType<ManualReleaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completePendingRetellRelease>>, TError,{releaseId: number;data: BodyType<ManualReleaseInput>}, TContext> => {
+
+const mutationKey = ['completePendingRetellRelease'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completePendingRetellRelease>>, {releaseId: number;data: BodyType<ManualReleaseInput>}> = (props) => {
+          const {releaseId,data} = props ?? {};
+
+          return  completePendingRetellRelease(releaseId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompletePendingRetellReleaseMutationResult = NonNullable<Awaited<ReturnType<typeof completePendingRetellRelease>>>
+    export type CompletePendingRetellReleaseMutationBody = BodyType<ManualReleaseInput>
+    export type CompletePendingRetellReleaseMutationError = ErrorType<void>
+
+    export const useCompletePendingRetellRelease = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePendingRetellRelease>>, TError,{releaseId: number;data: BodyType<ManualReleaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completePendingRetellRelease>>,
+        TError,
+        {releaseId: number;data: BodyType<ManualReleaseInput>},
+        TContext
+      > => {
+      return useMutation(getCompletePendingRetellReleaseMutationOptions(options));
+    }
 
 export const getClaimWelcomeUrl = () => {
 

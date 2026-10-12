@@ -20,3 +20,4 @@
 - [Billing policy boundary](billing-policy-boundary.md) — approved flag-only billing overrides differ from the agreement; development/test only, no live rollout.
 - [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
 - [Native reviewer boundaries](native-reviewer-boundaries.md) — exclude native payment surfaces; keep manually seeded App Store review data isolated from real customers.
+- [Account deletion boundaries](account-deletion-boundaries.md) — preserve Retell for manual release; paid-support refusal needs Apple policy review before submission.

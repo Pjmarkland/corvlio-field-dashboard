@@ -5,8 +5,77 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type AccountDeletionInputConfirmation = typeof AccountDeletionInputConfirmation[keyof typeof AccountDeletionInputConfirmation];
+
+
+export const AccountDeletionInputConfirmation = {
+  DELETE: 'DELETE',
+} as const;
+
+export interface AccountDeletionInput {
+  confirmation: AccountDeletionInputConfirmation;
+}
+
+export type AccountDeletionResultStatus = typeof AccountDeletionResultStatus[keyof typeof AccountDeletionResultStatus];
+
+
+export const AccountDeletionResultStatus = {
+  completed: 'completed',
+  pending: 'pending',
+} as const;
+
+export interface AccountDeletionResult {
+  status: AccountDeletionResultStatus;
+  message: string;
+}
+
+export type ManualReleaseInputConfirmation = typeof ManualReleaseInputConfirmation[keyof typeof ManualReleaseInputConfirmation];
+
+
+export const ManualReleaseInputConfirmation = {
+  MANUALLY_RELEASED: 'MANUALLY RELEASED',
+} as const;
+
+export interface ManualReleaseInput {
+  confirmation: ManualReleaseInputConfirmation;
+}
+
+export interface PendingRetellRelease {
+  id: number;
+  /** @nullable */
+  businessId: number | null;
+  businessName: string;
+  /** @nullable */
+  phoneNumber: string | null;
+  /** @nullable */
+  agentId: string | null;
+  /** @nullable */
+  provisioningStatus: string | null;
+  createdAt: string;
+}
+
 export interface BillingAvailability {
   enabled: boolean;
+}
+
+export type NativeBillingSummaryStatus = typeof NativeBillingSummaryStatus[keyof typeof NativeBillingSummaryStatus];
+
+
+export const NativeBillingSummaryStatus = {
+  active: 'active',
+  past_due: 'past_due',
+  canceled: 'canceled',
+  not_subscribed: 'not_subscribed',
+} as const;
+
+export interface NativeBillingSummary {
+  /** @nullable */
+  planName: string | null;
+  status: NativeBillingSummaryStatus;
+  /** @nullable */
+  nextChargeDate: string | null;
+  billingEnabled: boolean;
+  hasStripeCustomer: boolean;
 }
 
 export type BillingPlanInputPlan = typeof BillingPlanInputPlan[keyof typeof BillingPlanInputPlan];
