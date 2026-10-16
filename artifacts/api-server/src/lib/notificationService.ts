@@ -18,6 +18,7 @@ import { logger } from "./logger";
 import { deliverLeadAlertEmails } from "./leadAlertEmail";
 import { deliverOperationalFailureAlerts } from "./operationalFailures";
 import { dispatchNotificationChannels } from "./notificationDispatch";
+import { databaseErrorFields } from "@workspace/db/errors";
 
 const POLL_INTERVAL_MS = 5 * 60_000;
 const MAX_POLL_BACKOFF_MS = 15 * 60_000;
@@ -438,7 +439,7 @@ export async function runNotificationPollCycle(): Promise<void> {
     void renewPollerLease().catch((error) => {
       renewalError = error;
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        databaseErrorFields(error),
         "Failed to renew poller lease during cycle",
       );
     });
@@ -498,7 +499,7 @@ export function startLeadNotificationPoller(): void {
       .catch((error) => {
         consecutiveFailures += 1;
         logger.error(
-          { error: error instanceof Error ? error.message : "Unknown polling error" },
+          databaseErrorFields(error),
           "Lead notification poll cycle failed",
         );
       })

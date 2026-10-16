@@ -9,6 +9,7 @@ import { db, leadsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
+import { databaseErrorFields } from "@workspace/db/errors";
 
 const router: IRouter = Router();
 
@@ -88,9 +89,7 @@ router.get("/leads", async (req, res): Promise<void> => {
     }));
   } catch (error) {
     req.log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown database error",
-      },
+      databaseErrorFields(error),
       "Unable to load database leads",
     );
     res.status(502).json({ error: "Unable to load leads" });
@@ -159,9 +158,7 @@ router.patch("/leads/:leadId/status", async (req, res): Promise<void> => {
     }));
   } catch (error) {
     req.log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown database error",
-      },
+      databaseErrorFields(error),
       "Unable to update database lead status",
     );
     res.status(502).json({ error: "Unable to update lead status" });

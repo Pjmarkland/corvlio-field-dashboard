@@ -6,7 +6,8 @@ import {
   RegisterNotificationDeviceResponse,
   RevokeNotificationDeviceParams,
 } from "@workspace/api-zod";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type ErrorRequestHandler } from "express";
+import { databaseErrorFields } from "@workspace/db/errors";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import {
   getNotificationStatus,
@@ -115,5 +116,12 @@ router.get("/notifications/outbox", async (req, res): Promise<void> => {
   const events = await listNotificationOutbox(String(business.id));
   res.json(ListNotificationOutboxResponse.parse(events));
 });
+
+const logNotificationError: ErrorRequestHandler = (error, req, res, next) => {
+  req.log.error(databaseErrorFields(error), "Notification request failed");
+  if (res.headersSent) { next(error); return; }
+  res.status(502).json({ error: "Unable to process notification request" });
+};
+router.use(logNotificationError);
 
 export default router;

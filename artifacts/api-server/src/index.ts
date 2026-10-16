@@ -1,4 +1,5 @@
 import app from "./app";
+import { databaseErrorFields } from "@workspace/db/errors";
 import { startAccountDeletionWorker, stopAccountDeletionWorker } from "./lib/accountDeletionWorker";
 import { startBillingWorker, stopBillingWorker } from "./billing/worker";
 import { closeApnsSession } from "./lib/apnsAdapter";
@@ -31,7 +32,7 @@ const server = app.listen(port, (err) => {
     .then(() => logger.info("Business phone cache refreshed"))
     .catch((error) => {
       logger.error(
-        { error: error instanceof Error ? error.message : "Unknown cache refresh error" },
+        databaseErrorFields(error),
         "Initial business phone cache refresh failed",
       );
     });

@@ -1,3 +1,4 @@
+import { databaseErrorFields } from "@workspace/db/errors";
 import {
   RetellPostCallWebhookBody,
   RetellPreCallWebhookBody,
@@ -185,7 +186,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   } catch (error) {
     const details = error instanceof Error ? error.message : "Unknown business lookup error";
     req.log.error(
-      { error: details },
+      databaseErrorFields(error),
       "Retell pre-call business lookup failed; answering with generic no-business variables",
     );
     await recordRetellFailure(req, "retell-pre-call", "pre_call_fallback", {
@@ -310,7 +311,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   } catch (error) {
     const details = error instanceof Error ? error.message : "Unknown Retell post-call processing error";
     req.log.error(
-      { error: details },
+      databaseErrorFields(error),
       "Retell post-call processing failed",
     );
     await recordPostCallFailure(req, {

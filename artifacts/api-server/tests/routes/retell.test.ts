@@ -157,7 +157,7 @@ describe("Retell webhook safety", () => {
     const result = await requestPreCall();
     expect(result).toEqual({ status: 200, body: { call_inbound: { dynamic_variables: dynamicVariables(null) } } });
     expect(mocks.logError).toHaveBeenCalledWith(
-      { error: "Database unavailable" },
+      expect.objectContaining({ databaseError: expect.objectContaining({ message: "Database unavailable" }) }),
       expect.stringContaining("answering with generic"),
     );
     expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
@@ -175,7 +175,7 @@ describe("Retell webhook safety", () => {
     expect(Date.now() - started).toBeLessThan(6000);
     expect(result).toEqual({ status: 200, body: { call_inbound: { dynamic_variables: dynamicVariables(null) } } });
     expect(mocks.logError).toHaveBeenCalledWith(
-      { error: expect.stringContaining("3500ms pre-call deadline") },
+      expect.objectContaining({ databaseError: expect.objectContaining({ message: expect.stringContaining("3500ms pre-call deadline") }) }),
       expect.stringContaining("answering with generic"),
     );
     rejectLookup(new Error("Late database error"));

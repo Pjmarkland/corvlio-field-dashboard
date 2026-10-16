@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { databaseErrorFields } from "@workspace/db/errors";
 
 const activeChannels = new Map<string, { running: Promise<void>; requested: boolean }>();
 
@@ -20,7 +21,7 @@ function runChannel(channel: { name: string; deliver: () => Promise<void> }): Pr
           failure = error;
           logger.error({
             channel: channel.name,
-            error: error instanceof Error ? error.message : "Unknown delivery error",
+            ...databaseErrorFields(error),
           }, "Notification channel failed; other channels continue independently");
         }
       } while (state.requested);

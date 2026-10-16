@@ -4,6 +4,7 @@ import { db, notificationEventsTable } from "@workspace/db";
 import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { Router } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
+import { databaseErrorFields } from "@workspace/db/errors";
 
 const router = Router();
 router.get("/notifications/inbox", async (req, res): Promise<void> => {
@@ -22,7 +23,7 @@ router.get("/notifications/inbox", async (req, res): Promise<void> => {
       id: e.id, title: e.title, body: e.body, deepLink: e.deepLink, createdAt: e.createdAt.toISOString(),
     })) }));
   } catch (error) {
-    req.log.error({ errorName: error instanceof Error ? error.name : "unknown" }, "Lead alert inbox failed");
+    req.log.error(databaseErrorFields(error), "Lead alert inbox failed");
     res.status(502).json({ error: "Unable to load lead alerts" });
   }
 });
@@ -39,7 +40,8 @@ router.post("/notifications/inbox", async (req, res): Promise<void> => {
       isNull(notificationEventsTable.readAt),
     ));
     res.sendStatus(204);
-  } catch {
+  } catch (error) {
+    req.log.error(databaseErrorFields(error), "Lead alert read-state update failed");
     res.status(502).json({ error: "Unable to mark alerts read" });
   }
 });

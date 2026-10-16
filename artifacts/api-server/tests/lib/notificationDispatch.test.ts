@@ -21,7 +21,9 @@ describe("independent notification channels", () => {
     ])).resolves.toBeUndefined();
     expect(push).toHaveBeenCalledOnce(); expect(admin).toHaveBeenCalledOnce();
     expect(log).toHaveBeenCalledWith(
-      { channel: "owner_email", error: "Gmail API disabled" },
+      { channel: "owner_email", databaseError: {
+        message: "Gmail API disabled", code: undefined, table: undefined, column: undefined,
+      } },
       "Notification channel failed; other channels continue independently",
     );
   });
