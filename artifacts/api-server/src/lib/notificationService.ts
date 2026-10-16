@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   db,
+  advisoryLockPool,
   businessesTable,
   notificationDeliveryAttemptsTable,
   notificationDevicesTable,
@@ -11,14 +12,15 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import type { Business } from "./businessRegistry";
-import { sendApnsNotification, isApnsConfigured } from "./apnsAdapter";
+import { sendApnsNotification, isApnsConfigured, type ApnsOutcome } from "./apnsAdapter";
 import { readGoogleSheetLeads } from "./googleSheets";
 import { logger } from "./logger";
 import { deliverLeadAlertEmails } from "./leadAlertEmail";
 import { deliverOperationalFailureAlerts } from "./operationalFailures";
 import { dispatchNotificationChannels } from "./notificationDispatch";
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 5 * 60_000;
+const MAX_POLL_BACKOFF_MS = 15 * 60_000;
 const SHEETS_READ_TIMEOUT_MS = 55_000; // must be < POLLER_LEASE_MS
 const POLLER_LEASE_NAME = "lead-notification-poller";
 const POLLER_OWNER_ID = randomUUID();
@@ -258,20 +260,34 @@ async function processNotificationOutbox(): Promise<void> {
   logger.info({ count: events.length }, "Processing notification outbox");
 
   for (const queuedEvent of events) {
-    await db.transaction(async (tx) => {
-    const lock = await tx.execute(sql`SELECT pg_try_advisory_xact_lock(542317, ${queuedEvent.id}) AS locked`);
-    if (!lock.rows[0]?.locked) return;
+    // Same advisory key as the former transaction lock, but session-scoped:
+    // it protects both short transactions and the intervening APNs request.
+    // Use the separate lock pool so network waits cannot exhaust query clients.
+    const lockClient = await advisoryLockPool.connect();
+    let locked = false;
+    let discardClient = false;
+    let lockError: Error | undefined;
+    const onLockError = (error: Error) => {
+      lockError = error;
+      discardClient = true;
+    };
+    lockClient.on("error", onLockError);
+    try {
+    const lock = await lockClient.query("SELECT pg_try_advisory_lock(542317, $1) AS locked", [queuedEvent.id]);
+    locked = Boolean(lock.rows[0]?.locked);
+    if (!locked) continue;
+    const prepared = await db.transaction(async (tx) => {
     const [event] = await tx.select().from(notificationEventsTable).where(eq(notificationEventsTable.id, queuedEvent.id));
     if (!event || event.status !== "queued" || event.nextAttemptAt > new Date() || event.attempts >= MAX_DELIVERY_ATTEMPTS) return;
-    const [business] = await db.select().from(businessesTable)
+    const [business] = await tx.select().from(businessesTable)
       .where(sql`${businessesTable.id}::text = ${event.businessId}`);
     if (!business || !business.leadAlertsEnabled || business.isSample) {
-      await db.update(notificationEventsTable).set({ status: "failed", lastError: "Business alerts disabled", attempts: MAX_DELIVERY_ATTEMPTS })
+      await tx.update(notificationEventsTable).set({ status: "failed", lastError: "Business alerts disabled", attempts: MAX_DELIVERY_ATTEMPTS })
         .where(eq(notificationEventsTable.id, event.id));
       return;
     }
     // Fetch active iOS devices for this business.
-    const devices = await db
+    const devices = await tx
       .select()
       .from(notificationDevicesTable)
       .where(
@@ -290,26 +306,37 @@ async function processNotificationOutbox(): Promise<void> {
       // Increment attempts so events don't spin forever when no devices are
       // registered yet; they will be retried until MAX_DELIVERY_ATTEMPTS.
       const nextAttemptAt = new Date(now.getTime() + Math.pow(2, newAttempts) * 60_000);
-      await db
+      await tx
         .update(notificationEventsTable)
         .set({ attempts: newAttempts, lastError: "No active iOS devices", nextAttemptAt })
         .where(eq(notificationEventsTable.id, event.id));
       return;
     }
+    return { event, devices, newAttempts };
+    });
+    if (!prepared) continue;
+    const { event, devices, newAttempts } = prepared;
 
-    let anyDelivered = false;
-    let lastError: string | null = null;
-
+    // The read transaction has committed before any network I/O starts.
+    const results: Array<{ device: (typeof devices)[number]; result: ApnsOutcome }> = [];
     for (const device of devices) {
+      if (lockError) throw lockError;
       const result = await sendApnsNotification({
         deviceToken: device.token,
         title: event.title,
         body: event.body,
         deepLink: event.deepLink,
       });
+      results.push({ device, result });
+    }
+    if (lockError) throw lockError;
+    await db.transaction(async (tx) => {
+    let anyDelivered = false;
+    let lastError: string | null = null;
 
+    for (const { device, result } of results) {
       // Record the per-device attempt.
-      await db.insert(notificationDeliveryAttemptsTable).values({
+      await tx.insert(notificationDeliveryAttemptsTable).values({
         eventId: event.id,
         deviceId: device.id,
         provider: "apns",
@@ -333,7 +360,7 @@ async function processNotificationOutbox(): Promise<void> {
           { deviceId: device.id, tokenSuffix: device.token.slice(-8) },
           "APNs 410 Gone — invalidating device token",
         );
-        await db
+        await tx
           .update(notificationDevicesTable)
           .set({ enabled: false, invalidatedAt: now, updatedAt: now })
           .where(eq(notificationDevicesTable.id, device.id));
@@ -348,13 +375,13 @@ async function processNotificationOutbox(): Promise<void> {
 
     // Update the event record with the outcome of this attempt batch.
     if (anyDelivered) {
-      await db
+      await tx
         .update(notificationEventsTable)
         .set({ status: "delivered", attempts: newAttempts, deliveredAt: now, lastError: null })
         .where(eq(notificationEventsTable.id, event.id));
       logger.info({ eventId: event.id }, "Notification event marked delivered");
     } else if (newAttempts >= MAX_DELIVERY_ATTEMPTS) {
-      await db
+      await tx
         .update(notificationEventsTable)
         .set({ status: "failed", attempts: newAttempts, lastError: lastError ?? "All delivery attempts exhausted" })
         .where(eq(notificationEventsTable.id, event.id));
@@ -362,25 +389,54 @@ async function processNotificationOutbox(): Promise<void> {
     } else {
       // Exponential back-off: 2^attempts minutes (2 min, 4 min, …).
       const nextAttemptAt = new Date(now.getTime() + Math.pow(2, newAttempts) * 60_000);
-      await db
+      await tx
         .update(notificationEventsTable)
         .set({ attempts: newAttempts, lastError, nextAttemptAt })
         .where(eq(notificationEventsTable.id, event.id));
       logger.debug({ eventId: event.id, nextAttemptAt }, "Notification event scheduled for retry");
     }
     });
+    } finally {
+      try {
+        if (locked) await lockClient.query("SELECT pg_advisory_unlock(542317, $1)", [queuedEvent.id]);
+      } catch (error) {
+        // Never return a potentially locked session to the pool.
+        discardClient = true;
+        throw error;
+      } finally {
+        lockClient.removeListener("error", onLockError);
+        lockClient.release(discardClient);
+      }
+    }
   }
 }
 
+/** One read, no lease writes when all push/email queues are idle. */
+async function hasDueNotificationWork(): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT (
+      EXISTS (SELECT 1 FROM notification_events
+        WHERE status = 'queued' AND next_attempt_at <= now() AND attempts < ${MAX_DELIVERY_ATTEMPTS})
+      OR EXISTS (SELECT 1 FROM notification_events
+        WHERE email_status = 'queued' AND email_next_attempt_at <= now())
+      OR EXISTS (SELECT 1 FROM operational_failures
+        WHERE alert_sent_at IS NULL AND alert_next_attempt_at <= now())
+    ) AS due`);
+  return Boolean(result.rows[0]?.due);
+}
+
 export async function runNotificationPollCycle(): Promise<void> {
+  if (!(await hasDueNotificationWork())) return;
   if (!(await acquirePollerLease())) {
     logger.debug("Skipping lead poll because another server owns the lease");
     return;
   }
 
   // Renew the lease periodically so it never expires during a long cycle.
+  let renewalError: unknown;
   const heartbeat = setInterval(() => {
     void renewPollerLease().catch((error) => {
+      renewalError = error;
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
         "Failed to renew poller lease during cycle",
@@ -392,14 +448,14 @@ export async function runNotificationPollCycle(): Promise<void> {
   try {
     // The owner workspace now reads PostgreSQL leads. Do not also poll legacy
     // Make/Sheets logs: that would generate duplicate or historical alerts.
-    try {
-      await runNotificationOutboxNow();
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Notification outbox processing failed",
-      );
-    }
+    // Scheduled retries observe channel failures so DB errors trigger backoff.
+    // The immediate new-lead path below remains independent of this sweep.
+    await dispatchNotificationChannels([
+      { name: "owner_email", deliver: deliverLeadAlertEmails },
+      { name: "admin_email", deliver: deliverOperationalFailureAlerts },
+      { name: "push", deliver: processNotificationOutbox },
+    ], { throwOnError: true });
+    if (renewalError) throw renewalError;
   } finally {
     clearInterval(heartbeat);
     await releasePollerLease();
@@ -407,8 +463,8 @@ export async function runNotificationPollCycle(): Promise<void> {
 }
 
 export function runNotificationOutboxNow(): Promise<void> {
-  // Email owns its independent in-flight state. Do not hold the push poller's
-  // lease until a slow email batch completes, including on later retry ticks.
+  // Immediate lead delivery stays separate from scheduled retry/backoff:
+  // slow email must not delay this or a subsequent new lead's push.
   void dispatchNotificationChannels([
     { name: "owner_email", deliver: deliverLeadAlertEmails },
     { name: "admin_email", deliver: deliverOperationalFailureAlerts },
@@ -426,18 +482,21 @@ let pollTimer: NodeJS.Timeout | null = null;
 let cycleInFlight = false;
 // Resolves when the active cycle completes; null when no cycle is running.
 let cyclePromise: Promise<void> | null = null;
+let pollerStarted = false;
+let consecutiveFailures = 0;
 
 export function startLeadNotificationPoller(): void {
-  if (pollTimer) return;
+  if (pollerStarted) return;
+  pollerStarted = true;
+  consecutiveFailures = 0;
 
   const runOnce = () => {
-    if (cycleInFlight) {
-      logger.debug("Skipping lead poll tick because previous cycle is still in progress");
-      return;
-    }
+    if (!pollerStarted || cycleInFlight) return;
     cycleInFlight = true;
     cyclePromise = runNotificationPollCycle()
+      .then(() => { consecutiveFailures = 0; })
       .catch((error) => {
+        consecutiveFailures += 1;
         logger.error(
           { error: error instanceof Error ? error.message : "Unknown polling error" },
           "Lead notification poll cycle failed",
@@ -446,19 +505,23 @@ export function startLeadNotificationPoller(): void {
       .finally(() => {
         cycleInFlight = false;
         cyclePromise = null;
+        if (pollerStarted) {
+          const delay = Math.min(MAX_POLL_BACKOFF_MS,
+            POLL_INTERVAL_MS * 2 ** Math.min(Math.max(0, consecutiveFailures - 1), 2));
+          pollTimer = setTimeout(runOnce, delay);
+          pollTimer.unref();
+        }
       });
   };
 
   runOnce();
-  pollTimer = setInterval(runOnce, POLL_INTERVAL_MS);
-  pollTimer.unref();
   logger.info({ intervalMs: POLL_INTERVAL_MS }, "Lead notification retry worker started (new events deliver immediately)");
 }
 
 /** Stop scheduling new cycles and wait for any in-progress cycle to finish. */
 export async function stopLeadNotificationPoller(): Promise<void> {
-  if (!pollTimer) return;
-  clearInterval(pollTimer);
+  pollerStarted = false;
+  if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
   logger.info("Lead notification poller stopping — waiting for in-flight cycle");
   if (cyclePromise) await cyclePromise;

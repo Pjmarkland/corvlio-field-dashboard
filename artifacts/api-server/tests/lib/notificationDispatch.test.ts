@@ -4,6 +4,15 @@ vi.mock("../../src/lib/logger", () => ({ logger: { error: log } }));
 import { dispatchNotificationChannels } from "../../src/lib/notificationDispatch";
 
 describe("independent notification channels", () => {
+  it("reports retry-worker failures only after all independent channels settle", async () => {
+    const failure = new Error("database unavailable");
+    const push = vi.fn(async () => {});
+    await expect(dispatchNotificationChannels([
+      { name: "owner_email", deliver: async () => { throw failure; } },
+      { name: "push", deliver: push },
+    ], { throwOnError: true })).rejects.toBe(failure);
+    expect(push).toHaveBeenCalledOnce();
+  });
   it("still delivers push and admin notifications when owner email fails", async () => {
     const push = vi.fn(async () => {}), admin = vi.fn(async () => {});
     await expect(dispatchNotificationChannels([

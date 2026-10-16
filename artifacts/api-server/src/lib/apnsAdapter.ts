@@ -22,6 +22,7 @@ const APNS_HOST =
 
 // APNs tokens are valid for 1 hour; refresh every 50 minutes.
 const JWT_LIFETIME_MS = 50 * 60 * 1000;
+const APNS_REQUEST_TIMEOUT_MS = 10_000;
 
 let _cachedJwt: { token: string; generatedAt: number } | null = null;
 let _apnsSession: http2.ClientHttp2Session | null = null;
@@ -135,6 +136,14 @@ export async function sendApnsNotification(input: {
   });
 
   return new Promise((resolve) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const finish = (result: ApnsOutcome) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      resolve(result);
+    };
     let req: http2.ClientHttp2Stream;
     try {
       req = session.request({
@@ -150,7 +159,7 @@ export async function sendApnsNotification(input: {
     } catch (err) {
       // Session may have gone away; null it so next call reconnects.
       _apnsSession = null;
-      resolve({
+      finish({
         outcome: "error",
         statusCode: 0,
         reason: err instanceof Error ? err.message : String(err),
@@ -161,6 +170,12 @@ export async function sendApnsNotification(input: {
     let statusCode = 0;
     let apnsId: string | undefined;
     let body = "";
+    // Wall-clock deadline, including connection establishment and response body.
+    timeout = setTimeout(() => {
+      finish({ outcome: "error", statusCode: 0, reason: "APNs request timed out after 10000ms" });
+      req.close(http2.constants.NGHTTP2_CANCEL);
+    }, APNS_REQUEST_TIMEOUT_MS);
+    timeout.unref();
 
     req.on("response", (headers) => {
       statusCode = Number(headers[":status"]);
@@ -173,11 +188,11 @@ export async function sendApnsNotification(input: {
 
     req.on("end", () => {
       if (statusCode === 200) {
-        resolve({ outcome: "delivered", apnsId });
+        finish({ outcome: "delivered", apnsId });
         return;
       }
       if (statusCode === 410) {
-        resolve({ outcome: "invalid_token" });
+        finish({ outcome: "invalid_token" });
         return;
       }
       let reason: string | undefined;
@@ -187,12 +202,15 @@ export async function sendApnsNotification(input: {
       } catch {
         reason = body || undefined;
       }
-      resolve({ outcome: "error", statusCode, reason });
+      finish({ outcome: "error", statusCode, reason });
     });
 
     req.on("error", (err) => {
       _apnsSession = null;
-      resolve({ outcome: "error", statusCode: 0, reason: err.message });
+      finish({ outcome: "error", statusCode: 0, reason: err.message });
+    });
+    req.on("close", () => {
+      finish({ outcome: "error", statusCode: 0, reason: "APNs stream closed before response completed" });
     });
 
     req.write(apsPayload);

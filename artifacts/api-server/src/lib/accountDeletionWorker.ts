@@ -13,7 +13,7 @@ export function startAccountDeletionWorker() {
     })().catch(() => logger.error("Account deletion retry failed; requests remain queued."))
       .finally(() => { running = null; });
   };
-  timer = setInterval(run, 60_000);
+  timer = setInterval(run, 5 * 60_000);
   timer.unref();
 }
 export async function stopAccountDeletionWorker() {
