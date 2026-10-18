@@ -5,6 +5,73 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ManualPaymentConfirmation {
+  /** @maxLength 500 */
+  reference: string;
+}
+
+export interface PaymentInstructions {
+  /** @maxLength 6000 */
+  instructions: string;
+  /** @maxLength 2048 */
+  paymentLink: string;
+}
+
+export type ManualInvoiceStatus = typeof ManualInvoiceStatus[keyof typeof ManualInvoiceStatus];
+
+
+export const ManualInvoiceStatus = {
+  invoiced: 'invoiced',
+  paid: 'paid',
+  overdue: 'overdue',
+} as const;
+
+export interface ManualInvoice {
+  id: number;
+  number: string;
+  businessName: string;
+  plan: string;
+  payee: string;
+  monthlyCents: number;
+  setupCents: number;
+  totalCents: number;
+  issuedAt: string;
+  dueAt: string;
+  periodKey: string;
+  status: ManualInvoiceStatus;
+  /** @nullable */
+  paidAt: string | null;
+  /** @nullable */
+  paymentReference: string | null;
+  deliveryStatus: string;
+  reminderStatus: string;
+}
+
+export type InvoiceOverviewStatus = typeof InvoiceOverviewStatus[keyof typeof InvoiceOverviewStatus];
+
+
+export const InvoiceOverviewStatus = {
+  legacy: 'legacy',
+  requested: 'requested',
+  invoiced: 'invoiced',
+  paid: 'paid',
+  overdue: 'overdue',
+} as const;
+
+export interface InvoiceOverview {
+  businessId: number;
+  businessName: string;
+  /** @nullable */
+  plan: string | null;
+  /** @nullable */
+  businessAgeMonths: number | null;
+  status: InvoiceOverviewStatus;
+  serviceActive: boolean;
+  provisioningState: string;
+  invoices: ManualInvoice[];
+  settings: PaymentInstructions;
+}
+
 export type AccountDeletionInputConfirmation = typeof AccountDeletionInputConfirmation[keyof typeof AccountDeletionInputConfirmation];
 
 
@@ -887,5 +954,10 @@ export interface AdminActivity {
 export type CreateOwnerDemoCall200 = {
   callId: string;
   message: string;
+};
+
+export type GetAdminInvoices200 = {
+  businesses: InvoiceOverview[];
+  settings: PaymentInstructions;
 };
 

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetLeadsQueryKey, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import { PlanPicker } from '@/components/PlanPicker';
+import { validStartupAge, type PlanId } from '@/lib/invoicePlans';
 import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo.svg';
@@ -344,6 +346,8 @@ function OnboardingPage() {
   const { revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
+  const [chosenPlan, setChosenPlan] = useState<PlanId | ''>('');
+  const [startupAge, setStartupAge] = useState('');
   const [sampleResetKey, setSampleResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const websiteMutation = usePreviewBusinessWebsite();
@@ -436,6 +440,15 @@ function OnboardingPage() {
       return;
     }
 
+    if (!chosenPlan) {
+      setSubmission({ kind: 'error', message: 'Choose a plan before finishing.' });
+      return;
+    }
+    const startupAgeMonths = chosenPlan === 'startup' ? validStartupAge(startupAge) : null;
+    if (chosenPlan === 'startup' && startupAgeMonths === null) {
+      setSubmission({ kind: 'error', message: 'Startup is for businesses under 18 months. Enter a whole number from 0 to 17.' });
+      return;
+    }
     setIsSubmitting(true);
     setSubmission(null);
 
@@ -446,6 +459,8 @@ function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           isSample: form.isSample,
+          chosenPlan,
+          ...(chosenPlan === 'startup' ? { startupAgeMonths } : {}),
           businessName: form.businessName,
           agentName: form.agentName.trim() || undefined,
           businessType: form.businessType,
@@ -498,6 +513,8 @@ function OnboardingPage() {
         kind: 'success',
         message: payload.isSample
           ? "Sample business saved. No live phone number was purchased."
+          : payload.awaitingPayment === true
+          ? "Setup saved. Your dashboard explains the next steps."
           : payload.phoneProvisioningPending
           ? "Your business is setting up. We'll finish shortly."
           : `Setup submitted successfully. Your assigned phone number is ${payload.phoneNumber}.`,
@@ -668,6 +685,9 @@ function OnboardingPage() {
                 <Field id="emergencyContact" label="Emergency / after-hours policy" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours availability, dispatch instructions, or urgent-call guidance." multiline rows={4} />
                 <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank />
               </div>
+            </section>
+            <section className="rounded-2xl border border-border bg-card p-5 sm:p-7" data-testid="section-plan">
+              <PlanPicker value={chosenPlan} onChange={setChosenPlan} age={startupAge} onAge={setStartupAge} />
             </section>
           </div>
 

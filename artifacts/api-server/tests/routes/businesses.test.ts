@@ -1,5 +1,7 @@
 import { createServer, type Server } from "node:http";
 import express from "express";
+vi.mock("../../src/invoicing/service", () => ({ initializeInvoices: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../../src/invoicing/worker", () => ({ runInvoiceCycle: vi.fn().mockResolvedValue(undefined) }));
 
 const mocks = vi.hoisted(() => ({
   getAuth: vi.fn(),
@@ -57,6 +59,7 @@ let baseUrl: string;
 let business: Record<string, any> | undefined;
 
 const validBody = {
+  chosenPlan: "starter",
   businessName: "Example Heating",
   ownerEmail: "business-owner@example.test",
 };

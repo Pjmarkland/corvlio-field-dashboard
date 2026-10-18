@@ -23,3 +23,4 @@
 - [Account deletion boundaries](account-deletion-boundaries.md) — preserve Retell for manual release; paid-support refusal needs Apple policy review before submission.
 - [Lead alert latency](lead-alert-latency.md) — database-cost reductions may slow retry sweeps, never creation-triggered alerts for new leads.
 - [Production DB diagnostics](production-db-diagnostics.md) — unavailable read replicas do not establish primary database health, suspension, or schema state.
+- [Manual invoice boundaries](manual-invoice-boundaries.md) — keep Stripe disabled, preserve existing accounts, and review uncertain Gmail sends instead of risking duplicates.

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
-import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, LayoutDashboard, LockKeyhole, Radio, RefreshCw, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, FileText, LayoutDashboard, LockKeyhole, Radio, RefreshCw, ShieldAlert, Users } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
 import type { AdminBusinessSummary } from '@workspace/api-client-react';
@@ -10,6 +10,7 @@ const BILLING_NAV = { href: '/admin/billing', label: 'Billing', icon: BarChart3 
 export const ADMIN_NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/activity', label: 'Lead activity', icon: Radio },
+  { href: '/admin/invoices', label: 'Invoices', icon: FileText },
 ];
 
 export function formatAdminDate(value: string | null | undefined, fallback = 'Not recorded') {

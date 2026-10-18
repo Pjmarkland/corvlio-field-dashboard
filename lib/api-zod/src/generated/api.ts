@@ -1191,3 +1191,208 @@ export const SetStartupEligibilityResponse = zod.object({
 })
 
 
+export const getOwnerInvoicesResponseSettingsInstructionsMax = 6000;
+
+export const getOwnerInvoicesResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const GetOwnerInvoicesResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(getOwnerInvoicesResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(getOwnerInvoicesResponseSettingsPaymentLinkMax)
+})
+})
+
+
+export const getAdminInvoicesResponseBusinessesItemSettingsInstructionsMax = 6000;
+
+export const getAdminInvoicesResponseBusinessesItemSettingsPaymentLinkMax = 2048;
+
+export const getAdminInvoicesResponseSettingsInstructionsMax = 6000;
+
+export const getAdminInvoicesResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const GetAdminInvoicesResponse = zod.object({
+  "businesses": zod.array(zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(getAdminInvoicesResponseBusinessesItemSettingsInstructionsMax),
+  "paymentLink": zod.string().max(getAdminInvoicesResponseBusinessesItemSettingsPaymentLinkMax)
+})
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(getAdminInvoicesResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(getAdminInvoicesResponseSettingsPaymentLinkMax)
+})
+})
+
+
+export const updateInvoiceSettingsBodyInstructionsMax = 6000;
+
+export const updateInvoiceSettingsBodyPaymentLinkMax = 2048;
+
+
+
+export const UpdateInvoiceSettingsBody = zod.object({
+  "instructions": zod.string().max(updateInvoiceSettingsBodyInstructionsMax),
+  "paymentLink": zod.string().max(updateInvoiceSettingsBodyPaymentLinkMax)
+})
+
+export const updateInvoiceSettingsResponseInstructionsMax = 6000;
+
+export const updateInvoiceSettingsResponsePaymentLinkMax = 2048;
+
+
+
+export const UpdateInvoiceSettingsResponse = zod.object({
+  "instructions": zod.string().max(updateInvoiceSettingsResponseInstructionsMax),
+  "paymentLink": zod.string().max(updateInvoiceSettingsResponsePaymentLinkMax)
+})
+
+
+export const ApproveStartupInvoiceParams = zod.object({
+  "businessId": zod.coerce.number()
+})
+
+export const approveStartupInvoiceResponseSettingsInstructionsMax = 6000;
+
+export const approveStartupInvoiceResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const ApproveStartupInvoiceResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(approveStartupInvoiceResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(approveStartupInvoiceResponseSettingsPaymentLinkMax)
+})
+})
+
+
+export const MarkManualInvoicePaidParams = zod.object({
+  "invoiceId": zod.coerce.number()
+})
+
+export const markManualInvoicePaidBodyReferenceMax = 500;
+
+
+
+export const MarkManualInvoicePaidBody = zod.object({
+  "reference": zod.string().max(markManualInvoicePaidBodyReferenceMax)
+})
+
+export const markManualInvoicePaidResponseSettingsInstructionsMax = 6000;
+
+export const markManualInvoicePaidResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const MarkManualInvoicePaidResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(markManualInvoicePaidResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(markManualInvoicePaidResponseSettingsPaymentLinkMax)
+})
+})
+
+

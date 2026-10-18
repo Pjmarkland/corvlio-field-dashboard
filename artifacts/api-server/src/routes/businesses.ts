@@ -21,6 +21,8 @@ import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
 import { recordOperationalFailure } from "../lib/operationalFailures";
 import { runNotificationOutboxNow } from "../lib/notificationService";
+import { initializeInvoices } from "../invoicing/service";
+import { runInvoiceCycle } from "../invoicing/worker";
 
 const router: IRouter = Router();
 
@@ -300,6 +302,8 @@ router.post("/businesses/onboarding/website-preview", async (req, res): Promise<
 });
 
 const OnboardBusinessBody = z.object({
+  chosenPlan: z.enum(["startup","starter","professional","managed"]),
+  startupAgeMonths: z.number().int().min(0).max(17).optional(),
   businessHours: z.string().trim().max(500).refine(v => !v || parseBusinessHours(v) !== null).optional(),
   timeZone: z.string().trim().max(100).refine(v => !v || validTimeZone(v)).optional(),
   isSample: z.boolean().optional(),
@@ -344,6 +348,9 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   }
 
   const nameError = businessNameValidationError(body.data.businessName);
+  if(body.data.chosenPlan === "startup" && body.data.startupAgeMonths === undefined) {
+    res.status(400).json({error:"Startup requires a business age under 18 months."});return;
+  }
   if (nameError) {
     res.status(400).json({ error: nameError });
     return;
@@ -396,12 +403,21 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
 
   try {
     const existingBusiness = await findBusinessByClerkUserId(userId);
+    if (existingBusiness?.chosenPlan && existingBusiness.chosenPlan !== body.data.chosenPlan) {
+      res.status(409).json({error:"Your plan is already saved. Please contact support to change it."});return;
+    }
     const result = await saveBusinessWithOptionalPhone({
       ...businessInfo,
+      chosenPlan: existingBusiness ? existingBusiness.chosenPlan : body.data.chosenPlan,
+      startupAgeMonths: existingBusiness ? existingBusiness.startupAgeMonths : body.data.startupAgeMonths ?? null,
+      manualPaymentState: existingBusiness ? existingBusiness.manualPaymentState
+        : body.data.chosenPlan === "startup" ? "requested" : "invoiced",
       businessWebsiteUrl: websiteUrl,
       websiteEnrichmentAttemptedAt: null,
     });
-    if (result.phoneProvisioningPending) {
+    await initializeInvoices(result.business.id);
+    void runInvoiceCycle();
+    if (result.phoneProvisioningPending && result.business.provisioningState !== "awaiting_payment") {
       const provisioningDetails = result.provisioningError instanceof Error
         ? result.provisioningError.message
         : "Unknown Retell provisioning error";
@@ -442,9 +458,10 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
       phoneProvisioningPending: result.phoneProvisioningPending,
       isSample: result.business.isSample,
       provisioningState: result.business.provisioningState,
+      awaitingPayment: Boolean(result.business.chosenPlan && !result.business.firstInvoicePaidAt && !result.business.isSample),
     });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("A live business cannot")) {
+    if (error instanceof Error && (error.message.startsWith("A live business cannot") || error.message.startsWith("Your plan is already saved"))) {
       res.status(409).json({ error: error.message });
       return;
     }

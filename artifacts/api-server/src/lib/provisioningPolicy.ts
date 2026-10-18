@@ -33,6 +33,9 @@ export async function guardedProvisioning(
   if (!account) throw new Error("An authenticated account is required to provision a number");
   return store.lock(account, async () => {
     const existing = await store.find(account);
+    if (existing?.chosenPlan && input.chosenPlan && existing.chosenPlan !== input.chosenPlan) {
+      throw new Error("Your plan is already saved. Please contact support to change it.");
+    }
     if (input.isSample && existing?.retellPhoneNumber) {
       throw new Error("A live business cannot be converted to a sample. Use Preview sample call instead.");
     }
@@ -50,6 +53,10 @@ export async function guardedProvisioning(
       provisioningError: error,
     });
     if (business.isSample || business.retellPhoneNumber) return result(business);
+    if (business.chosenPlan && !business.firstInvoicePaidAt) {
+      await store.state(business.id, "awaiting_payment");
+      return result({ ...business, provisioningState: "awaiting_payment" });
+    }
 
     let attempt: PurchaseAttempt | undefined;
     try {
@@ -70,7 +77,9 @@ export async function guardedProvisioning(
       }
     }
     // Existing pending businesses/uncertain requests are deliberately not purchased again.
-    if (existing || attempt) return result(business);
+    const firstPaidActivation = Boolean(business.chosenPlan && business.firstInvoicePaidAt
+      && business.provisioningState === "awaiting_payment");
+    if ((existing && !firstPaidActivation) || attempt) return result(business);
     try {
       if (!await store.reserve(account, business.id, caps.daily, caps.total)) {
         await store.state(business.id, "capped");

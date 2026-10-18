@@ -30,6 +30,11 @@ export const provisioningStore: ProvisioningStore = {
     const isSample = business.isSample || Boolean(input.isSample);
     const updated = await updateBusiness(business.id, {
       ...input,
+      // Onboarding retries must not overwrite approval or payment recorded by an admin.
+      chosenPlan: business.chosenPlan,
+      startupAgeMonths: business.startupAgeMonths,
+      manualPaymentState: business.manualPaymentState,
+      firstInvoicePaidAt: business.firstInvoicePaidAt,
       isSample,
       websiteEnrichmentSources: sources,
       websiteEnrichmentAttemptedAt: business.websiteEnrichmentAttemptedAt,

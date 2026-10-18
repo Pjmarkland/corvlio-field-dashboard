@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
@@ -9,6 +9,11 @@ export const businessesTable = pgTable("businesses", {
   agentName: text("agent_name"),
   clerkUserId: text("clerk_user_id"),
   ownerEmail: text("owner_email"),
+  // Null preserves existing businesses; only newly opted-in accounts are gated.
+  chosenPlan: text("chosen_plan"),
+  startupAgeMonths: integer("startup_age_months"),
+  manualPaymentState: text("manual_payment_state"),
+  firstInvoicePaidAt: timestamp("first_invoice_paid_at", { withTimezone: true }),
   ownerPhone: text("owner_phone"),
   leadAlertsEnabled: boolean("lead_alerts_enabled").notNull().default(true),
   retellPhoneNumber: text("retell_phone_number"),

@@ -5,6 +5,8 @@ import {
   getGetLeadsQueryKey,
   getGetLeadDetailQueryKey,
   useGetBusinessProfile,
+  useGetOwnerInvoices,
+  getGetOwnerInvoicesQueryKey,
   useGetLeads,
   useGetNotificationStatus,
   useUpdateBusinessProfile,
@@ -52,6 +54,8 @@ import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/Accoun
 import NativeBillingSection from '@/components/NativeBillingSection';
 import AdminActivityPage from '@/pages/admin/AdminActivityPage';
 import BillingPage from '@/pages/billing';
+import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage';
+import OwnerInvoicePanel from '@/components/OwnerInvoicePanel';
 import AdminBillingPage from '@/pages/admin/AdminBillingPage';
 import { useBillingAvailability } from '@/hooks/useBilling';
 import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
@@ -257,6 +261,16 @@ function formatReplyTime(minutes: number | null) {
 
 function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
   const [location] = useLocation();
+  const invoices = useGetOwnerInvoices({ query: {
+    queryKey: getGetOwnerInvoicesQueryKey(), retry: false, staleTime: 15_000,
+    refetchInterval: 45_000, refetchOnWindowFocus: true,
+  } });
+  const serviceLive = invoices.data?.serviceActive === true && invoices.data.provisioningState === 'ready';
+  const activationLabel = !invoices.data ? 'Checking service status'
+    : invoices.data.status === 'requested' ? 'Awaiting approval'
+    : serviceLive ? 'Receptionist live'
+    : invoices.data.invoices.some(i => i.status === 'paid') ? 'Activation pending'
+    : invoices.data.plan && invoices.data.status !== 'legacy' ? 'Awaiting payment' : 'Phone setup pending';
   const pendingCount = leads.filter((lead) => lead.status === 'pending').length;
   const nav = [
     { href: '/dashboard', label: 'Today', icon: Home, count: pendingCount },
@@ -288,9 +302,9 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
           })}
         </nav>
         <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/55 p-4">
-          <div className="mb-3 flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[10px] uppercase tracking-[0.16em]">Receptionist live</span></div>
-          <p className="text-xs leading-relaxed text-sidebar-foreground/65">New calls land here. One tap gets you moving.</p>
-          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] text-sidebar-foreground/45"><span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-primary" /> listening for leads</div>
+          <div className="mb-3 flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[10px] uppercase tracking-[0.16em]">{activationLabel}</span></div>
+          <p className="text-xs leading-relaxed text-sidebar-foreground/65">{serviceLive ? 'New calls land here. One tap gets you moving.' : 'Your dashboard will update when your receptionist is ready.'}</p>
+          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] text-sidebar-foreground/45"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{serviceLive ? 'listening for leads' : 'service not yet active'}</div>
         </div>
       </aside>
 
@@ -310,7 +324,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
+        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden" aria-label="Mobile navigation">
@@ -629,7 +643,7 @@ function Router({ refreshLeads, leads, businessName, retellPhoneNumber, onboardi
   // Analytics can use this device's zone without saving it as a business fact.
   const timeZone = savedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [location] = useLocation();
-  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><OwnerInvoicePanel /><HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
 }
 
 export function UnconfiguredAccountScreen({
@@ -816,6 +830,10 @@ function AdminActivityRoute() {
   return <AdminGuard><AdminActivityPage /></AdminGuard>;
 }
 
+function AdminInvoicesRoute() {
+  return <AdminGuard><AdminInvoicesPage /></AdminGuard>;
+}
+
 function AdminBillingRoute() {
   return <AdminGuard><AdminBillingPage /></AdminGuard>;
 }
@@ -858,7 +876,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {

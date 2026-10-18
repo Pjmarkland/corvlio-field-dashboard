@@ -63,7 +63,7 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     if (businesses.some(b => !owned.rows.some(o => o.id === b.id))) throw new AccountDeletionError("Business ownership changed. Please retry.");
     const ids = businesses.map(b => b.id);
     const billing = await client.query("SELECT * FROM billing_accounts WHERE business_id = ANY($1::int[]) FOR UPDATE", [ids]);
-    if (billing.rows.some(paidDeletionBlocked)) {
+    if (billing.rows.some(paidDeletionBlocked) || businesses.some(b => b.chosen_plan && b.first_invoice_paid_at)) {
       throw new AccountDeletionError("Account deletion is blocked while a paid subscription is active, past due, or unresolved. Contact hello@corvlio.com for support.");
     }
     const attempts = await client.query(

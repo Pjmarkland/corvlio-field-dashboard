@@ -661,6 +661,85 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/StartupEligibilityInput"}}}}
       responses:
         "200": {description: Admin eligibility, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /invoicing/me:
+    get:
+      operationId: getOwnerInvoices
+      tags: [Invoicing]
+      responses:
+        '200':
+          description: Owner invoices and payment instructions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+  /admin/invoicing:
+    get:
+      operationId: getAdminInvoices
+      tags: [Invoicing]
+      responses:
+        '200':
+          description: Businesses and their invoice history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [businesses, settings]
+                properties:
+                  businesses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceOverview'
+                  settings:
+                    $ref: '#/components/schemas/PaymentInstructions'
+  /admin/invoicing/settings:
+    patch:
+      operationId: updateInvoiceSettings
+      tags: [Invoicing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInstructions'
+      responses:
+        '200':
+          description: Saved instructions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstructions'
+  /admin/invoicing/{businessId}/approve-startup:
+    post:
+      operationId: approveStartupInvoice
+      tags: [Invoicing]
+      parameters:
+        - { name: businessId, in: path, required: true, schema: { type: number } }
+      responses:
+        '200':
+          description: Startup approved and invoice queued for email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+  /admin/invoicing/invoices/{invoiceId}/paid:
+    post:
+      operationId: markManualInvoicePaid
+      tags: [Invoicing]
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualPaymentConfirmation'
+      responses:
+        '200':
+          description: Payment recorded; initial payment queues provisioning
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
 components:
   securitySchemes:
     clerkSession:
@@ -672,6 +751,54 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ManualPaymentConfirmation:
+      type: object
+      required: [reference]
+      properties:
+        reference: { type: string, maxLength: 500 }
+    PaymentInstructions:
+      type: object
+      required: [instructions, paymentLink]
+      properties:
+        instructions: { type: string, maxLength: 6000 }
+        paymentLink: { type: string, maxLength: 2048 }
+    ManualInvoice:
+      type: object
+      required: [id, number, businessName, plan, payee, monthlyCents, setupCents, totalCents, issuedAt, dueAt, periodKey, status, paidAt, paymentReference, deliveryStatus, reminderStatus]
+      properties:
+        id: { type: number }
+        number: { type: string }
+        businessName: { type: string }
+        plan: { type: string }
+        payee: { type: string }
+        monthlyCents: { type: number }
+        setupCents: { type: number }
+        totalCents: { type: number }
+        issuedAt: { type: string }
+        dueAt: { type: string }
+        periodKey: { type: string }
+        status: { type: string, enum: [invoiced, paid, overdue] }
+        paidAt: { type: [string, 'null'] }
+        paymentReference: { type: [string, 'null'] }
+        deliveryStatus: { type: string }
+        reminderStatus: { type: string }
+    InvoiceOverview:
+      type: object
+      required: [businessId, businessName, plan, businessAgeMonths, status, serviceActive, provisioningState, invoices, settings]
+      properties:
+        businessId: { type: number }
+        businessName: { type: string }
+        plan: { type: [string, 'null'] }
+        businessAgeMonths: { type: [number, 'null'] }
+        status: { type: string, enum: [legacy, requested, invoiced, paid, overdue] }
+        serviceActive: { type: boolean }
+        provisioningState: { type: string }
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManualInvoice'
+        settings:
+          $ref: '#/components/schemas/PaymentInstructions'
     AccountDeletionInput:
       type: object
       required: [confirmation]

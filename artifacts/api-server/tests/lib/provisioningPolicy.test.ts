@@ -57,6 +57,34 @@ function fixture() {
 }
 
 describe("phone provisioning safeguards", () => {
+  it("saves unpaid onboarding without reserving or purchasing a number", async () => {
+    const {store,buy}=fixture();
+    const r=await guardedProvisioning({...input(),chosenPlan:"starter",manualPaymentState:"invoiced"},store,buy);
+    expect(r.business.provisioningState).toBe("awaiting_payment");
+    expect(store.reserve).not.toHaveBeenCalled();
+    expect(buy).not.toHaveBeenCalled();
+  });
+  it("a Startup request cannot activate before first payment", async () => {
+    const {store,buy}=fixture();
+    const r=await guardedProvisioning({...input(),chosenPlan:"startup",manualPaymentState:"requested"},store,buy);
+    expect(r.business.provisioningState).toBe("awaiting_payment");
+    expect(buy).not.toHaveBeenCalled();
+  });
+  it("activates an existing awaiting-payment account exactly once after payment", async () => {
+    const {store,buy,businesses}=fixture();
+    await guardedProvisioning({...input(),chosenPlan:"professional"},store,buy);
+    const b=businesses.get("test-owner")!;
+    b.firstInvoicePaidAt=new Date();
+    await Promise.all(Array.from({length:5},()=>guardedProvisioning({...input(),chosenPlan:"professional"},store,buy)));
+    expect(buy).toHaveBeenCalledOnce();
+    expect(businesses.get("test-owner")?.retellPhoneNumber).toBeTruthy();
+  });
+  it("does not let a concurrent onboarding retry switch the saved plan", async () => {
+    const {store,buy}=fixture();
+    await guardedProvisioning({...input(),chosenPlan:"startup",manualPaymentState:"requested"},store,buy);
+    await expect(guardedProvisioning({...input(),chosenPlan:"managed"},store,buy)).rejects.toThrow("plan is already saved");
+    expect(buy).not.toHaveBeenCalled();
+  });
   it("saves sample businesses but never reserves budget or buys a number", async () => {
     const { store, buy } = fixture();
     const result = await guardedProvisioning(input("demo", true), store, buy);

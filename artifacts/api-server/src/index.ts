@@ -1,4 +1,5 @@
 import app from "./app";
+import { startInvoiceWorker, stopInvoiceWorker } from "./invoicing/worker";
 import { databaseErrorFields } from "@workspace/db/errors";
 import { startAccountDeletionWorker, stopAccountDeletionWorker } from "./lib/accountDeletionWorker";
 import { startBillingWorker, stopBillingWorker } from "./billing/worker";
@@ -39,6 +40,7 @@ const server = app.listen(port, (err) => {
   startLeadNotificationPoller();
   startBillingWorker();
   startAccountDeletionWorker();
+  startInvoiceWorker();
 });
 
 async function shutdown(signal: string) {
@@ -48,6 +50,7 @@ async function shutdown(signal: string) {
   await stopLeadNotificationPoller();
   await stopBillingWorker();
   await stopAccountDeletionWorker();
+  await stopInvoiceWorker();
   closeApnsSession();
   server.close((error) => {
     if (error) {
