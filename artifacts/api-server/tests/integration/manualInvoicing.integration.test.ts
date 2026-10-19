@@ -69,4 +69,20 @@ describe.skipIf(process.env.RUN_MANUAL_INVOICE_DB_TESTS !== "true")("manual invo
     expect(reminders.rows).toHaveLength(2);
     expect(reminders.rows.every(r=>r.count===1)).toBe(true);
   });
+  it("defaults to manual and suppresses Square generation and reminders without changing old invoices",async()=>{
+    const id=await business();
+    const mode=await pool.query("SELECT billing_mode FROM businesses WHERE id=$1",[id]);
+    expect(mode.rows[0].billing_mode).toBe("manual");
+    await initializeInvoices(id);
+    const original=(await ownerInvoiceOverview(id)).invoices[0];
+    await pool.query("UPDATE invoice_emails SET status='sent' WHERE invoice_id=$1",[original.id]);
+    await pool.query("UPDATE businesses SET billing_mode='square',first_invoice_paid_at=$2 WHERE id=$1",
+      [id,new Date("2026-01-31T12:00Z")]);
+    await initializeInvoices(id);
+    await scheduleInvoiceWork(new Date("2026-12-01T12:00Z"),[id]);
+    expect((await ownerInvoiceOverview(id)).invoices).toHaveLength(1);
+    const reminders=await pool.query("SELECT id FROM invoice_emails WHERE invoice_id=$1 AND kind='reminder'",[original.id]);
+    expect(reminders.rows).toHaveLength(0);
+    await expect(pool.query("UPDATE businesses SET billing_mode='invalid' WHERE id=$1",[id])).rejects.toThrow();
+  });
 });

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const businessesTable = pgTable("businesses", {
   id: serial("id").primaryKey(),
@@ -11,6 +11,7 @@ export const businessesTable = pgTable("businesses", {
   ownerEmail: text("owner_email"),
   // Null preserves existing businesses; only newly opted-in accounts are gated.
   chosenPlan: text("chosen_plan"),
+  billingMode: text("billing_mode", { enum: ["manual", "square"] }).notNull().default("manual"),
   startupAgeMonths: integer("startup_age_months"),
   manualPaymentState: text("manual_payment_state"),
   firstInvoicePaidAt: timestamp("first_invoice_paid_at", { withTimezone: true }),
@@ -51,6 +52,7 @@ export const businessesTable = pgTable("businesses", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  check("businesses_billing_mode_check", sql`${table.billingMode} IN ('manual','square')`),
   uniqueIndex("businesses_clerk_user_id_unique").on(table.clerkUserId),
   uniqueIndex("businesses_phone_normalized_unique")
     .on(table.retellPhoneNormalized),

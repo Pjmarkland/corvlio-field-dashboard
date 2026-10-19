@@ -12,6 +12,7 @@ import { approveStartup,initializeInvoices,insertInvoice,markInvoicePaid,schedul
 import { deliverInvoiceEmails,invoiceEmailBody,provisionPaidBusinesses } from "../../src/invoicing/worker";
 
 const b={id:71,business_name:"Test Invoice Business",owner_email:"test@example.test",chosen_plan:"starter",
+  billing_mode:"manual" as const,
   startup_age_months:null,manual_payment_state:"invoiced",first_invoice_paid_at:null,provisioning_state:"awaiting_payment",retell_phone_number:null,is_sample:false};
 const i={id:91,business_id:71,business_name:b.business_name,plan:"starter",period_key:"initial",
   monthly_cents:75000,setup_cents:30000,issued_at:new Date("2026-10-18T12:00Z"),due_at:new Date("2026-10-23T12:00Z"),
@@ -140,7 +141,7 @@ describe("email and provisioning safety",()=>{
       if(sql.startsWith("SELECT instructions")) return {rows:[{instructions:"Pay by check",payment_link:""}]};
       if(sql.startsWith("SELECT id FROM invoice_emails")) return {rows:[{id:1}]};
       if(sql.startsWith("UPDATE invoice_emails e")) {if(claimed)return {rows:[]};claimed=true;return {rows:[{invoice_id:91,kind:"invoice"}]};}
-      if(sql.startsWith("SELECT i.*")) return {rows:[{...i,owner_email:"test@example.test"}]};
+      if(sql.startsWith("SELECT i.*")) return {rows:[{...i,owner_email:"test@example.test",billing_mode:"manual"}]};
       return {rows:[]};
     });
     mocks.send.mockRejectedValue(new Error("Network response lost"));
@@ -152,5 +153,22 @@ describe("email and provisioning safety",()=>{
     await provisionPaidBusinesses();
     expect(mocks.provision).not.toHaveBeenCalled();
     expect(mocks.query.mock.calls[0][0]).toContain("first_invoice_paid_at IS NOT NULL");
+  });
+  it("never creates a local invoice for a Square-mode business",async()=>{
+    await insertInvoice({query:mocks.query} as any,{...b,billing_mode:"square"},"initial",new Date());
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+  it("does not email a Square business even if a stale local email was claimed",async()=>{
+    mocks.query.mockImplementation(async(sql:string)=>{
+      if(sql.startsWith("SELECT instructions")) return {rows:[{instructions:"Pay by check",payment_link:""}]};
+      if(sql.startsWith("SELECT id FROM invoice_emails")) return {rows:[{id:1}]};
+      if(sql.startsWith("UPDATE invoice_emails e")) return {rows:[{invoice_id:91,kind:"reminder"}]};
+      if(sql.startsWith("SELECT i.*")) return {rows:[{...i,owner_email:"test@example.test",billing_mode:"square"}]};
+      return {rows:[]};
+    });
+    await deliverInvoiceEmails();
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("b.billing_mode='manual'"),[1]);
+    expect(mocks.query).toHaveBeenCalledWith("UPDATE invoice_emails SET status='skipped' WHERE id=$1",[1]);
   });
 });

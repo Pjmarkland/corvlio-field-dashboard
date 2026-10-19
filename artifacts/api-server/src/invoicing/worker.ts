@@ -34,13 +34,14 @@ export async function deliverInvoiceEmails() {
     const claim = await pool.query<{invoice_id:number;kind:string}>(`UPDATE invoice_emails e
       SET status='sending',claimed_at=now() FROM manual_invoices i
       WHERE e.id=$1 AND e.status IN ('pending','unconfigured') AND i.id=e.invoice_id AND i.paid_at IS NULL
+        AND EXISTS (SELECT 1 FROM businesses b WHERE b.id=i.business_id AND b.billing_mode='manual')
       RETURNING e.invoice_id,e.kind`,[id]);
     const item = claim.rows[0];
     if (!item) continue;
-    const result = await pool.query<InvoiceRow & {owner_email:string|null}>(`SELECT i.*,b.owner_email
+    const result = await pool.query<InvoiceRow & {owner_email:string|null;billing_mode:string}>(`SELECT i.*,b.owner_email,b.billing_mode
       FROM manual_invoices i JOIN businesses b ON b.id=i.business_id WHERE i.id=$1`,[item.invoice_id]);
     const invoice = result.rows[0];
-    if (!invoice || invoice.paid_at) {
+    if (!invoice || invoice.paid_at || invoice.billing_mode !== "manual") {
       await pool.query("UPDATE invoice_emails SET status='skipped' WHERE id=$1",[id]); continue;
     }
     try {

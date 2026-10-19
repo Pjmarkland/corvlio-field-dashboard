@@ -10,6 +10,7 @@ export type InvoiceBusiness = {
   chosen_plan: string | null; startup_age_months: number | null;
   manual_payment_state: string | null; first_invoice_paid_at: Date | null;
   provisioning_state: string; retell_phone_number: string | null; is_sample: boolean;
+  billing_mode: "manual" | "square";
 };
 export type InvoiceRow = {
   id: number; business_id: number; business_name: string; plan: string;
@@ -28,6 +29,7 @@ export async function paymentInstructions(): Promise<PaymentInstructions> {
   return { instructions: r.rows[0]?.instructions ?? "", paymentLink: r.rows[0]?.payment_link ?? "" };
 }
 export async function insertInvoice(c: PoolClient, b: InvoiceBusiness, key: string, date: Date) {
+  if (b.billing_mode === "square") return;
   if (!isPlan(b.chosen_plan)) throw new InvoiceError("A valid plan is required.");
   const p = PLANS[b.chosen_plan];
   const r = await c.query<InvoiceRow>(`INSERT INTO manual_invoices
@@ -127,6 +129,7 @@ export async function scheduleInvoiceWork(now = new Date(), onlyBusinessIds: num
   await pool.query(`INSERT INTO invoice_emails(invoice_id,kind)
     SELECT i.id,'reminder' FROM manual_invoices i
     JOIN invoice_emails e ON e.invoice_id=i.id AND e.kind='invoice' AND e.status='sent'
+    JOIN businesses b ON b.id=i.business_id AND b.billing_mode='manual'
     WHERE i.paid_at IS NULL AND i.due_at <= $1 AND ($2::int[] IS NULL OR i.business_id=ANY($2::int[]))
     ON CONFLICT(invoice_id,kind) DO NOTHING`,[addDays(now,-3),onlyBusinessIds]);
 }
