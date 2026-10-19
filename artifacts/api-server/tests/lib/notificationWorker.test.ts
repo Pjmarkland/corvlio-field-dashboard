@@ -33,11 +33,13 @@ let devices: any[];
 let lockClient: EventEmitter & { query: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> };
 let writes: any[];
 let timeline: string[];
+let internalBusiness = false;
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.resetAllMocks();
   inTransaction = false;
+  internalBusiness = false;
   event = {
     id: 1, businessId: "7", status: "queued", nextAttemptAt: new Date(0),
     attempts: 0, title: "New lead", body: "Repair", deepLink: "/leads/3",
@@ -60,7 +62,7 @@ beforeEach(() => {
     from: (table: unknown) => ({
       where: () => {
         const rows = table === businessesTable
-          ? [{ id: 7, leadAlertsEnabled: true, isSample: false }]
+          ? [{ id: 7, leadAlertsEnabled: true, isSample: false, isInternal: internalBusiness }]
           : table === notificationDevicesTable ? devices
           : event ? [event] : [];
         return Object.assign(Promise.resolve(rows), { limit: () => Promise.resolve(rows) });
@@ -100,6 +102,13 @@ afterEach(async () => {
 });
 
 describe("notification retry cost controls", () => {
+  it("delivers push for a non-billed internal business through the normal channel", async () => {
+    internalBusiness = true;
+    await runNotificationOutboxNow();
+    expect(mocks.send).toHaveBeenCalledOnce();
+    expect(writes.some(w => w.status === "delivered")).toBe(true);
+  });
+
   it("uses a single read and no lease writes or channel calls when idle", async () => {
     await runNotificationPollCycle();
     expect(mocks.execute).toHaveBeenCalledOnce();

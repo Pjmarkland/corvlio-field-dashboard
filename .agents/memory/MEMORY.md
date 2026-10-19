@@ -25,3 +25,4 @@
 - [Production DB diagnostics](production-db-diagnostics.md) — unavailable read replicas do not establish primary database health, suspension, or schema state.
 - [Manual invoice boundaries](manual-invoice-boundaries.md) — keep Stripe disabled, preserve existing accounts, and review uncertain Gmail sends instead of risking duplicates.
 - [Gmail configuration boundary](gmail-configuration-boundary.md) — Google Cloud activation belongs to the owner; historical lead failures require explicit batch approval before replay.
+- [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.

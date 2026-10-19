@@ -261,12 +261,15 @@ function formatReplyTime(minutes: number | null) {
 
 function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
   const [location] = useLocation();
+  const profileQ = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
+  const isInternal = profileQ.data?.isInternal === true;
   const invoices = useGetOwnerInvoices({ query: {
+    enabled: profileQ.isSuccess && !isInternal,
     queryKey: getGetOwnerInvoicesQueryKey(), retry: false, staleTime: 15_000,
     refetchInterval: 45_000, refetchOnWindowFocus: true,
   } });
-  const serviceLive = invoices.data?.serviceActive === true && invoices.data.provisioningState === 'ready';
-  const activationLabel = !invoices.data ? 'Checking service status'
+  const serviceLive = !isInternal && invoices.data?.serviceActive === true && invoices.data.provisioningState === 'ready';
+  const activationLabel = isInternal ? 'Internal account' : !invoices.data ? 'Checking service status'
     : invoices.data.status === 'requested' ? 'Awaiting approval'
     : serviceLive ? 'Receptionist live'
     : invoices.data.invoices.some(i => i.status === 'paid') ? 'Activation pending'
@@ -303,8 +306,8 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
         </nav>
         <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/55 p-4">
           <div className="mb-3 flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[10px] uppercase tracking-[0.16em]">{activationLabel}</span></div>
-          <p className="text-xs leading-relaxed text-sidebar-foreground/65">{serviceLive ? 'New calls land here. One tap gets you moving.' : 'Your dashboard will update when your receptionist is ready.'}</p>
-          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] text-sidebar-foreground/45"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{serviceLive ? 'listening for leads' : 'service not yet active'}</div>
+          <p className="text-xs leading-relaxed text-sidebar-foreground/65">{isInternal ? 'Internal sales leads appear here when the call webhook is connected. No billing or payment activation is required.' : serviceLive ? 'New calls land here. One tap gets you moving.' : 'Your dashboard will update when your receptionist is ready.'}</p>
+          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] text-sidebar-foreground/45"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{isInternal ? 'non-billed lead capture' : serviceLive ? 'listening for leads' : 'service not yet active'}</div>
         </div>
       </aside>
 
@@ -324,7 +327,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
+        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden" aria-label="Mobile navigation">

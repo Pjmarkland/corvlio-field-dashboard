@@ -569,6 +569,56 @@ paths:
                 $ref: "#/components/schemas/AdminOverview"
         "404":
           description: Not found or administrator access is unavailable
+  /admin/internal-businesses:
+    get:
+      operationId: getAdminInternalBusinesses
+      tags: [admin]
+      responses:
+        "200":
+          description: Internal businesses and eligible admin owners
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessDirectory"
+    post:
+      operationId: createAdminInternalBusiness
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBusinessInput"
+      responses:
+        "200":
+          description: Created internal business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessRecord"
+  /admin/internal-businesses/{businessId}:
+    patch:
+      operationId: updateAdminInternalBusiness
+      tags: [admin]
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBusinessAgentUpdate"
+      responses:
+        "200":
+          description: Updated local agent ID only; no Retell changes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessRecord"
   /admin/businesses/{businessId}:
     get:
       operationId: getAdminBusiness
@@ -1164,10 +1214,66 @@ components:
         - retellPhoneNumber
         - timeZone
         - leads
+    InternalBusinessAgentUpdate:
+      type: object
+      properties:
+        retellAgentId:
+          type: [string, "null"]
+      required: [retellAgentId]
+    InternalBusinessInput:
+      type: object
+      properties:
+        businessName:
+          type: string
+        retellPhoneNumber:
+          type: string
+        ownerUserId:
+          type: string
+        retellAgentId:
+          type: [string, "null"]
+      required: [businessName, retellPhoneNumber, ownerUserId]
+    InternalBusinessRecord:
+      type: object
+      properties:
+        id:
+          type: number
+        businessName:
+          type: string
+        retellPhoneNumber:
+          type: string
+        retellAgentId:
+          type: [string, "null"]
+        ownerUserId:
+          type: string
+        ownerEmail:
+          type: string
+      required: [id, businessName, retellPhoneNumber, retellAgentId, ownerUserId, ownerEmail]
+    InternalBusinessDirectory:
+      type: object
+      properties:
+        businesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalBusinessRecord"
+        owners:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              email:
+                type: string
+              linkedBusinessName:
+                type: [string, "null"]
+            required: [userId, email, linkedBusinessName]
+      required: [businesses, owners]
     BusinessProfile:
       type: object
       additionalProperties: false
       properties:
+        isInternal:
+          type: boolean
         ownerPhone:
           type: [string, "null"]
         leadAlertsEnabled:
@@ -1616,6 +1722,8 @@ components:
     AdminBusinessSummary:
       type: object
       properties:
+        isInternal:
+          type: boolean
         isSample:
           type: boolean
         provisioningState:

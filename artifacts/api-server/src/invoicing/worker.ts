@@ -34,14 +34,14 @@ export async function deliverInvoiceEmails() {
     const claim = await pool.query<{invoice_id:number;kind:string}>(`UPDATE invoice_emails e
       SET status='sending',claimed_at=now() FROM manual_invoices i
       WHERE e.id=$1 AND e.status IN ('pending','unconfigured') AND i.id=e.invoice_id AND i.paid_at IS NULL
-        AND EXISTS (SELECT 1 FROM businesses b WHERE b.id=i.business_id AND b.billing_mode='manual')
+        AND EXISTS (SELECT 1 FROM businesses b WHERE b.id=i.business_id AND b.billing_mode='manual' AND b.is_internal=false)
       RETURNING e.invoice_id,e.kind`,[id]);
     const item = claim.rows[0];
     if (!item) continue;
-    const result = await pool.query<InvoiceRow & {owner_email:string|null;billing_mode:string}>(`SELECT i.*,b.owner_email,b.billing_mode
+    const result = await pool.query<InvoiceRow & {owner_email:string|null;billing_mode:string;is_internal:boolean}>(`SELECT i.*,b.owner_email,b.billing_mode,b.is_internal
       FROM manual_invoices i JOIN businesses b ON b.id=i.business_id WHERE i.id=$1`,[item.invoice_id]);
     const invoice = result.rows[0];
-    if (!invoice || invoice.paid_at || invoice.billing_mode !== "manual") {
+    if (!invoice || invoice.is_internal || invoice.paid_at || invoice.billing_mode !== "manual") {
       await pool.query("UPDATE invoice_emails SET status='skipped' WHERE id=$1",[id]); continue;
     }
     try {
@@ -58,7 +58,7 @@ export async function deliverInvoiceEmails() {
 }
 export async function provisionPaidBusinesses() {
   const candidates = await pool.query<{id:number}>(`SELECT id FROM businesses
-    WHERE chosen_plan IS NOT NULL AND first_invoice_paid_at IS NOT NULL AND is_sample=false
+    WHERE is_internal=false AND chosen_plan IS NOT NULL AND first_invoice_paid_at IS NOT NULL AND is_sample=false
       AND retell_phone_number IS NULL AND provisioning_state IN ('awaiting_payment','recovery')`);
   for (const {id} of candidates.rows) {
     const b = await findBusinessById(id);

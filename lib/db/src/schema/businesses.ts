@@ -11,6 +11,7 @@ export const businessesTable = pgTable("businesses", {
   ownerEmail: text("owner_email"),
   // Null preserves existing businesses; only newly opted-in accounts are gated.
   chosenPlan: text("chosen_plan"),
+  isInternal: boolean("is_internal").notNull().default(false),
   billingMode: text("billing_mode", { enum: ["manual", "square"] }).notNull().default("manual"),
   startupAgeMonths: integer("startup_age_months"),
   manualPaymentState: text("manual_payment_state"),
@@ -52,6 +53,7 @@ export const businessesTable = pgTable("businesses", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  check("businesses_internal_billing_check", sql`NOT ${table.isInternal} OR (${table.chosenPlan} IS NULL AND ${table.billingMode} = 'manual' AND ${table.manualPaymentState} IS NULL AND ${table.firstInvoicePaidAt} IS NULL AND NOT ${table.isSample})`),
   check("businesses_billing_mode_check", sql`${table.billingMode} IN ('manual','square')`),
   uniqueIndex("businesses_clerk_user_id_unique").on(table.clerkUserId),
   uniqueIndex("businesses_phone_normalized_unique")

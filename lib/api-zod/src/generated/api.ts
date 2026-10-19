@@ -88,6 +88,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Get the signed-in owner's business profile
  */
 export const GetBusinessProfileResponse = zod.object({
+  "isInternal": zod.boolean().optional(),
   "ownerPhone": zod.string().nullish(),
   "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
@@ -191,6 +192,7 @@ export const UpdateBusinessProfileBody = zod.object({
 })
 
 export const UpdateBusinessProfileResponse = zod.object({
+  "isInternal": zod.boolean().optional(),
   "ownerPhone": zod.string().nullish(),
   "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
@@ -742,6 +744,7 @@ export const GetAdminOverviewResponse = zod.object({
   "activePushDeviceCount": zod.number().multipleOf(getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf)
 }),
   "businesses": zod.array(zod.object({
+  "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
   "provisioningState": zod.string().optional(),
   "unusedNumber7Days": zod.boolean().optional(),
@@ -769,6 +772,58 @@ export const GetAdminOverviewResponse = zod.object({
   "hasUncontactedOver24Hours": zod.boolean(),
   "oldestUncontactedAt": zod.coerce.date().nullable()
 }))
+})
+
+
+export const GetAdminInternalBusinessesResponse = zod.object({
+  "businesses": zod.array(zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "retellPhoneNumber": zod.string(),
+  "retellAgentId": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "ownerEmail": zod.string()
+})),
+  "owners": zod.array(zod.object({
+  "userId": zod.string(),
+  "email": zod.string(),
+  "linkedBusinessName": zod.string().nullable()
+}))
+})
+
+
+export const CreateAdminInternalBusinessBody = zod.object({
+  "businessName": zod.string(),
+  "retellPhoneNumber": zod.string(),
+  "ownerUserId": zod.string(),
+  "retellAgentId": zod.string().nullish()
+})
+
+export const CreateAdminInternalBusinessResponse = zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "retellPhoneNumber": zod.string(),
+  "retellAgentId": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "ownerEmail": zod.string()
+})
+
+
+export const UpdateAdminInternalBusinessParams = zod.object({
+  "businessId": zod.coerce.number()
+})
+
+export const UpdateAdminInternalBusinessBody = zod.object({
+  "retellAgentId": zod.string().nullable()
+})
+
+export const UpdateAdminInternalBusinessResponse = zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "retellPhoneNumber": zod.string(),
+  "retellAgentId": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "ownerEmail": zod.string()
 })
 
 
@@ -811,6 +866,7 @@ export const getAdminBusinessResponseCallsItemDurationMsMultipleOf = 1;
 
 export const GetAdminBusinessResponse = zod.object({
   "business": zod.object({
+  "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
   "provisioningState": zod.string().optional(),
   "unusedNumber7Days": zod.boolean().optional(),

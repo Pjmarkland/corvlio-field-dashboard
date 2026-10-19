@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ native: true, summary: {} as any, loading: false, failed: false,
+  profile: { isLoading: false, isSuccess: true, data: { isInternal: false } } as any,
   query: vi.fn(), portal: vi.fn(), external: vi.fn(), refetch: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => m.native } }));
 vi.mock('@capacitor/app-launcher', () => ({ AppLauncher: { openUrl: m.external } }));
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isSignedIn: true }) }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetNativeBillingSummaryQueryKey: () => ['native-summary'],
+  getGetBusinessProfileQueryKey: () => ['prof'],
+  useGetBusinessProfile: () => m.profile,
   useGetNativeBillingSummary: (options: any) => { m.query(options); return {
     data: m.summary, isLoading: m.loading, isError: m.failed, refetch: m.refetch,
   }; },
@@ -15,7 +18,7 @@ vi.mock('@workspace/api-client-react', () => ({
 import NativeBillingSection from './NativeBillingSection';
 import { websiteBillingUrl } from '@/lib/nativeBillingBrowser';
 beforeEach(() => {
-  vi.clearAllMocks(); m.native = true; m.loading = false; m.failed = false;
+  vi.clearAllMocks(); m.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; m.native = true; m.loading = false; m.failed = false;
   m.summary = { planName: 'Professional', status: 'active', nextChargeDate: '2026-11-01T00:00:00Z',
     billingEnabled: true, hasStripeCustomer: true };
   m.portal.mockResolvedValue({ url: 'https://billing.stripe.com/p/session/fake_session' });
@@ -89,5 +92,18 @@ describe('native Settings billing', () => {
     render(<NativeBillingSection />);
     expect(screen.getByText('Billing details are temporarily unavailable.')).toBeTruthy();
     expect(screen.queryByText('No active subscription')).toBeNull();
+  });
+});
+describe('native Settings billing internal guard', () => {
+  it('renders nothing and disables query for internal business', () => {
+    m.profile = { isLoading: false, isSuccess: true, data: { isInternal: true } };
+    const { container } = render(<NativeBillingSection />);
+    expect(container.innerHTML).toBe('');
+    expect(m.query.mock.calls.at(-1)![0].query.enabled).toBe(false);
+  });
+  it('waits for profile before querying', () => {
+    m.profile = { isLoading: true, isSuccess: false, data: undefined };
+    render(<NativeBillingSection />);
+    expect(m.query.mock.calls.at(-1)![0].query.enabled).toBe(false);
   });
 });

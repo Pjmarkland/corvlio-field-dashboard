@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { useGetOwnerInvoices, getGetOwnerInvoicesQueryKey } from '@workspace/api-client-react';
+import { useGetOwnerInvoices, getGetOwnerInvoicesQueryKey, useGetBusinessProfile, getGetBusinessProfileQueryKey } from '@workspace/api-client-react';
 import { ExternalLink, FileText } from 'lucide-react';
 import { openInvoiceWebsite } from '@/lib/nativeInvoiceBrowser';
 import { fmtDate, money, planName, safeHttpsUrl } from '@/lib/invoicePlans';
 
 export default function OwnerInvoicePanel() {
   const native = Capacitor.isNativePlatform();
+  const profile = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
+  const internal = profile.data?.isInternal === true;
   const q = useGetOwnerInvoices({ query: {
+    enabled: profile.isSuccess && !internal,
     queryKey: getGetOwnerInvoicesQueryKey(), retry: false,
     refetchInterval: 45_000, refetchOnWindowFocus: true, staleTime: 15_000,
   } });
   const [launchError, setLaunchError] = useState('');
   const d = q.data;
+  if (internal || profile.isLoading) return internal ? null : <div className="mb-6 h-32 animate-pulse rounded-2xl bg-muted" data-testid="state-invoice-loading" />;
   if (q.isLoading) return <div className="mb-6 h-32 animate-pulse rounded-2xl bg-muted" data-testid="state-invoice-loading" />;
   if (q.isError) return <div className="mb-6 rounded-2xl border border-border bg-card p-4 text-sm" data-testid="state-invoice-error">Billing status could not load. <button type="button" className="font-semibold text-primary underline" onClick={() => void q.refetch()} data-testid="button-invoice-retry">Try again</button></div>;
   if (!d || d.plan == null || d.status === 'legacy') return null;

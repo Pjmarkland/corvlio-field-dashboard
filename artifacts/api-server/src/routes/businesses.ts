@@ -76,6 +76,7 @@ const ENRICHMENT_FIELD_BY_PROFILE_FIELD: Partial<
 
 function toBusinessProfile(business: OwnedBusiness) {
   return {
+    isInternal: business.isInternal,
     ownerPhone: business.ownerPhone ?? null,
     leadAlertsEnabled: business.leadAlertsEnabled ?? true,
     businessHours: business.businessHours ?? "",

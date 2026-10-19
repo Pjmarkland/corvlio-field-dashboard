@@ -175,4 +175,15 @@ describe("phone provisioning safeguards", () => {
     expect(provisioningCap("12", 5)).toBe(12);
     for (const value of ["", "-1", "NaN", "2.5", "9007199254740992"]) expect(provisioningCap(value, 5)).toBe(0);
   });
+  it("keeps an internal account out of payment gates and all Retell provisioning, even without a number", async () => {
+    const {store,buy}=fixture();
+    const state=vi.spyOn(store,"state");
+    const existing=await store.create({...input(),isInternal:true,provisioningState:"internal"});
+    const result=await guardedProvisioning({...input(),chosenPlan:"professional"},store,buy);
+    expect(result.business).toBe(existing);
+    expect(result.phoneProvisioningPending).toBe(false);
+    expect(buy).not.toHaveBeenCalled();
+    expect(store.reserve).not.toHaveBeenCalled();
+    expect(state).not.toHaveBeenCalled();
+  });
 });

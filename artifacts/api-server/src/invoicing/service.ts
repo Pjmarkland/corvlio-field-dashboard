@@ -11,6 +11,7 @@ export type InvoiceBusiness = {
   manual_payment_state: string | null; first_invoice_paid_at: Date | null;
   provisioning_state: string; retell_phone_number: string | null; is_sample: boolean;
   billing_mode: "manual" | "square";
+  is_internal: boolean;
 };
 export type InvoiceRow = {
   id: number; business_id: number; business_name: string; plan: string;
@@ -29,6 +30,7 @@ export async function paymentInstructions(): Promise<PaymentInstructions> {
   return { instructions: r.rows[0]?.instructions ?? "", paymentLink: r.rows[0]?.payment_link ?? "" };
 }
 export async function insertInvoice(c: PoolClient, b: InvoiceBusiness, key: string, date: Date) {
+  if (b.is_internal) return;
   if (b.billing_mode === "square") return;
   if (!isPlan(b.chosen_plan)) throw new InvoiceError("A valid plan is required.");
   const p = PLANS[b.chosen_plan];
@@ -44,13 +46,14 @@ export async function insertInvoice(c: PoolClient, b: InvoiceBusiness, key: stri
 export async function initializeInvoices(businessId: number, now = new Date()) {
   await withInvoiceTransaction(async c => {
     const b = (await c.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1 FOR UPDATE", [businessId])).rows[0];
-    if (!b || b.is_sample || !b.chosen_plan || b.manual_payment_state === "requested") return;
+    if (!b || b.is_internal || b.is_sample || !b.chosen_plan || b.manual_payment_state === "requested") return;
     await insertInvoice(c,b,"initial",now);
   });
 }
 export async function ownerInvoiceOverview(businessId: number, now = new Date()): Promise<InvoiceOverview> {
   const b = (await pool.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1", [businessId])).rows[0];
   if (!b) throw new InvoiceError("Business not found.",404);
+  if (b.is_internal) throw new InvoiceError("Internal businesses are not billed.",404);
   const settings = await paymentInstructions();
   const rows = await pool.query<InvoiceRow>(`SELECT i.*,
     coalesce(e.status,'pending') AS delivery_status,coalesce(r.status,'not_scheduled') AS reminder_status
@@ -80,7 +83,7 @@ export async function ownerInvoiceOverview(businessId: number, now = new Date())
 export async function approveStartup(businessId: number) {
   await withInvoiceTransaction(async c => {
     const b = (await c.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1 FOR UPDATE",[businessId])).rows[0];
-    if (!b || b.chosen_plan !== "startup" || b.is_sample) throw new InvoiceError("No Startup request exists.",404);
+    if (!b || b.is_internal || b.chosen_plan !== "startup" || b.is_sample) throw new InvoiceError("No Startup request exists.",404);
     if (b.startup_age_months === null || b.startup_age_months < 0 || b.startup_age_months >= 18)
       throw new InvoiceError("Startup is available only to businesses under 18 months old.");
     if (b.manual_payment_state !== "requested") return; // Idempotent approval.
@@ -96,6 +99,7 @@ export async function markInvoicePaid(invoiceId: number, actor: string, referenc
     if (!match) throw new InvoiceError("Invoice not found.",404);
     const b = (await c.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1 FOR UPDATE",[match.business_id])).rows[0];
     if (!b) throw new InvoiceError("Business not found.",404);
+    if (b.is_internal) throw new InvoiceError("Internal businesses are not billed.",404);
     const i = (await c.query<InvoiceRow>("SELECT * FROM manual_invoices WHERE id=$1 FOR UPDATE",[invoiceId])).rows[0];
     if (!i) throw new InvoiceError("Invoice not found.",404);
     if (!i.paid_at) {
@@ -109,11 +113,11 @@ export async function markInvoicePaid(invoiceId: number, actor: string, referenc
 }
 export async function scheduleInvoiceWork(now = new Date(), onlyBusinessIds: number[] | null = null) {
   const businesses = await pool.query<{id:number}>(
-    "SELECT id FROM businesses WHERE chosen_plan IS NOT NULL AND is_sample=false AND ($1::int[] IS NULL OR id=ANY($1::int[]))",[onlyBusinessIds]);
+    "SELECT id FROM businesses WHERE is_internal=false AND chosen_plan IS NOT NULL AND is_sample=false AND ($1::int[] IS NULL OR id=ANY($1::int[]))",[onlyBusinessIds]);
   for (const {id} of businesses.rows) {
     await withInvoiceTransaction(async c => {
       const b = (await c.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1 FOR UPDATE",[id])).rows[0];
-      if (!b || b.manual_payment_state === "requested") return;
+      if (!b || b.is_internal || b.manual_payment_state === "requested") return;
       await insertInvoice(c,b,"initial",now);
       if (b.first_invoice_paid_at) {
         const anchor = b.first_invoice_paid_at;
@@ -129,7 +133,7 @@ export async function scheduleInvoiceWork(now = new Date(), onlyBusinessIds: num
   await pool.query(`INSERT INTO invoice_emails(invoice_id,kind)
     SELECT i.id,'reminder' FROM manual_invoices i
     JOIN invoice_emails e ON e.invoice_id=i.id AND e.kind='invoice' AND e.status='sent'
-    JOIN businesses b ON b.id=i.business_id AND b.billing_mode='manual'
+    JOIN businesses b ON b.id=i.business_id AND b.billing_mode='manual' AND b.is_internal=false
     WHERE i.paid_at IS NULL AND i.due_at <= $1 AND ($2::int[] IS NULL OR i.business_id=ANY($2::int[]))
     ON CONFLICT(invoice_id,kind) DO NOTHING`,[addDays(now,-3),onlyBusinessIds]);
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useUser } from '@clerk/react';
 import { ExternalLink } from 'lucide-react';
-import { getGetNativeBillingSummaryQueryKey, useGetNativeBillingSummary, useCreateBillingPortal } from '@workspace/api-client-react';
+import { getGetBusinessProfileQueryKey, useGetBusinessProfile, getGetNativeBillingSummaryQueryKey, useGetNativeBillingSummary, useCreateBillingPortal } from '@workspace/api-client-react';
 import { billingDate } from '@/lib/billingFormat';
 import { openBillingWebsite, openStripeBillingPortal, websiteBillingUrl } from '@/lib/nativeBillingBrowser';
 
@@ -13,8 +13,10 @@ export default function NativeBillingSection() {
 
 function NativeBillingContent() {
   const { isSignedIn } = useUser();
+  const profile = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
+  const internal = profile.data?.isInternal === true;
   const query = useGetNativeBillingSummary({ query: {
-    queryKey: getGetNativeBillingSummaryQueryKey(), enabled: Boolean(isSignedIn),
+    queryKey: getGetNativeBillingSummaryQueryKey(), enabled: Boolean(isSignedIn) && profile.isSuccess && !internal,
     retry: false, staleTime: 0, refetchInterval: 60_000,
   } });
   const portal = useCreateBillingPortal();
@@ -43,6 +45,7 @@ function NativeBillingContent() {
     } finally { setOpening(false); }
   };
   const labels = { active: 'Active', past_due: 'Past due', canceled: 'Canceled', not_subscribed: 'No active subscription' };
+  if (internal || profile.isLoading) return null;
   return <section className="mt-4 rounded-2xl border border-border bg-card p-5 text-foreground sm:p-6" data-testid="section-native-billing">
     <h2 className="font-bold">Billing</h2>
     <p className="mt-2 text-sm text-muted-foreground">Your account information. Billing management opens in your device’s browser.</p>

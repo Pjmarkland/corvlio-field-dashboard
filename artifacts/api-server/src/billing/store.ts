@@ -1,6 +1,6 @@
 import { db, businessesTable, billingAccountsTable, billingEventsTable, billingNoticesTable } from "@workspace/db";
-import { eq, or, desc, sql } from "drizzle-orm";
-import { initialBillingState, type BillingState } from "./policy";
+import { and, eq, or, desc, sql } from "drizzle-orm";
+import { BillingError, initialBillingState, type BillingState } from "./policy";
 
 export type BillingBusiness = { id: number; businessName: string; ownerEmail: string | null; clerkUserId: string | null };
 export type BillingNotice = { key: string; audience: "owner" | "admin"; title: string; body: string };
@@ -28,13 +28,15 @@ export const billingStore: BillingStore = {
     if (new Set(rows.map(r => r.businessId)).size > 1) throw new Error("Conflicting Stripe tenancy");
     return rows[0]?.businessId ?? null;
   },
-  async business(id) { return (await db.select().from(businessesTable).where(eq(businessesTable.id, id)).limit(1))[0] ?? null; },
-  async businesses() { return db.select().from(businessesTable); },
+  async business(id) { return (await db.select().from(businessesTable).where(and(eq(businessesTable.id, id),eq(businessesTable.isInternal,false))).limit(1))[0] ?? null; },
+  async businesses() { return db.select().from(businessesTable).where(eq(businessesTable.isInternal,false)); },
   async timeline(id) {
     return (await db.select().from(billingEventsTable).where(eq(billingEventsTable.businessId, id))
       .orderBy(desc(billingEventsTable.createdAt)).limit(50)).map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
   },
   async transact(businessId, work) {
+    const business = await this.business(businessId);
+    if (!business) throw new BillingError("Business is unavailable for billing.",404);
     return db.transaction(async tx => {
       // Serializes state, webhook replay claims, threshold flags and action notices.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(62741, ${businessId})`);

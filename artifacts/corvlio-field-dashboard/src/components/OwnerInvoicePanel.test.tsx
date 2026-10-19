@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const h = vi.hoisted(() => ({ native: false, state: {} as Record<string, unknown>, open: vi.fn() }));
+const h = vi.hoisted(() => ({ native: false, state: {} as Record<string, unknown>, profile: {} as Record<string, unknown>, opts: undefined as unknown, open: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => h.native } }));
 vi.mock('@/lib/nativeInvoiceBrowser', () => ({ openInvoiceWebsite: h.open }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetOwnerInvoicesQueryKey: () => ['inv'],
-  useGetOwnerInvoices: () => h.state,
+  getGetBusinessProfileQueryKey: () => ['prof'],
+  useGetBusinessProfile: () => h.profile,
+  useGetOwnerInvoices: (o: unknown) => { h.opts = o; return h.state; },
 }));
 import OwnerInvoicePanel from './OwnerInvoicePanel';
 
@@ -15,7 +17,7 @@ const data = (o = {}) => ({ businessId: 1, businessName: 'B', plan: 'professiona
 const set = (d: unknown, extra = {}) => { h.state = { data: d, isLoading: false, isError: false, refetch: vi.fn(), ...extra }; };
 
 describe('OwnerInvoicePanel', () => {
-  beforeEach(() => { h.native = false; h.open.mockReset(); });
+  beforeEach(() => { h.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; h.native = false; h.open.mockReset(); });
   it('requested', () => { set(data({ status: 'requested', invoices: [] })); render(<OwnerInvoicePanel />); expect(screen.getByTestId('status-invoice').textContent).toBe('Awaiting approval'); });
   it('awaiting payment on web shows invoice details', () => {
     set(data()); render(<OwnerInvoicePanel />);
@@ -41,5 +43,20 @@ describe('OwnerInvoicePanel', () => {
     expect(container.textContent).not.toMatch(/\$|Wire to X|pay\.example/);
     fireEvent.click(screen.getByTestId('button-open-billing-website'));
     await waitFor(() => expect(screen.getByTestId('error-open-website').textContent).toBe('boom'));
+  });
+  it('internal business hides panel and disables invoice query', () => {
+    h.profile = { isLoading: false, isSuccess: true, data: { isInternal: true } }; set(undefined, { isError: true });
+    const { container } = render(<OwnerInvoicePanel />);
+    expect(container.innerHTML).toBe('');
+    expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(false);
+  });
+  it('waits for profile before enabling invoice query', () => {
+    h.profile = { isLoading: true, isSuccess: false, data: undefined }; set(undefined);
+    render(<OwnerInvoicePanel />);
+    expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(false);
+  });
+  it('enables invoice query for confirmed non-internal profile', () => {
+    set(data()); render(<OwnerInvoicePanel />);
+    expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(true);
   });
 });

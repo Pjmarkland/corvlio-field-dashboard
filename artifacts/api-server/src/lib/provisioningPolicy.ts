@@ -33,6 +33,10 @@ export async function guardedProvisioning(
   if (!account) throw new Error("An authenticated account is required to provision a number");
   return store.lock(account, async () => {
     const existing = await store.find(account);
+    if (existing?.isInternal || input.isInternal) {
+      if (!existing?.isInternal) throw new Error("Internal businesses must be created by an administrator.");
+      return { business: existing, phoneProvisioningPending: false, provisioningError: null };
+    }
     if (existing?.chosenPlan && input.chosenPlan && existing.chosenPlan !== input.chosenPlan) {
       throw new Error("Your plan is already saved. Please contact support to change it.");
     }

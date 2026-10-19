@@ -42,6 +42,10 @@ import type {
   EmailTestResult,
   GetAdminInvoices200,
   HealthStatus,
+  InternalBusinessAgentUpdate,
+  InternalBusinessDirectory,
+  InternalBusinessInput,
+  InternalBusinessRecord,
   InvoiceOverview,
   LeadAlertInbox,
   LeadDetail,
@@ -1866,6 +1870,208 @@ export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOv
 
 
 
+
+export const getGetAdminInternalBusinessesUrl = () => {
+
+
+
+
+  return `/api/admin/internal-businesses`
+}
+
+export const getAdminInternalBusinesses = async ( options?: Parameters<typeof customFetch>[1]): Promise<InternalBusinessDirectory> => {
+
+  return customFetch<InternalBusinessDirectory>(getGetAdminInternalBusinessesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminInternalBusinessesQueryKey = () => {
+    return [
+    `/api/admin/internal-businesses`
+    ] as const;
+    }
+
+
+export const getGetAdminInternalBusinessesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminInternalBusinesses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInternalBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminInternalBusinessesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminInternalBusinesses>>> = ({ signal }) => getAdminInternalBusinesses({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminInternalBusinesses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminInternalBusinessesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminInternalBusinesses>>>
+export type GetAdminInternalBusinessesQueryError = ErrorType<unknown>
+
+
+
+export function useGetAdminInternalBusinesses<TData = Awaited<ReturnType<typeof getAdminInternalBusinesses>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInternalBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminInternalBusinessesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAdminInternalBusinessUrl = () => {
+
+
+
+
+  return `/api/admin/internal-businesses`
+}
+
+export const createAdminInternalBusiness = async (internalBusinessInput: InternalBusinessInput, options?: Parameters<typeof customFetch>[1]): Promise<InternalBusinessRecord> => {
+
+  return customFetch<InternalBusinessRecord>(getCreateAdminInternalBusinessUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(internalBusinessInput)
+  }
+);}
+
+
+
+
+
+export const getCreateAdminInternalBusinessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminInternalBusiness>>, TError,{data: BodyType<InternalBusinessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdminInternalBusiness>>, TError,{data: BodyType<InternalBusinessInput>}, TContext> => {
+
+const mutationKey = ['createAdminInternalBusiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdminInternalBusiness>>, {data: BodyType<InternalBusinessInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAdminInternalBusiness(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdminInternalBusinessMutationResult = NonNullable<Awaited<ReturnType<typeof createAdminInternalBusiness>>>
+    export type CreateAdminInternalBusinessMutationBody = BodyType<InternalBusinessInput>
+    export type CreateAdminInternalBusinessMutationError = ErrorType<unknown>
+
+    export const useCreateAdminInternalBusiness = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminInternalBusiness>>, TError,{data: BodyType<InternalBusinessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAdminInternalBusiness>>,
+        TError,
+        {data: BodyType<InternalBusinessInput>},
+        TContext
+      > => {
+      return useMutation(getCreateAdminInternalBusinessMutationOptions(options));
+    }
+
+export const getUpdateAdminInternalBusinessUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/internal-businesses/${businessId}`
+}
+
+export const updateAdminInternalBusiness = async (businessId: number,
+    internalBusinessAgentUpdate: InternalBusinessAgentUpdate, options?: Parameters<typeof customFetch>[1]): Promise<InternalBusinessRecord> => {
+
+  return customFetch<InternalBusinessRecord>(getUpdateAdminInternalBusinessUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(internalBusinessAgentUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminInternalBusinessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminInternalBusiness>>, TError,{businessId: number;data: BodyType<InternalBusinessAgentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminInternalBusiness>>, TError,{businessId: number;data: BodyType<InternalBusinessAgentUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminInternalBusiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminInternalBusiness>>, {businessId: number;data: BodyType<InternalBusinessAgentUpdate>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  updateAdminInternalBusiness(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminInternalBusinessMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminInternalBusiness>>>
+    export type UpdateAdminInternalBusinessMutationBody = BodyType<InternalBusinessAgentUpdate>
+    export type UpdateAdminInternalBusinessMutationError = ErrorType<unknown>
+
+    export const useUpdateAdminInternalBusiness = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminInternalBusiness>>, TError,{businessId: number;data: BodyType<InternalBusinessAgentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminInternalBusiness>>,
+        TError,
+        {businessId: number;data: BodyType<InternalBusinessAgentUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminInternalBusinessMutationOptions(options));
+    }
 
 export const getGetAdminBusinessUrl = (businessId: number,) => {
 

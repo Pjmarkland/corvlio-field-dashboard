@@ -23,7 +23,7 @@ router.get("/invoicing/me",async(req,res,next) => {
 router.use("/admin/invoicing",requireAdmin,(_req,res,next) => {res.set("Cache-Control","private, no-store");next();});
 router.get("/admin/invoicing",async(_req,res,next) => {
   try {
-    const r=await pool.query<{id:number}>("SELECT id FROM businesses ORDER BY created_at DESC");
+    const r=await pool.query<{id:number}>("SELECT id FROM businesses WHERE is_internal=false ORDER BY created_at DESC");
     const businesses=[];
     for (const b of r.rows) businesses.push(await ownerInvoiceOverview(b.id));
     res.json({businesses,settings:await paymentInstructions()});

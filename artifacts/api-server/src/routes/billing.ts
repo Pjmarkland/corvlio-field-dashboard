@@ -17,7 +17,7 @@ router.get("/billing/native-summary", async (req, res): Promise<void> => {
   if (!userId) { res.sendStatus(401); return; }
   try {
     const business = await findBusinessByClerkUserId(userId);
-    if (!business) { res.sendStatus(404); return; }
+    if (!business || business.isInternal) { res.sendStatus(404); return; }
     res.json(await readNativeBillingSummary(business.id));
   } catch {
     res.status(503).json({ error: "Billing details are temporarily unavailable." });
@@ -46,7 +46,7 @@ function ownerAction(action: Action, input: "plan" | "empty" | "none" = "empty")
         res.status(400).json({ error: "Invalid billing input" }); return;
       }
       const business = await findBusinessByClerkUserId(userId);
-      if (!business) { res.sendStatus(404); return; }
+      if (!business || business.isInternal) { res.sendStatus(404); return; }
       res.json(await action(business.id, userId, req));
     } catch (error) {
       res.status(error instanceof BillingError ? error.status : 503)

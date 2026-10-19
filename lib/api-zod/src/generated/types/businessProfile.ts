@@ -7,6 +7,7 @@
  */
 
 export interface BusinessProfile {
+  isInternal?: boolean;
   /** @nullable */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;

@@ -37,10 +37,16 @@ const server = app.listen(port, (err) => {
         "Initial business phone cache refresh failed",
       );
     });
-  startLeadNotificationPoller();
-  startBillingWorker();
-  startAccountDeletionWorker();
-  startInvoiceWorker();
+  // Workspace restarts must not send queued customer email or purchase/release
+  // provider resources while developing. Production delivery is unchanged.
+  if (process.env.NODE_ENV !== "development" || process.env.ENABLE_DEV_BACKGROUND_WORKERS === "true") {
+    startLeadNotificationPoller();
+    startBillingWorker();
+    startAccountDeletionWorker();
+    startInvoiceWorker();
+  } else {
+    logger.info("Development background delivery/provisioning paused; explicit test flows use mocked providers");
+  }
 });
 
 async function shutdown(signal: string) {

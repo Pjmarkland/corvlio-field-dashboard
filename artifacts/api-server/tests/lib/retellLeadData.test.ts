@@ -3,6 +3,17 @@ import { extractRetellLead } from "../../src/lib/retellLeadData";
 import { agentDraftPatch, llmDraftPatch } from "../../src/lib/retellDraftConfig";
 
 describe("voice lead extraction compatibility", () => {
+  it("accepts Aria's sales analysis names and leaves missing intake fields blank", () => {
+    const lead=extractRetellLead({from_number:"+12025550199",call_analysis:{
+      call_summary:"Sales question",call_successful:true,
+      custom_analysis_data:{"User_phone":"+12025550198","User name":"Sales caller",
+        reason_for_call:"Ask about Corvlio",appointment_booked:true,"User Sentiment":"Positive"},
+    }});
+    expect(lead).toMatchObject({callerName:"Sales caller",phoneNumber:"+12025550198",
+      issueReason:"Ask about Corvlio",summary:"Sales question",address:null,urgencyLevel:null});
+    expect(extractRetellLead({call_analysis:{custom_analysis_data:{appointment_booked:false}}}))
+      .toMatchObject({callerName:null,phoneNumber:null,issueReason:null,address:null});
+  });
   it("stores an existing provider recording URL, without inventing or fetching a recording", () => {
     expect(extractRetellLead({ recording_url: "https://recordings.example.test/call.wav" }).recordingUrl)
       .toBe("https://recordings.example.test/call.wav");

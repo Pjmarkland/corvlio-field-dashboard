@@ -33,7 +33,7 @@ export function extractRetellLead(call: RetellCall) {
   return {
     callerName: analysisValue(data, "caller_name", "customer_name", "name", "User name"),
     callerId, callbackNumber, phoneNumber: callbackNumber ?? callerId,
-    issueReason: analysisValue(data, "issue_reason", "issue", "reason", "call_reason") ?? summary,
+    issueReason: analysisValue(data, "issue_reason", "issue", "reason", "call_reason", "reason_for_call") ?? summary,
     address: analysisValue(data, "address", "service_address"),
     urgencyLevel: analysisValue(data, "urgency_level", "urgency"),
     availability: analysisValue(data, "availability", "preferred_availability", "preferred_time"),
@@ -67,7 +67,7 @@ export function capturedInfo(call: RetellCall, analysisComplete: boolean) {
     callbackCaptured: explicitCallback
       ? !!lead.callbackNumber && lead.callbackNumber.replace(/\D/g, "").length >= 7
       : legacyPhone ? null : false,
-    issueCaptured: !!analysisValue(data, "issue_reason", "issue", "reason", "call_reason"),
+    issueCaptured: !!analysisValue(data, "issue_reason", "issue", "reason", "call_reason", "reason_for_call"),
     addressCaptured: !!lead.address,
   };
 }

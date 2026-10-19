@@ -124,6 +124,7 @@ function summarizeBusiness(
   return {
     ...numberActivity(business, calls, now, assignedAt),
     id: business.id,
+    isInternal: business.isInternal,
     businessName: business.businessName,
     ownerEmail: business.ownerEmail,
     ownerName: profile.ownerName,

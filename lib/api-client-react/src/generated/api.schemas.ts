@@ -417,7 +417,43 @@ export interface LeadWorkspace {
   leads: Lead[];
 }
 
+export interface InternalBusinessAgentUpdate {
+  /** @nullable */
+  retellAgentId: string | null;
+}
+
+export interface InternalBusinessInput {
+  businessName: string;
+  retellPhoneNumber: string;
+  ownerUserId: string;
+  /** @nullable */
+  retellAgentId?: string | null;
+}
+
+export interface InternalBusinessRecord {
+  id: number;
+  businessName: string;
+  retellPhoneNumber: string;
+  /** @nullable */
+  retellAgentId: string | null;
+  ownerUserId: string;
+  ownerEmail: string;
+}
+
+export type InternalBusinessDirectoryOwnersItem = {
+  userId: string;
+  email: string;
+  /** @nullable */
+  linkedBusinessName: string | null;
+};
+
+export interface InternalBusinessDirectory {
+  businesses: InternalBusinessRecord[];
+  owners: InternalBusinessDirectoryOwnersItem[];
+}
+
 export interface BusinessProfile {
+  isInternal?: boolean;
   /** @nullable */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;
@@ -788,6 +824,7 @@ export const AdminBusinessSummaryProvisioningStatus = {
 } as const;
 
 export interface AdminBusinessSummary {
+  isInternal?: boolean;
   isSample?: boolean;
   provisioningState?: string;
   unusedNumber7Days?: boolean;

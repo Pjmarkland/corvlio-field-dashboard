@@ -5,6 +5,7 @@ import { getGetAdminOverviewQueryKey, useGetAdminOverview, type AdminBusinessSum
 
 import AdminCallQuality from './AdminCallQuality';
 import PendingRetellReleases from './PendingRetellReleases';
+import InternalBusinessesSection from './InternalBusinessesSection';
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, SectionHeading, formatAdminResponse, formatAdminShortDate } from './AdminShared';
 
 type SortKey = 'createdAt' | 'businessName' | 'onboardingCompletenessPercent' | 'totalLeadCount' | 'uncontactedLeadCount' | 'provisioningStatus';
@@ -30,6 +31,7 @@ function BusinessRow({ business }: { business: AdminBusinessSummary }) {
       </Link>
     </td>
     <td className="px-4 py-4 sm:px-5">
+      {business.isInternal ? <span className="mb-1 mr-1 inline-block rounded-full bg-[#e4f0e9] px-2.5 py-1 text-xs font-semibold text-[#2c6b56]" data-testid={`badge-internal-row-${business.id}`}>Internal / non-billed</span> : null}
       {business.isSample ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Sample / demo</span> : <AdminStatus status={business.provisioningStatus} />}
       <p className="mt-2 text-xs text-[#536258]">{business.retellPhoneNumber ?? 'No assigned number'}</p>
       <p className="mt-1 text-xs text-[#536258]">State: {business.provisioningState ?? business.provisioningStatus}</p>
@@ -68,6 +70,7 @@ export default function AdminOverviewPage() {
   const { metrics } = data;
   return <AdminShell title="Overview" eyebrow="Founder operations" action={<span className="hidden items-center gap-2 text-xs text-[#76837a] sm:flex"><span className="h-2 w-2 rounded-full bg-[#4e8d70]" />Live read-only snapshot</span>}>
     <PendingRetellReleases />
+    <InternalBusinessesSection />
     <section className="mb-8 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
       <div className="relative overflow-hidden rounded-3xl bg-[#244d3f] p-6 text-[#eff6ee] shadow-[0_16px_40px_rgba(36,77,63,.15)] sm:p-8">
         <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-[#4e8d70]/25" /><div className="absolute -bottom-24 right-20 h-48 w-48 rounded-full border border-[#bad7c2]/20" />
