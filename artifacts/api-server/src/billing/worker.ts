@@ -62,6 +62,7 @@ async function deliverPendingNotices() {
           if (progress.deviceIds.includes(device.id)) continue;
           const result = await sendApnsNotification({
             deviceToken: device.token, title: notice.title, body: notice.body,
+            environment: device.apnsEnvironment ?? undefined,
             deepLink: config.operations.ownerPath,
           });
           if (result.outcome === "delivered" || result.outcome === "invalid_token") {

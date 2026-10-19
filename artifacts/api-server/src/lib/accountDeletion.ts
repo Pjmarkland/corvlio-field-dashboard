@@ -1,5 +1,6 @@
 import { clerkClient } from "@clerk/express";
 import { pool } from "@workspace/db";
+import { hasVerifiedAdminEmail, parseAdminEmails } from "../middlewares/requireAdmin";
 type SqlResult = { rows: Record<string, any>[] };
 type SqlQuery = (text: string, values?: any[]) => Promise<SqlResult>;
 type SqlClient = { query: SqlQuery; release: () => void };
@@ -20,8 +21,20 @@ export function paidDeletionBlocked(account: { state: Record<string, unknown>; s
 export type DeletionDependencies = {
   pool: { connect: () => Promise<SqlClient>; query: SqlQuery };
   deleteUser: (id: string) => Promise<unknown>;
+  isProtectedUser?: (id: string) => Promise<boolean>;
 };
-const defaults: DeletionDependencies = { pool, deleteUser: id => clerkClient.users.deleteUser(id) };
+const defaults: DeletionDependencies = { pool, deleteUser: id => clerkClient.users.deleteUser(id),
+  isProtectedUser: async id => {
+    try {return hasVerifiedAdminEmail((await clerkClient.users.getUser(id)).emailAddresses,parseAdminEmails(process.env.ADMIN_EMAILS));}
+    catch(e) {if((e as {status?:number}).status===404)return false;throw e;}
+  },
+};
+const protectedReason = "Admin and internal business owner accounts cannot be deleted from the app. This protects business access. Contact support for a reviewed account change.";
+export async function accountDeletionEligibility(userId:string,deps=defaults) {
+  if (await deps.isProtectedUser?.(userId)) return {allowed:false,reason:protectedReason};
+  const result=await deps.pool.query("SELECT is_internal FROM businesses WHERE clerk_user_id=$1",[userId]);
+  return result.rows.some(b=>b.is_internal) ? {allowed:false,reason:protectedReason} : {allowed:true,reason:null};
+}
 
 async function preserveResources(client: SqlClient, businesses: any[], attempts: any[], userId: string) {
   const add = (key: string, businessId: number | null, name: string, phone: string | null, agent: string | null, state: string | null) =>
@@ -30,7 +43,7 @@ async function preserveResources(client: SqlClient, businesses: any[], attempts:
       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (source_key) DO NOTHING`, [key, businessId, name, phone, agent, state]);
   for (const business of businesses) {
     if (business.retell_phone_number || business.retell_agent_id) {
-      await add(`business:${business.id}`, business.id, business.business_name,
+      await add(`business:${business.id}`, business.id, "Deleted account",
         business.retell_phone_number, business.retell_agent_id, business.provisioning_state);
     }
   }
@@ -40,13 +53,14 @@ async function preserveResources(client: SqlClient, businesses: any[], attempts:
     if (attempt.business_id && !business) throw new AccountDeletionError("Ownership conflict in phone provisioning. Contact hello@corvlio.com.");
     if (attempt.purchased_number && attempt.purchased_number === business?.retell_phone_number) continue;
     // Preserve uncertain purchase journals even when no number was returned.
-    await add(`purchase:${attempt.id}`, attempt.business_id, business?.business_name ?? "Deleted account — unlinked phone purchase",
+    await add(`purchase:${attempt.id}`, attempt.business_id, "Deleted account",
       attempt.purchased_number, null, attempt.status);
   }
 }
 
 /** Database phase is all-or-nothing. Identity deletion only starts after commit. */
 export async function removeOwnedAppData(userId: string, deps = defaults) {
+  if (await deps.isProtectedUser?.(userId)) throw new AccountDeletionError(protectedReason,403);
   const client = await deps.pool.connect();
   try {
     await client.query("BEGIN");
@@ -62,8 +76,9 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     const { rows: businesses } = await client.query("SELECT * FROM businesses WHERE clerk_user_id = $1 ORDER BY id FOR UPDATE", [userId]);
     if (businesses.some(b => !owned.rows.some(o => o.id === b.id))) throw new AccountDeletionError("Business ownership changed. Please retry.");
     const ids = businesses.map(b => b.id);
+    if (businesses.some(b=>b.is_internal)) throw new AccountDeletionError(protectedReason,403);
     const billing = await client.query("SELECT * FROM billing_accounts WHERE business_id = ANY($1::int[]) FOR UPDATE", [ids]);
-    if (billing.rows.some(paidDeletionBlocked) || businesses.some(b => b.chosen_plan && b.first_invoice_paid_at)) {
+    if (billing.rows.some(paidDeletionBlocked)) {
       throw new AccountDeletionError("Account deletion is blocked while a paid subscription is active, past due, or unresolved. Contact hello@corvlio.com for support.");
     }
     const attempts = await client.query(
@@ -80,6 +95,10 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::int[])`, [ids]);
     }
     await client.query("DELETE FROM provisioning_attempts WHERE clerk_user_id = $1 OR business_id = ANY($2::int[])", [userId, ids]);
+    // Remove pending invoice/reminder jobs before removing their invoices.
+    await client.query("DELETE FROM invoice_emails WHERE invoice_id IN (SELECT id FROM manual_invoices WHERE business_id=ANY($1::int[]))",[ids]);
+    await client.query("DELETE FROM manual_invoices WHERE business_id=ANY($1::int[])",[ids]);
+    await client.query("DELETE FROM email_health_attempts WHERE actor_user_id=$1",[userId]);
     await client.query("DELETE FROM businesses WHERE clerk_user_id = $1 AND id = ANY($2::int[])", [userId, ids]);
     await client.query("COMMIT");
     return "pending";

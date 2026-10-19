@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountDeletionEligibility,
   AccountDeletionInput,
   AccountDeletionResult,
   AdminActivity,
@@ -163,6 +164,77 @@ export function useGetNativeBillingSummary<TData = Awaited<ReturnType<typeof get
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetNativeBillingSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAccountDeletionEligibilityUrl = () => {
+
+
+
+
+  return `/api/account/deletion-eligibility`
+}
+
+export const getAccountDeletionEligibility = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccountDeletionEligibility> => {
+
+  return customFetch<AccountDeletionEligibility>(getGetAccountDeletionEligibilityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccountDeletionEligibilityQueryKey = () => {
+    return [
+    `/api/account/deletion-eligibility`
+    ] as const;
+    }
+
+
+export const getGetAccountDeletionEligibilityQueryOptions = <TData = Awaited<ReturnType<typeof getAccountDeletionEligibility>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountDeletionEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccountDeletionEligibilityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountDeletionEligibility>>> = ({ signal }) => getAccountDeletionEligibility({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccountDeletionEligibility>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccountDeletionEligibilityQueryResult = NonNullable<Awaited<ReturnType<typeof getAccountDeletionEligibility>>>
+export type GetAccountDeletionEligibilityQueryError = ErrorType<unknown>
+
+
+
+export function useGetAccountDeletionEligibility<TData = Awaited<ReturnType<typeof getAccountDeletionEligibility>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountDeletionEligibility>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccountDeletionEligibilityQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

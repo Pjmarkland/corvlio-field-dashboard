@@ -29,6 +29,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
+import { iosPushEnvironment } from '@/lib/pushEnvironment';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
   registerNotificationDevice,
@@ -258,6 +259,7 @@ export function usePushNotifications(userId: string | undefined) {
     const platform = Capacitor.getPlatform() as 'ios' | 'android' | string;
     try {
       const device = await registerNotificationDevice({
+        apnsEnvironment: await iosPushEnvironment(),
         token: tokenValue,
         platform: platform as 'ios' | 'android',
         enabled: true,

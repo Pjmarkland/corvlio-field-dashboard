@@ -39,6 +39,16 @@ paths:
           description: No business owned by this account
         "503":
           description: Summary temporarily unavailable
+  /account/deletion-eligibility:
+    get:
+      operationId: getAccountDeletionEligibility
+      responses:
+        "200":
+          description: Self-service deletion eligibility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionEligibility"
   /account/me:
     delete:
       operationId: deleteMyAccount
@@ -928,12 +938,19 @@ components:
       properties:
         enabled: {type: boolean}
       required: [enabled]
+    AccountDeletionEligibility:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        reason: { type: [string, "null"] }
+      required: [allowed, reason]
     NativeBillingSummary:
       type: object
       properties:
         planName: { type: [string, "null"] }
-        status: { type: string, enum: [active, past_due, canceled, not_subscribed] }
+        status: { type: string, enum: [active, past_due, canceled, not_subscribed, requested, invoiced, overdue, paid, legacy] }
         nextChargeDate: { type: [string, "null"], format: date-time }
+        nextInvoiceDate: { type: [string, "null"], format: date-time }
         billingEnabled: { type: boolean }
         hasStripeCustomer: { type: boolean }
       required: [planName, status, nextChargeDate, billingEnabled, hasStripeCustomer]
@@ -1508,6 +1525,9 @@ components:
       type: object
       additionalProperties: false
       properties:
+        apnsEnvironment:
+          type: string
+          enum: [sandbox, production]
         token:
           type: string
           minLength: 16

@@ -6,26 +6,22 @@
  *   APNS_KEY_ID    — 10-character Key ID from Apple Developer
  *   APNS_TEAM_ID   — 10-character Team ID from Apple Developer
  *   APNS_BUNDLE_ID — iOS bundle identifier (default: com.corvlio.fielddashboard)
- *   APNS_ENV       — "production" | "sandbox" (default: "sandbox")
+ *   APNS_ENV       — optional legacy-token override; otherwise production on deployed servers
  */
 
 import { createSign } from "node:crypto";
 import http2 from "node:http2";
 import { logger } from "./logger";
+import { apnsHost, defaultApnsEnvironment, type ApnsEnvironment } from "./apnsEnvironment";
 
 const APNS_BUNDLE_ID = process.env["APNS_BUNDLE_ID"] ?? "com.corvlio.fielddashboard";
-const APNS_ENV = process.env["APNS_ENV"] ?? "sandbox";
-const APNS_HOST =
-  APNS_ENV === "production"
-    ? "api.push.apple.com"
-    : "api.sandbox.push.apple.com";
 
 // APNs tokens are valid for 1 hour; refresh every 50 minutes.
 const JWT_LIFETIME_MS = 50 * 60 * 1000;
 const APNS_REQUEST_TIMEOUT_MS = 10_000;
 
 let _cachedJwt: { token: string; generatedAt: number } | null = null;
-let _apnsSession: http2.ClientHttp2Session | null = null;
+const sessions = new Map<ApnsEnvironment,http2.ClientHttp2Session>();
 
 // ─── Credentials ──────────────────────────────────────────────────────────────
 
@@ -76,29 +72,29 @@ function getJwt(creds: ApnsCredentials): string {
 
 // ─── HTTP/2 session ───────────────────────────────────────────────────────────
 
-function getSession(): http2.ClientHttp2Session {
-  if (_apnsSession && !_apnsSession.destroyed && !_apnsSession.closed) {
-    return _apnsSession;
+function getSession(environment:ApnsEnvironment): http2.ClientHttp2Session {
+  const existing=sessions.get(environment);
+  if (existing && !existing.destroyed && !existing.closed) {
+    return existing;
   }
-  logger.debug({ host: APNS_HOST }, "Opening APNs HTTP/2 session");
-  const session = http2.connect(`https://${APNS_HOST}`);
+  const host=apnsHost(environment);
+  logger.debug({ host }, "Opening APNs HTTP/2 session");
+  const session = http2.connect(`https://${host}`);
   session.on("error", (err) => {
     logger.warn({ err: err.message }, "APNs HTTP/2 session error — will reconnect on next send");
-    _apnsSession = null;
+    if(sessions.get(environment)===session)sessions.delete(environment);
   });
   session.on("close", () => {
-    _apnsSession = null;
+    if(sessions.get(environment)===session)sessions.delete(environment);
   });
-  _apnsSession = session;
+  sessions.set(environment,session);
   return session;
 }
 
 /** Tear down the shared HTTP/2 session gracefully (call on server shutdown). */
 export function closeApnsSession(): void {
-  if (_apnsSession) {
-    _apnsSession.close();
-    _apnsSession = null;
-  }
+  for(const session of sessions.values())session.close();
+  sessions.clear();
 }
 
 // ─── Send ─────────────────────────────────────────────────────────────────────
@@ -113,6 +109,7 @@ export async function sendApnsNotification(input: {
   title: string;
   body: string;
   deepLink: string;
+  environment?: ApnsEnvironment;
 }): Promise<ApnsOutcome> {
   const creds = getCredentials();
   if (!creds) {
@@ -124,7 +121,8 @@ export async function sendApnsNotification(input: {
   }
 
   const jwt = getJwt(creds);
-  const session = getSession();
+  const environment=input.environment ?? defaultApnsEnvironment();
+  const session = getSession(environment);
 
   const apsPayload = JSON.stringify({
     aps: {
@@ -158,7 +156,7 @@ export async function sendApnsNotification(input: {
       });
     } catch (err) {
       // Session may have gone away; null it so next call reconnects.
-      _apnsSession = null;
+      sessions.delete(environment);
       finish({
         outcome: "error",
         statusCode: 0,
@@ -206,7 +204,7 @@ export async function sendApnsNotification(input: {
     });
 
     req.on("error", (err) => {
-      _apnsSession = null;
+      sessions.delete(environment);
       finish({ outcome: "error", statusCode: 0, reason: err.message });
     });
     req.on("close", () => {

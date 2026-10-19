@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accountDeletionEligibility';
 export * from './accountDeletionInput';
 export * from './accountDeletionInputConfirmation';
 export * from './accountDeletionResult';
@@ -78,6 +79,7 @@ export * from './nativeBillingSummary';
 export * from './nativeBillingSummaryStatus';
 export * from './notificationDevice';
 export * from './notificationDeviceRegistration';
+export * from './notificationDeviceRegistrationApnsEnvironment';
 export * from './notificationOutboxEvent';
 export * from './notificationOutboxEventStatus';
 export * from './notificationPlatform';

@@ -13,6 +13,8 @@ export interface NativeBillingSummary {
   status: NativeBillingSummaryStatus;
   /** @nullable */
   nextChargeDate: Date | null;
+  /** @nullable */
+  nextInvoiceDate?: Date | null;
   billingEnabled: boolean;
   hasStripeCustomer: boolean;
 }

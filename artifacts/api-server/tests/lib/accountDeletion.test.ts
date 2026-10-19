@@ -33,6 +33,22 @@ function fixture() {
   return { state, calls, deps, deleteUser, fail: () => { fail = true; } };
 }
 describe("account deletion safety", () => {
+  it("protects verified admins before acquiring a database connection",async()=>{
+    const f=fixture();f.deps.isProtectedUser=async()=>true;
+    await expect(deleteAccount("user_owner",f.deps)).rejects.toMatchObject({status:403});
+    expect(f.calls).toHaveLength(0);expect(f.deleteUser).not.toHaveBeenCalled();
+  });
+  it("protects an internal owner even when not an admin",async()=>{
+    const f=fixture();Object.assign(f.state.business,{is_internal:true});
+    await expect(deleteAccount("user_owner",f.deps)).rejects.toMatchObject({status:403});
+    expect(f.calls.some(c=>c.sql.startsWith("DELETE"))).toBe(false);
+    expect(f.deleteUser).not.toHaveBeenCalled();
+  });
+  it("removes pending invoice/reminder data and email test history before identity deletion",async()=>{
+    const f=fixture();await deleteAccount("user_owner",f.deps);
+    for(const prefix of ["DELETE FROM invoice_emails","DELETE FROM manual_invoices","DELETE FROM email_health_attempts"])
+      expect(f.calls.some(c=>c.sql.startsWith(prefix))).toBe(true);
+  });
   it("commits owned cleanup before calling Clerk, preserves resources and is idempotent", async () => {
     const f = fixture();
     f.deleteUser.mockImplementation(async id => {
@@ -41,7 +57,7 @@ describe("account deletion safety", () => {
       expect(f.calls.at(-2)?.sql).toBe("COMMIT");
     });
     expect(await deleteAccount("user_owner", f.deps)).toBe("completed");
-    expect(f.state.resources).toEqual([["business:7", 7, "Demo repair", "+12395550101", "agent_shared", "ready"]]);
+    expect(f.state.resources).toEqual([["business:7", 7, "Deleted account", "+12395550101", "agent_shared", "ready"]]);
     expect(await deleteAccount("user_owner", f.deps)).toBe("completed");
     expect(f.deleteUser).toHaveBeenCalledOnce();
     expect(f.calls.filter(c => c.sql.startsWith("DELETE FROM businesses"))).toHaveLength(1);
@@ -81,7 +97,7 @@ describe("account deletion safety", () => {
     const f = fixture(); await deleteAccount("user_owner", f.deps);
     for (const call of f.calls.filter(c => c.sql.startsWith("DELETE"))) {
       expect(call.sql).toContain("WHERE");
-      if (call.sql.includes("clerk_user_id")) expect(call.args[0]).toBe("user_owner");
+      if (call.sql.includes("clerk_user_id") || call.sql.includes("actor_user_id")) expect(call.args[0]).toBe("user_owner");
       else expect(call.args[0]).toEqual(expect.arrayContaining([call.sql.includes("text[]") ? "7" : 7]));
       expect(JSON.stringify(call.args)).not.toContain("user_other");
     }

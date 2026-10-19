@@ -1,5 +1,11 @@
 # Account deletion and App Store review
 
+See `ios-app-store-hardening.md` for the current hardening changes: admins and
+internal owners are protected, ordinary manual-invoice accounts may self-delete,
+and invoice/reminder jobs are removed with their invoices. Earlier manual
+payment alone is no longer a deletion blocker. External subscription safeguards
+and the Apple policy caveat still apply.
+
 This feature is implemented in the development app. It has **not** been published
 or applied to production in this change. No real account, business, or provider
 resource was deleted, and no reviewer seed was executed.

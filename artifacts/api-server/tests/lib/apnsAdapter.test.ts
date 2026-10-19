@@ -28,6 +28,12 @@ afterEach(() => {
 });
 const input = { deviceToken: "test-token", title: "New lead", body: "Repair", deepLink: "/leads/1" };
 describe("APNs network deadline", () => {
+  it.each(["sandbox","production"] as const)("routes a device explicitly to %s regardless of the server default",async environment=>{
+    const pending=sendApnsNotification({...input,environment});
+    expect(mocks.connect).toHaveBeenCalledWith(environment==="production" ? "https://api.push.apple.com" : "https://api.sandbox.push.apple.com");
+    req.emit("response",{":status":200});req.emit("end");
+    expect((await pending).outcome).toBe("delivered");
+  });
   it("cancels a hung request at 10 seconds", async () => {
     const pending = sendApnsNotification(input);
     await vi.advanceTimersByTimeAsync(10_000);

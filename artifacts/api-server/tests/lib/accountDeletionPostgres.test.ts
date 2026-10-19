@@ -33,6 +33,9 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
       CREATE TEMP TABLE operational_failures (business_id int REFERENCES businesses(id));
       CREATE TEMP TABLE billing_events (business_id int REFERENCES businesses(id));
       CREATE TEMP TABLE billing_notices (business_id int REFERENCES businesses(id));
+      CREATE TEMP TABLE manual_invoices (id int, business_id int REFERENCES businesses(id));
+      CREATE TEMP TABLE invoice_emails (invoice_id int);
+      CREATE TEMP TABLE email_health_attempts (actor_user_id text);
     `);
     expect((await client.query("SHOW search_path")).rows[0].search_path).toBe("pg_temp");
     const migration = readFileSync(new URL("../../../../scripts/migrate-account-deletion.sql", import.meta.url), "utf8");

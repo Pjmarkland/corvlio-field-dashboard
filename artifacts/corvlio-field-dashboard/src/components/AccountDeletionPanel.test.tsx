@@ -1,12 +1,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ mutate: vi.fn(), signOut: vi.fn(), clear: vi.fn() }));
-vi.mock('@workspace/api-client-react', () => ({ useDeleteMyAccount: () => ({ mutateAsync: m.mutate, isPending: false }) }));
+const m = vi.hoisted(() => ({ mutate: vi.fn(), signOut: vi.fn(), clear: vi.fn(),allowed:true }));
+vi.mock('@workspace/api-client-react', () => ({
+  useDeleteMyAccount: () => ({ mutateAsync: m.mutate, isPending: false }),
+  getGetAccountDeletionEligibilityQueryKey:()=>['eligibility'],
+  useGetAccountDeletionEligibility:()=>({data:{allowed:m.allowed,reason:m.allowed?null:'Admin and internal business owner accounts cannot be deleted from the app.'}}),
+}));
 vi.mock('@clerk/react', () => ({ useClerk: () => ({ signOut: m.signOut }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ clear: m.clear }) }));
 import AccountDeletionPanel, { deletionSignOutMarker } from './AccountDeletionPanel';
-beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); m.mutate.mockResolvedValue({ status: 'completed' }); m.signOut.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); m.allowed=true; sessionStorage.clear(); m.mutate.mockResolvedValue({ status: 'completed' }); m.signOut.mockResolvedValue(undefined); });
 describe('in-app account deletion', () => {
+  it('blocks protected accounts with a clear explanation and no deletion request',()=>{
+    m.allowed=false;render(<AccountDeletionPanel />);
+    expect((screen.getByTestId('button-delete-account') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Admin and internal business owner accounts cannot/)).toBeTruthy();
+    expect(m.mutate).not.toHaveBeenCalled();
+  });
   it('requires exact DELETE, explains irreversible deletion and manual resource retention', () => {
     render(<AccountDeletionPanel />);
     fireEvent.click(screen.getByTestId('button-delete-account'));

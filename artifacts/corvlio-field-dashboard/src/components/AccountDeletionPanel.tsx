@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useClerk } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDeleteMyAccount } from '@workspace/api-client-react';
+import { useDeleteMyAccount, useGetAccountDeletionEligibility, getGetAccountDeletionEligibilityQueryKey } from '@workspace/api-client-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -12,10 +12,11 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState('');
   const deletion = useDeleteMyAccount();
+  const eligibility=useGetAccountDeletionEligibility({query:{queryKey:getGetAccountDeletionEligibilityQueryKey(),retry:false}});
   const { signOut } = useClerk();
   const client = useQueryClient();
   const submit = async () => {
-    if (confirmation !== 'DELETE' || deletion.isPending) return;
+    if (confirmation !== 'DELETE' || deletion.isPending || eligibility.data?.allowed!==true) return;
     setError('');
     try {
       await deletion.mutateAsync({ data: { confirmation: 'DELETE' } });
@@ -37,15 +38,17 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
     }
   };
   return <section className="mt-4 rounded-2xl border border-destructive/40 bg-card p-5 text-foreground sm:p-6">
-    <h2 className="font-bold">Delete account</h2>
+    <h2 className="font-bold">Delete my account</h2>
     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Permanently delete your account and business data. This cannot be undone.</p>
-    <button type="button" data-testid="button-delete-account" onClick={() => { setConfirmation(''); setError(''); setOpen(true); }}
-      className="mt-4 min-h-11 rounded-xl border border-destructive/60 bg-background px-4 text-sm font-bold text-destructive hover:bg-destructive/10">Delete account</button>
+    {eligibility.data?.allowed===false ? <p role="status" className="mt-3 text-sm">{eligibility.data.reason}</p> : null}
+    {eligibility.isError ? <p role="alert" className="mt-3 text-sm">Account protection could not be verified. Please try again before deleting.</p> : null}
+    <button type="button" data-testid="button-delete-account" disabled={eligibility.data?.allowed!==true} onClick={() => { setConfirmation(''); setError(''); setOpen(true); }}
+      className="mt-4 min-h-11 rounded-xl border border-destructive/60 bg-background px-4 text-sm font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50">Delete my account</button>
     <Dialog open={open} onOpenChange={value => { if (!deletion.isPending) setOpen(value); }}>
       <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader><DialogTitle>Delete your account permanently?</DialogTitle><DialogDescription>
           This deletes your leads, notifications, push registrations, business profile, onboarding data, and Clerk account.
-          You will be signed out. This cannot be undone.
+          Pending invoices and reminders are canceled. You will be signed out. This cannot be undone.
         </DialogDescription></DialogHeader>
         <p className="text-sm leading-relaxed text-muted-foreground">If a Retell phone or agent is assigned, it will not be released automatically.
           We retain only the minimal resource details needed for an admin to review and release it manually.

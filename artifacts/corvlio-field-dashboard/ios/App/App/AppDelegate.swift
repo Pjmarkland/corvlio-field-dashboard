@@ -1,6 +1,31 @@
 import UIKit
 import Capacitor
 
+// Native build configuration, not Vite's web build mode, determines the token's
+// APNs environment. A TestFlight/App Store Release reports production even when
+// pointed at a development API.
+@objc(PushEnvironmentPlugin)
+public class PushEnvironmentPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PushEnvironmentPlugin"
+    public let jsName = "PushEnvironment"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getEnvironment", returnType: CAPPluginReturnPromise)
+    ]
+    @objc func getEnvironment(_ call: CAPPluginCall) {
+        #if DEBUG
+        call.resolve(["environment": "sandbox"])
+        #else
+        call.resolve(["environment": "production"])
+        #endif
+    }
+}
+
+class AppViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(PushEnvironmentPlugin())
+    }
+}
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 

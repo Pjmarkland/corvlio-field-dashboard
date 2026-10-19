@@ -1,5 +1,14 @@
 # Native Settings billing
 
+The current App Store hardening contract is documented in
+`ios-app-store-hardening.md`. It supersedes the older portal behavior described
+below: native Billing now shows plan/status/next invoice date only, and Manage
+billing always opens the website billing page, without creating a portal
+session. Internal businesses are excluded. Native `/billing` is the read-only
+screen; native purchase/plan-selection surfaces remain blocked. With Stripe
+disabled, web `/billing` shows existing manual invoices instead of enabling
+Stripe.
+
 Implemented in development only. No publishing, redeployment, Secrets changes
 or deployment-setting changes are part of this work.
 

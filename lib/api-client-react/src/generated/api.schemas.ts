@@ -125,6 +125,12 @@ export interface BillingAvailability {
   enabled: boolean;
 }
 
+export interface AccountDeletionEligibility {
+  allowed: boolean;
+  /** @nullable */
+  reason: string | null;
+}
+
 export type NativeBillingSummaryStatus = typeof NativeBillingSummaryStatus[keyof typeof NativeBillingSummaryStatus];
 
 
@@ -133,6 +139,11 @@ export const NativeBillingSummaryStatus = {
   past_due: 'past_due',
   canceled: 'canceled',
   not_subscribed: 'not_subscribed',
+  requested: 'requested',
+  invoiced: 'invoiced',
+  overdue: 'overdue',
+  paid: 'paid',
+  legacy: 'legacy',
 } as const;
 
 export interface NativeBillingSummary {
@@ -141,6 +152,8 @@ export interface NativeBillingSummary {
   status: NativeBillingSummaryStatus;
   /** @nullable */
   nextChargeDate: string | null;
+  /** @nullable */
+  nextInvoiceDate?: string | null;
   billingEnabled: boolean;
   hasStripeCustomer: boolean;
 }
@@ -705,7 +718,16 @@ export const NotificationPlatform = {
   android: 'android',
 } as const;
 
+export type NotificationDeviceRegistrationApnsEnvironment = typeof NotificationDeviceRegistrationApnsEnvironment[keyof typeof NotificationDeviceRegistrationApnsEnvironment];
+
+
+export const NotificationDeviceRegistrationApnsEnvironment = {
+  sandbox: 'sandbox',
+  production: 'production',
+} as const;
+
 export interface NotificationDeviceRegistration {
+  apnsEnvironment?: NotificationDeviceRegistrationApnsEnvironment;
   /**
      * @minLength 16
      * @maxLength 4096

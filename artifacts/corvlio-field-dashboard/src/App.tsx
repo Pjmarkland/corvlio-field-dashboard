@@ -52,6 +52,7 @@ import ClientAgreementPage from '@/pages/client-agreement';
 import AdminOverviewPage from '@/pages/admin/AdminOverviewPage';
 import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/AccountDeletionPanel';
 import NativeBillingSection from '@/components/NativeBillingSection';
+import NativeBillingPage from '@/pages/NativeBillingPage';
 import AdminActivityPage from '@/pages/admin/AdminActivityPage';
 import BillingPage from '@/pages/billing';
 import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage';
@@ -613,6 +614,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
 
 function SettingsPage({ businessName, retellPhoneNumber }: { businessName: string; retellPhoneNumber: string | null }) {
   const { enabled: billingOn } = useBillingAvailability();
+  const billingProfile=useGetBusinessProfile({query:{queryKey:getGetBusinessProfileQueryKey(),retry:false}});
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
@@ -624,7 +626,7 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
     <section className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="mb-4 flex items-center gap-2 font-bold"><ShieldCheck size={17} /> Account controls</h2>
       <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
-      {billingOn ? <Link href="/billing" data-testid="link-settings-billing" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Billing</span><ChevronRight size={16} /></Link> : null}
+      {billingProfile.isSuccess && !billingProfile.data?.isInternal && (billingOn || Capacitor.isNativePlatform()) ? <Link href="/billing" data-testid="link-settings-billing" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Billing</span><ChevronRight size={16} /></Link> : null}
       <Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link>
       <Link href="/terms" data-testid="link-settings-terms" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Terms of Service</span><ChevronRight size={16} /></Link>
       <a href="mailto:hello@corvlio.com" data-testid="link-settings-support" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Support / Contact</span><ExternalLink size={15} /></a>
@@ -842,7 +844,7 @@ function AdminBillingRoute() {
 }
 
 function BillingRoute() {
-  if (Capacitor.isNativePlatform()) return <Redirect to="/dashboard" />;
+  if (Capacitor.isNativePlatform()) return <><Show when="signed-in"><NativeBillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
   return <><Show when="signed-in"><BillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
 }
 

@@ -14,4 +14,9 @@ export const NativeBillingSummaryStatus = {
   past_due: 'past_due',
   canceled: 'canceled',
   not_subscribed: 'not_subscribed',
+  requested: 'requested',
+  invoiced: 'invoiced',
+  overdue: 'overdue',
+  paid: 'paid',
+  legacy: 'legacy',
 } as const;

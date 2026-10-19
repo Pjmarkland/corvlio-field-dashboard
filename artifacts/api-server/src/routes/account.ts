@@ -1,9 +1,16 @@
 import { getAuth } from "@clerk/express";
 import { Router } from "express";
 import { DeleteMyAccountBody } from "@workspace/api-zod";
-import { AccountDeletionError, deleteAccount } from "../lib/accountDeletion";
+import { AccountDeletionError, deleteAccount, accountDeletionEligibility } from "../lib/accountDeletion";
 import { destructiveOriginAllowed } from "../middlewares/destructiveOrigin";
 const router = Router();
+router.get("/account/deletion-eligibility",async(req,res)=>{
+  res.set("Cache-Control","private, no-store");
+  const {userId}=getAuth(req);
+  if(!userId){res.sendStatus(401);return;}
+  try {res.json(await accountDeletionEligibility(userId));}
+  catch {res.status(503).json({error:"Account protection could not be checked. Deletion is unavailable until it can be verified."});}
+});
 router.delete("/account/me", async (req, res) => {
   res.set("Cache-Control", "private, no-store");
   const { userId } = getAuth(req);

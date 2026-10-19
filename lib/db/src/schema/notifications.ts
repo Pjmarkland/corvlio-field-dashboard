@@ -16,6 +16,7 @@ export const notificationDevicesTable = pgTable(
     clerkUserId: text("clerk_user_id").notNull(),
     businessId: text("business_id").notNull(),
     platform: text("platform").notNull(),
+    apnsEnvironment: text("apns_environment", {enum:["sandbox","production"]}),
     token: text("token").notNull(),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

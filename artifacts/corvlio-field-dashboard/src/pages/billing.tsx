@@ -6,9 +6,11 @@ import {
   getGetOwnerBillingQueryKey, useCancelBilling, useCreateBillingCheckout, useCreateBillingPortal,
   useGetOwnerBilling, useResumeBilling, useUpgradeBillingPlan,
   type BillingPlanInputPlan, type BillingSnapshot,
+  useGetBusinessProfile, getGetBusinessProfileQueryKey,
 } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
 import { billingDate, errorText, isAssignedStartup, money, periodLabel, usageText } from '@/lib/billingFormat';
+import OwnerInvoicePanel from '@/components/OwnerInvoicePanel';
 
 const MAX_POLLS = 6;
 
@@ -19,7 +21,14 @@ export default function BillingPage() {
 
 function WebBillingPage() {
   const { enabled, disabled } = useBillingAvailability();
-  if (disabled) return <Redirect to="/dashboard" />;
+  const profile=useGetBusinessProfile({query:{queryKey:getGetBusinessProfileQueryKey(),retry:false}});
+  if(!profile.isSuccess)return null;
+  if(profile.data?.isInternal)return <Redirect to="/dashboard" />;
+  if (disabled) return <main className="mx-auto min-h-screen max-w-3xl bg-background px-4 py-8 text-foreground">
+    <Link href="/dashboard" className="inline-flex min-h-11 items-center font-semibold underline">Back to dashboard</Link>
+    <h1 className="my-5 text-2xl font-bold">Billing</h1>
+    <OwnerInvoicePanel />
+  </main>;
   if (!enabled) return null;
   return <BillingContent />;
 }

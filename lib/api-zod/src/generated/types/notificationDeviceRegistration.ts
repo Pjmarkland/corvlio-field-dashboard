@@ -5,9 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NotificationDeviceRegistrationApnsEnvironment } from './notificationDeviceRegistrationApnsEnvironment';
 import type { NotificationPlatform } from './notificationPlatform';
 
 export interface NotificationDeviceRegistration {
+  apnsEnvironment?: NotificationDeviceRegistrationApnsEnvironment;
   /**
      * @minLength 16
      * @maxLength 4096

@@ -9,12 +9,15 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => m.native } }));
 vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => m.avail }));
+vi.mock('@/components/OwnerInvoicePanel',()=>({default:()=> <div data-testid="manual-invoices">Website invoices</div>}));
 vi.mock('wouter', () => ({
   Link: ({ children, href, ...r }: { children: React.ReactNode; href: string }) => <a href={href} {...r}>{children}</a>,
   Redirect: ({ to }: { to: string }) => <div data-testid="redirect">{to}</div>,
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@workspace/api-client-react', () => ({
+  getGetBusinessProfileQueryKey:()=>['profile'],
+  useGetBusinessProfile:()=>({isSuccess:true,data:{isInternal:false}}),
   getGetOwnerBillingQueryKey: () => ['b'],
   useGetOwnerBilling: () => { m.snapshot(); return { data: m.data, isLoading: false, isError: false, refetch: vi.fn(), dataUpdatedAt: 0 }; },
   useCreateBillingCheckout: () => ({ mutate: m.checkout, isPending: false }),
@@ -32,6 +35,13 @@ beforeEach(() => {
   m.data = { account, usage: { count: 63, limit: 100, start: '2025-06-01T00:00:00Z', end: '2025-07-01T00:00:00Z' }, plans: [{ id: 'starter', label: 'Starter', monthlyCents: 5000, setupCents: 0, callLimit: 100 }], policy: { cancellationNoticeDays: 30 }, timeline: [] };
 });
 describe('billing page', () => {
+  it('shows existing website invoices while Stripe is disabled, without requesting Stripe billing',()=>{
+    m.avail={enabled:false,settled:true,disabled:true};
+    render(<BillingPage />);
+    expect(screen.getByTestId('manual-invoices')).toBeTruthy();
+    expect(m.snapshot).not.toHaveBeenCalled();
+    expect(m.checkout).not.toHaveBeenCalled();
+  });
   it.each(['ios', 'android'])('blocks native %s direct billing/portal entry even if availability says enabled', () => {
     m.native = true;
     m.avail = { enabled: true, settled: true, disabled: false };
@@ -73,11 +83,11 @@ describe('billing page', () => {
     render(<BillingPage />);
     expect(screen.getByTestId('text-next-charge').textContent).toContain('renewal before cancellation');
   });
-  it('flag off redirects, renders no billing UI and requests no snapshot', () => {
+  it('flag off exposes only existing manual invoices, never Stripe billing UI or a snapshot', () => {
     m.avail = { enabled: false, settled: true, disabled: true };
     render(<BillingPage />);
-    expect(screen.getByTestId('redirect').textContent).toBe('/dashboard');
-    expect(screen.queryByText('Billing')).toBeNull();
+    expect(screen.getByTestId('manual-invoices')).toBeTruthy();
+    expect(screen.queryByTestId('section-billing-current')).toBeNull();
     expect(m.snapshot).not.toHaveBeenCalled();
   });
   it('shows usage and requires consent before cancelling, then shows effective date', () => {

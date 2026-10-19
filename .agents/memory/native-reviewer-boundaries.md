@@ -3,19 +3,17 @@ name: Native billing and reviewer boundaries
 description: User-required native payment exclusion and isolated App Store reviewer data.
 ---
 
-Native Capacitor iOS/Android Settings may show a read-only billing summary:
-plan name, subscription status and a known next charge date, with no prices,
-plan comparison, checkout, upgrade actions or payment forms. “Manage billing”
-opens the existing Stripe customer portal in the OS external browser, never an
-in-app browser. When billing is disabled or no Stripe customer exists, show
-“Billing is managed on our website” with an external website billing link.
+Native Capacitor iOS/Android Settings and Billing may show a read-only summary:
+plan name, status and next invoice date only, with no prices, plan comparison,
+checkout, upgrade actions or payment forms. “Manage billing” opens the website
+billing page in the OS external browser, never an in-app browser or a directly
+created Stripe portal. Hide Billing entirely for internal businesses.
 Direct native payment and plan-selection routes remain blocked. Preserve the
 regular web/PWA billing experience and the existing production billing guard.
 
-**Why:** The user replaced the earlier blanket native billing exclusion with
-this trust-focused read-only experience: “I want it very professional and so the
-user trust.” They explicitly prohibited publishing, redeployment, Secrets or
-deployment-setting changes, or enabling production billing.
+**Why:** The user explicitly refined App Store hardening to three read-only
+fields and a website-only external management action. They prohibited publishing,
+email, secret changes, and enabling production billing.
 
 **How to apply:** Keep native purchase routes excluded even if cached server
 availability says enabled. Summary reads must not activate billing, write

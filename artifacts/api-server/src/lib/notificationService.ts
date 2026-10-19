@@ -324,6 +324,7 @@ async function processNotificationOutbox(): Promise<void> {
       if (lockError) throw lockError;
       const result = await sendApnsNotification({
         deviceToken: device.token,
+        environment: device.apnsEnvironment ?? undefined,
         title: event.title,
         body: event.body,
         deepLink: event.deepLink,
@@ -578,6 +579,7 @@ export async function registerNotificationDevice(input: {
   clerkUserId: string;
   businessId: string;
   platform: "ios" | "android";
+  apnsEnvironment?: "production" | "sandbox";
   token: string;
   enabled: boolean;
 }) {
@@ -596,6 +598,7 @@ export async function registerNotificationDevice(input: {
         clerkUserId: input.clerkUserId,
         businessId: input.businessId,
         platform: input.platform,
+        apnsEnvironment: input.apnsEnvironment ?? null,
         enabled: input.enabled,
         lastSeenAt: now,
         updatedAt: now,

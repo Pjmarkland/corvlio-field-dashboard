@@ -13,10 +13,17 @@ import * as zod from 'zod';
  */
 export const GetNativeBillingSummaryResponse = zod.object({
   "planName": zod.string().nullable(),
-  "status": zod.enum(['active', 'past_due', 'canceled', 'not_subscribed']),
+  "status": zod.enum(['active', 'past_due', 'canceled', 'not_subscribed', 'requested', 'invoiced', 'overdue', 'paid', 'legacy']),
   "nextChargeDate": zod.coerce.date().nullable(),
+  "nextInvoiceDate": zod.coerce.date().nullish(),
   "billingEnabled": zod.boolean(),
   "hasStripeCustomer": zod.boolean()
+})
+
+
+export const GetAccountDeletionEligibilityResponse = zod.object({
+  "allowed": zod.boolean(),
+  "reason": zod.string().nullable()
 })
 
 
@@ -622,6 +629,7 @@ export const registerNotificationDeviceBodyTokenMax = 4096;
 export const registerNotificationDeviceBodyEnabledDefault = true;
 
 export const RegisterNotificationDeviceBody = zod.object({
+  "apnsEnvironment": zod.enum(['sandbox', 'production']).optional(),
   "token": zod.string().min(registerNotificationDeviceBodyTokenMin).max(registerNotificationDeviceBodyTokenMax),
   "platform": zod.enum(['ios', 'android']),
   "enabled": zod.boolean().default(registerNotificationDeviceBodyEnabledDefault)

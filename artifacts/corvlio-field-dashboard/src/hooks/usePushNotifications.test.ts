@@ -16,6 +16,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+vi.mock('@/lib/pushEnvironment',()=>({iosPushEnvironment:async()=>undefined}));
 
 // ---------------------------------------------------------------------------
 // Hoist mock fns so vi.mock factories can reference them safely

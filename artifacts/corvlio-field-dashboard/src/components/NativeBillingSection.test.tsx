@@ -19,7 +19,7 @@ import NativeBillingSection from './NativeBillingSection';
 import { websiteBillingUrl } from '@/lib/nativeBillingBrowser';
 beforeEach(() => {
   vi.clearAllMocks(); m.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; m.native = true; m.loading = false; m.failed = false;
-  m.summary = { planName: 'Professional', status: 'active', nextChargeDate: '2026-11-01T00:00:00Z',
+  m.summary = { planName: 'Professional', status: 'active', nextInvoiceDate: '2026-11-01T00:00:00Z',
     billingEnabled: true, hasStripeCustomer: true };
   m.portal.mockResolvedValue({ url: 'https://billing.stripe.com/p/session/fake_session' });
   m.external.mockResolvedValue({ completed: true });
@@ -37,26 +37,24 @@ describe('native Settings billing', () => {
   });
   it.each([['active', 'Active'], ['past_due', 'Past due'], ['canceled', 'Canceled'],
     ['not_subscribed', 'No active subscription']])('renders %s in calm copy', (status, text) => {
-    m.summary.status = status; m.summary.nextChargeDate = null;
+    m.summary.status = status; m.summary.nextInvoiceDate = null;
     render(<NativeBillingSection />);
     expect(screen.getByText(text)).toBeTruthy();
     expect(screen.queryByText('Next charge date')).toBeNull();
   });
-  it('opens the authenticated portal in the external OS browser', async () => {
+  it('opens only the website billing page in the external OS browser', async () => {
     const windowOpen = vi.spyOn(window, 'open');
     render(<NativeBillingSection />);
     fireEvent.click(screen.getByRole('button', { name: 'Manage billing' }));
-    await waitFor(() => expect(m.external).toHaveBeenCalledWith({ url: 'https://billing.stripe.com/p/session/fake_session' }));
-    expect(m.portal).toHaveBeenCalledWith();
+    await waitFor(() => expect(m.external).toHaveBeenCalledWith({ url: websiteBillingUrl }));
+    expect(m.portal).not.toHaveBeenCalled();
     expect(windowOpen).not.toHaveBeenCalled(); windowOpen.mockRestore();
   });
   it.each(['disabled', 'no customer'])('shows a neutral website link for %s and never requests a portal', async mode => {
     if (mode === 'disabled') m.summary.billingEnabled = false;
     else m.summary.hasStripeCustomer = false;
     render(<NativeBillingSection />);
-    expect(screen.getByText('Billing is managed on our website.')).toBeTruthy();
-    const link = screen.getByRole('link', { name: 'Manage billing' });
-    expect(link.getAttribute('href')).toBe(websiteBillingUrl);
+    const link = screen.getByRole('button', { name: 'Manage billing' });
     fireEvent.click(link);
     await waitFor(() => expect(m.external).toHaveBeenCalledWith({ url: websiteBillingUrl }));
     expect(m.portal).not.toHaveBeenCalled();
@@ -66,7 +64,7 @@ describe('native Settings billing', () => {
     render(<NativeBillingSection />);
     fireEvent.click(screen.getByRole('button', { name: 'Manage billing' }));
     await waitFor(() => expect(m.external).toHaveBeenCalledWith({ url: websiteBillingUrl }));
-    expect(m.refetch).toHaveBeenCalledOnce();
+    expect(m.portal).not.toHaveBeenCalled();
   });
   it('reports a failed OS launch without navigating to an in-app payment screen', async () => {
     m.external.mockResolvedValue({ completed: false });
@@ -74,12 +72,12 @@ describe('native Settings billing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage billing' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Please try again'));
   });
-  it.each(['javascript:alert(1)', 'https://example.com/payment', 'http://billing.stripe.com/payment'])('rejects an unsafe portal URL: %s', async url => {
+  it.each(['javascript:alert(1)', 'https://example.com/payment', 'http://billing.stripe.com/payment'])('ignores portal URL data and opens only the website: %s', async url => {
     m.portal.mockResolvedValue({ url });
     render(<NativeBillingSection />);
     fireEvent.click(screen.getByRole('button', { name: 'Manage billing' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
-    expect(m.external).not.toHaveBeenCalled();
+    await waitFor(() => expect(m.external).toHaveBeenCalledWith({url:websiteBillingUrl}));
+    expect(m.portal).not.toHaveBeenCalled();
   });
   it('keeps web/PWA unchanged, without rendering or fetching a native summary', () => {
     m.native = false;
