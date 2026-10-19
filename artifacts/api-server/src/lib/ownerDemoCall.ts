@@ -55,7 +55,7 @@ export async function placeOwnerDemoCall(business: Business, number: string, con
   const versions = await collectRetellListItems<Version>((paginationKey) => {
     const query = paginationKey === undefined ? "" : `?${new URLSearchParams({ pagination_key: paginationKey })}`;
     return retell<unknown>(`/list-agent-versions/${encodeURIComponent(agentId)}${query}`);
-  }, { allowLegacyArray: true });
+  });
   const version = versions.filter((v: { is_published: boolean }) => v.is_published === false)
     .sort((a: { version: number }, b: { version: number }) => b.version - a.version)[0]?.version;
   if (!Number.isSafeInteger(version)) throw new DemoCallError(400, "There is no unpublished receptionist draft available to test.");

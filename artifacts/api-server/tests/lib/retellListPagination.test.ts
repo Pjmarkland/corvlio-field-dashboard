@@ -61,13 +61,33 @@ describe("Retell paginated list responses", () => {
       .mockResolvedValueOnce([{ phone_number: "+15550000002" }]);
     // Even supported array compatibility is first-page-only; mixing formats
     // halfway through pagination must never look like a complete inventory.
-    await expect(collectRetellListItems(request, { allowLegacyArray: true }))
+    await expect(collectRetellListItems(request))
       .rejects.toThrow("Invalid Retell list response");
     expect(request.mock.calls.map(args => args[0])).toEqual([undefined, "next"]);
   });
-  it("preserves explicitly requested agent-version array compatibility", async () => {
+  it("rejects obsolete agent-version arrays instead of bypassing the pagination contract", async () => {
     const request = vi.fn(async () => [{ version: 1, is_published: false }]);
-    expect(await collectRetellListItems(request, { allowLegacyArray: true })).toEqual([{ version: 1, is_published: false }]);
+    await expect(collectRetellListItems(request)).rejects.toThrow("Invalid Retell list response");
     expect(request).toHaveBeenCalledTimes(1);
+  });
+  it("collects every v3 call page with the cursor in the POST body and preserves filters", async () => {
+    const filters = { agent: [{ agent_id: "agent_fixture", version: [2] }] };
+    const calls = Array.from({ length: 101 }, (_, i) => ({ call_id: `fixture_call_${i}` }));
+    const request = vi.fn(async (_path: string, body: Record<string, unknown>) => {
+      expect(body.filter_criteria).toEqual(filters);
+      expect(body.limit).toBe(50);
+      if (body.pagination_key === undefined)
+        return { items: calls.slice(0, 50), has_more: true, pagination_key: "calls /+?& page2" };
+      if (body.pagination_key === "calls /+?& page2")
+        return { items: calls.slice(50, 100), has_more: true, pagination_key: "calls page3" };
+      return { items: calls.slice(100), has_more: false };
+    });
+    const result = await collectRetellListItems(key => request("/v3/list-calls", {
+      filter_criteria: filters, limit: 50, ...(key === undefined ? {} : { pagination_key: key }),
+    }));
+    expect(result).toEqual(calls);
+    expect(request.mock.calls.map(([path]) => path)).toEqual(Array(3).fill("/v3/list-calls"));
+    expect(request.mock.calls.map(([, body]) => body.pagination_key))
+      .toEqual([undefined, "calls /+?& page2", "calls page3"]);
   });
 });

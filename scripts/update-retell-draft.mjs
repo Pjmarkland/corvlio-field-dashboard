@@ -25,7 +25,7 @@ async function request(path, method = "GET", body) {
 const versions = await collectRetellListItems((paginationKey) => {
   const query = paginationKey === undefined ? "" : `?${new URLSearchParams({ pagination_key: paginationKey })}`;
   return request(`/list-agent-versions/${encodeURIComponent(id)}${query}`);
-}, { allowLegacyArray: true });
+});
 const publishedVersion = versions.filter(v => v.is_published).sort((a,b) => b.version-a.version)[0]?.version;
 const draftVersion = versions.filter(v => !v.is_published).sort((a,b) => b.version-a.version)[0]?.version;
 assert.notEqual(publishedVersion, undefined, "No published baseline found");

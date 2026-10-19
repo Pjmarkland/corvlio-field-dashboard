@@ -9,13 +9,14 @@ const retiredPaths = new Set([
   "/list-conversation-flow-components", "/list-batch-tests",
   "/list-test-case-definitions", "/list-test-runs",
   "/list-calls", "/v2/list-calls", "/list-chat", "/list-chats",
+  "/list-agents", "/list-chat-agents",
 ]);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     if (entry.name === "node_modules" || entry.name === "dist") return [];
     const path = join(dir, entry.name);
-    return entry.isDirectory() ? sourceFiles(path) : /\.(?:[cm]?[jt]s)$/.test(path) ? [path] : [];
+    return entry.isDirectory() ? sourceFiles(path) : /\.(?:[cm]?[jt]sx?|py|sh)$/.test(path) ? [path] : [];
   });
 }
 
@@ -26,6 +27,7 @@ describe("Retell legacy endpoint regression guard", () => {
       ...sourceFiles(join(root, "src")),
       ...sourceFiles(join(root, "../../lib")),
       ...sourceFiles(join(root, "../../scripts")),
+      ...sourceFiles(join(root, "../corvlio-field-dashboard/src")),
     ];
     const violations = paths.flatMap(path => {
       const endpoints = readFileSync(path, "utf8").match(/\/(?:v\d+\/)?list-[a-z-]+/g) ?? [];

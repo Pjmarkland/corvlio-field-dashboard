@@ -23,3 +23,15 @@ publishing a shared draft can affect unrelated businesses and the agency demo.
 
 **How to apply:** keep owner-call availability separate from provider release
 approval, and do not publish or repoint live routes merely to enable owner tests.
+
+Retell list migrations must follow the documented method/path for each resource,
+not blindly add a version prefix. Agent-version listing remains an unversioned
+supported path, but uses the same strict paginated `items` envelope.
+
+**Why:** Retell's June 2026 notice replaces specific legacy paths, not every
+unversioned list URL. An invented versioned path can break safe draft selection.
+
+**How to apply:** Check the current official endpoint reference; collect every
+page or fail explicitly before provider actions. Do not attribute an API warning
+to this checkout without request-origin evidence, or introduce unused bulk
+inventory readers merely to claim a migration.

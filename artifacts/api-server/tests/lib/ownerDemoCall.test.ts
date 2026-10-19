@@ -98,6 +98,16 @@ describe.each(["development", "production"])("owner-only demo calls in %s", mode
     const write = calls.find(c => c.options.method === "POST")!;
     expect(JSON.parse(write.options.body as string).override_agent_version).toBe(4);
   });
+  it("refuses an obsolete list array before placing a call", async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url, options) => {
+      if (!String(url).includes("list-agent-versions")) return original(url, options);
+      return { ok: true, json: async () => [{ version: 1, is_published: false }] } as Response;
+    });
+    await expect(placeOwnerDemoCall(business, business.ownerPhone!, true))
+      .rejects.toThrow("Invalid Retell list response");
+    expect(calls.filter(c => c.options.method === "POST")).toHaveLength(0);
+  });
   it("does not reserve an attempt or dial if a later list page fails", async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (url, options) => {
