@@ -611,6 +611,53 @@ paths:
                 $ref: "#/components/schemas/AdminActivity"
         "404":
           description: Not found or administrator access is unavailable
+  /admin/email-health:
+    get:
+      operationId: getAdminEmailHealth
+      tags: [admin]
+      security: [{clerkSession: []}]
+      responses:
+        "200":
+          description: Lead and admin-test email health
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminEmailHealth"}
+        "404": {description: Administrator access unavailable}
+  /admin/email-health/test:
+    post:
+      operationId: sendAdminEmailTest
+      tags: [admin]
+      security: [{clerkSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmailTestRequest"}
+      responses:
+        "200":
+          description: One test attempt, sent only to the authenticated admin
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EmailTestResult"}
+        "404": {description: Administrator access unavailable}
+        "429": {description: Wait one minute between tests}
+  /admin/email-health/retry:
+    post:
+      operationId: retryAdminLeadEmails
+      tags: [admin]
+      security: [{clerkSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmailRetryRequest"}
+      responses:
+        "200":
+          description: Confirmed lead emails queued; no unselected message is retried
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EmailRetryResult"}
+        "404": {description: Administrator access unavailable}
   /billing/availability:
     get:
       operationId: getBillingAvailability
@@ -1813,6 +1860,73 @@ components:
           items:
             $ref: "#/components/schemas/AdminCallRecord"
       required: [business, onboarding, leads, calls]
+    EmailHealthRecord:
+      type: object
+      required: [at, timestampExact, error, cause, hint]
+      properties:
+        at: {type: string}
+        timestampExact: {type: boolean}
+        error: {type: [string, "null"]}
+        cause: {type: string}
+        hint: {type: string}
+    FailedLeadEmail:
+      type: object
+      required: [id, recipient, createdAt, error, cause, hint]
+      properties:
+        id: {type: number, multipleOf: 1}
+        recipient: {type: [string, "null"]}
+        createdAt: {type: string}
+        error: {type: string}
+        cause: {type: string}
+        hint: {type: string}
+    AdminEmailHealth:
+      type: object
+      required: [lastSuccess, lastFailure, failed, hasMore]
+      properties:
+        lastSuccess:
+          anyOf: [{$ref: "#/components/schemas/EmailHealthRecord"}, {type: "null"}]
+        lastFailure:
+          anyOf: [{$ref: "#/components/schemas/EmailHealthRecord"}, {type: "null"}]
+        failed:
+          type: array
+          items: {$ref: "#/components/schemas/FailedLeadEmail"}
+        hasMore: {type: boolean}
+    EmailTestRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId]
+      properties:
+        requestId: {type: string}
+    EmailTestResult:
+      type: object
+      required: [success, error, cause, hint]
+      properties:
+        success: {type: boolean}
+        error: {type: [string, "null"]}
+        cause: {type: string}
+        hint: {type: string}
+    EmailRetryEntry:
+      type: object
+      required: [id, recipient]
+      properties:
+        id: {type: number, multipleOf: 1, minimum: 1}
+        recipient: {type: string}
+    EmailRetryRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmed, entries]
+      properties:
+        confirmed: {type: boolean, const: true}
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: "#/components/schemas/EmailRetryEntry"}
+    EmailRetryResult:
+      type: object
+      required: [queued]
+      properties:
+        queued: {type: number, multipleOf: 1}
     AdminActivity:
       type: object
       properties:
@@ -1846,6 +1960,8 @@ components:
     AdminOperationalFailure:
       type: object
       properties:
+        alertBlocked:
+          type: boolean
         id:
           type: number
           multipleOf: 1

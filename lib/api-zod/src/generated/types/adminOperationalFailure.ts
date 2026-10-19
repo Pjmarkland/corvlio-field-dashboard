@@ -8,6 +8,7 @@
 import type { AdminOperationalFailureSource } from './adminOperationalFailureSource';
 
 export interface AdminOperationalFailure {
+  alertBlocked?: boolean;
   id: number;
   source: AdminOperationalFailureSource;
   summary: string;

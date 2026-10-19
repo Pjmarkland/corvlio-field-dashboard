@@ -915,6 +915,63 @@ export interface AdminBusinessDetail {
   calls: AdminCallRecord[];
 }
 
+export interface EmailHealthRecord {
+  at: string;
+  timestampExact: boolean;
+  /** @nullable */
+  error: string | null;
+  cause: string;
+  hint: string;
+}
+
+export interface FailedLeadEmail {
+  id: number;
+  /** @nullable */
+  recipient: string | null;
+  createdAt: string;
+  error: string;
+  cause: string;
+  hint: string;
+}
+
+export interface AdminEmailHealth {
+  lastSuccess: EmailHealthRecord | null;
+  lastFailure: EmailHealthRecord | null;
+  failed: FailedLeadEmail[];
+  hasMore: boolean;
+}
+
+export interface EmailTestRequest {
+  requestId: string;
+}
+
+export interface EmailTestResult {
+  success: boolean;
+  /** @nullable */
+  error: string | null;
+  cause: string;
+  hint: string;
+}
+
+export interface EmailRetryEntry {
+  /** @minimum 1 */
+  id: number;
+  recipient: string;
+}
+
+export interface EmailRetryRequest {
+  confirmed: true;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  entries: EmailRetryEntry[];
+}
+
+export interface EmailRetryResult {
+  queued: number;
+}
+
 export type AdminOperationalFailureSource = typeof AdminOperationalFailureSource[keyof typeof AdminOperationalFailureSource];
 
 
@@ -926,6 +983,7 @@ export const AdminOperationalFailureSource = {
 } as const;
 
 export interface AdminOperationalFailure {
+  alertBlocked?: boolean;
   id: number;
   source: AdminOperationalFailureSource;
   summary: string;

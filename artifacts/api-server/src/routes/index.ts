@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import businessesRouter from "./businesses";
 import adminRouter from "./admin";
+import adminEmailHealthRouter from "./adminEmailHealth";
 import healthRouter from "./health";
 import leadsRouter from "./leads";
 import notificationsRouter from "./notifications";
@@ -23,6 +24,7 @@ router.use(invoicingRouter);
 
 router.use(healthRouter);
 router.use(billingRouter);
+router.use(adminEmailHealthRouter);
 router.use(adminRouter);
 router.use(businessesRouter);
 router.use(leadsRouter);

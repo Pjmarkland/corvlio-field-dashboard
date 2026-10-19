@@ -929,6 +929,7 @@ export const GetAdminActivityResponse = zod.object({
   "contactedAt": zod.coerce.date().nullable()
 })),
   "operationalFailures": zod.array(zod.object({
+  "alertBlocked": zod.boolean().optional(),
   "id": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemIdMultipleOf),
   "source": zod.enum(['pre_call_fallback', 'post_call_webhook', 'lead_gmail_notification', 'phone_provisioning']),
   "summary": zod.string(),
@@ -940,6 +941,72 @@ export const GetAdminActivityResponse = zod.object({
   "alertSentAt": zod.coerce.date().nullable(),
   "alertLastError": zod.string().nullable()
 }))
+})
+
+
+export const getAdminEmailHealthResponseFailedItemIdMultipleOf = 1;
+
+
+
+export const GetAdminEmailHealthResponse = zod.object({
+  "lastSuccess": zod.union([zod.object({
+  "at": zod.string(),
+  "timestampExact": zod.boolean(),
+  "error": zod.string().nullable(),
+  "cause": zod.string(),
+  "hint": zod.string()
+}),zod.null()]),
+  "lastFailure": zod.union([zod.object({
+  "at": zod.string(),
+  "timestampExact": zod.boolean(),
+  "error": zod.string().nullable(),
+  "cause": zod.string(),
+  "hint": zod.string()
+}),zod.null()]),
+  "failed": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminEmailHealthResponseFailedItemIdMultipleOf),
+  "recipient": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "error": zod.string(),
+  "cause": zod.string(),
+  "hint": zod.string()
+})),
+  "hasMore": zod.boolean()
+})
+
+
+export const SendAdminEmailTestBody = zod.object({
+  "requestId": zod.string()
+})
+
+export const SendAdminEmailTestResponse = zod.object({
+  "success": zod.boolean(),
+  "error": zod.string().nullable(),
+  "cause": zod.string(),
+  "hint": zod.string()
+})
+
+
+export const retryAdminLeadEmailsBodyEntriesItemIdMultipleOf = 1;
+
+export const retryAdminLeadEmailsBodyEntriesMax = 50;
+
+
+
+export const RetryAdminLeadEmailsBody = zod.object({
+  "confirmed": zod.literal(true),
+  "entries": zod.array(zod.object({
+  "id": zod.number().min(1).multipleOf(retryAdminLeadEmailsBodyEntriesItemIdMultipleOf),
+  "recipient": zod.string()
+})).min(1).max(retryAdminLeadEmailsBodyEntriesMax)
+})
+
+export const retryAdminLeadEmailsResponseQueuedMultipleOf = 1;
+
+
+
+export const RetryAdminLeadEmailsResponse = zod.object({
+  "queued": zod.number().multipleOf(retryAdminLeadEmailsResponseQueuedMultipleOf)
 })
 
 

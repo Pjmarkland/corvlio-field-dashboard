@@ -25,6 +25,7 @@ import type {
   AdminActivity,
   AdminBusinessDetail,
   AdminCallQuality,
+  AdminEmailHealth,
   AdminOverview,
   AlertReadReceipt,
   BillingAccount,
@@ -35,6 +36,10 @@ import type {
   BusinessProfile,
   BusinessProfileUpdate,
   CreateOwnerDemoCall200,
+  EmailRetryRequest,
+  EmailRetryResult,
+  EmailTestRequest,
+  EmailTestResult,
   GetAdminInvoices200,
   HealthStatus,
   InvoiceOverview,
@@ -2015,6 +2020,207 @@ export function useGetAdminActivity<TData = Awaited<ReturnType<typeof getAdminAc
 
 
 
+
+export const getGetAdminEmailHealthUrl = () => {
+
+
+
+
+  return `/api/admin/email-health`
+}
+
+export const getAdminEmailHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminEmailHealth> => {
+
+  return customFetch<AdminEmailHealth>(getGetAdminEmailHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminEmailHealthQueryKey = () => {
+    return [
+    `/api/admin/email-health`
+    ] as const;
+    }
+
+
+export const getGetAdminEmailHealthQueryOptions = <TData = Awaited<ReturnType<typeof getAdminEmailHealth>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminEmailHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminEmailHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminEmailHealth>>> = ({ signal }) => getAdminEmailHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminEmailHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminEmailHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminEmailHealth>>>
+export type GetAdminEmailHealthQueryError = ErrorType<void>
+
+
+
+export function useGetAdminEmailHealth<TData = Awaited<ReturnType<typeof getAdminEmailHealth>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminEmailHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminEmailHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendAdminEmailTestUrl = () => {
+
+
+
+
+  return `/api/admin/email-health/test`
+}
+
+export const sendAdminEmailTest = async (emailTestRequest: EmailTestRequest, options?: Parameters<typeof customFetch>[1]): Promise<EmailTestResult> => {
+
+  return customFetch<EmailTestResult>(getSendAdminEmailTestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(emailTestRequest)
+  }
+);}
+
+
+
+
+
+export const getSendAdminEmailTestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminEmailTest>>, TError,{data: BodyType<EmailTestRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendAdminEmailTest>>, TError,{data: BodyType<EmailTestRequest>}, TContext> => {
+
+const mutationKey = ['sendAdminEmailTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendAdminEmailTest>>, {data: BodyType<EmailTestRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendAdminEmailTest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendAdminEmailTestMutationResult = NonNullable<Awaited<ReturnType<typeof sendAdminEmailTest>>>
+    export type SendAdminEmailTestMutationBody = BodyType<EmailTestRequest>
+    export type SendAdminEmailTestMutationError = ErrorType<void>
+
+    export const useSendAdminEmailTest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminEmailTest>>, TError,{data: BodyType<EmailTestRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendAdminEmailTest>>,
+        TError,
+        {data: BodyType<EmailTestRequest>},
+        TContext
+      > => {
+      return useMutation(getSendAdminEmailTestMutationOptions(options));
+    }
+
+export const getRetryAdminLeadEmailsUrl = () => {
+
+
+
+
+  return `/api/admin/email-health/retry`
+}
+
+export const retryAdminLeadEmails = async (emailRetryRequest: EmailRetryRequest, options?: Parameters<typeof customFetch>[1]): Promise<EmailRetryResult> => {
+
+  return customFetch<EmailRetryResult>(getRetryAdminLeadEmailsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(emailRetryRequest)
+  }
+);}
+
+
+
+
+
+export const getRetryAdminLeadEmailsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAdminLeadEmails>>, TError,{data: BodyType<EmailRetryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryAdminLeadEmails>>, TError,{data: BodyType<EmailRetryRequest>}, TContext> => {
+
+const mutationKey = ['retryAdminLeadEmails'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryAdminLeadEmails>>, {data: BodyType<EmailRetryRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  retryAdminLeadEmails(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryAdminLeadEmailsMutationResult = NonNullable<Awaited<ReturnType<typeof retryAdminLeadEmails>>>
+    export type RetryAdminLeadEmailsMutationBody = BodyType<EmailRetryRequest>
+    export type RetryAdminLeadEmailsMutationError = ErrorType<void>
+
+    export const useRetryAdminLeadEmails = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAdminLeadEmails>>, TError,{data: BodyType<EmailRetryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryAdminLeadEmails>>,
+        TError,
+        {data: BodyType<EmailRetryRequest>},
+        TContext
+      > => {
+      return useMutation(getRetryAdminLeadEmailsMutationOptions(options));
+    }
 
 export const getGetBillingAvailabilityUrl = () => {
 

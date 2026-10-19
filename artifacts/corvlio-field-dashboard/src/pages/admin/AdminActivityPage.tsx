@@ -4,6 +4,7 @@ import { Link } from 'wouter';
 import { getGetAdminActivityQueryKey, useGetAdminActivity, type AdminLeadActivity } from '@workspace/api-client-react';
 
 import { AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, SectionHeading, formatAdminDate } from './AdminShared';
+import EmailHealthSection from './EmailHealthSection';
 
 function LeadActivityRow({ lead }: { lead: AdminLeadActivity }) {
   const isOpen = lead.status.toLowerCase() === 'pending' || lead.status.toLowerCase() === 'uncontacted';
@@ -37,6 +38,7 @@ export default function AdminActivityPage() {
       <AdminMetric label="Uncontacted" value={data.uncontactedLeadCount} detail="Still waiting for a response" tone={data.uncontactedLeadCount ? 'coral' : 'neutral'} icon={CircleAlert} />
       <AdminMetric label="Over 24 hours" value={data.uncontactedOver24HoursCount} detail="Oldest open follow-ups" tone={data.uncontactedOver24HoursCount ? 'coral' : 'neutral'} icon={Clock3} />
     </section>
+    <EmailHealthSection />
     <section>
       <SectionHeading eyebrow="Global feed" title="Recent leads" detail="The latest incoming lead activity across the Corvlio portfolio." />
       {leads.length === 0 ? <AdminEmpty title="No lead activity yet" description="When a receptionist captures a lead, it will appear here in newest-first order." icon={Radio} /> : <div className="admin-panel overflow-hidden rounded-2xl">{leads.map((lead) => <LeadActivityRow key={lead.id} lead={lead} />)}</div>}
@@ -54,7 +56,7 @@ export default function AdminActivityPage() {
                 <p className="mt-2 text-xs text-[#8a948d]">{failure.source.replaceAll('_', ' ')}{failure.businessName ? ` · ${failure.businessName}` : ''}</p>
               </div>
               <div className="shrink-0 text-right">
-                <span className={`rounded-full px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${failure.alertSentAt ? 'bg-[#e4f0e7] text-[#2c6b56]' : 'bg-[#fae8df] text-[#aa573f]'}`}>{failure.alertSentAt ? 'Alert sent' : failure.alertAttempts ? 'Retry pending' : 'Alert queued'}</span>
+                <span className={`rounded-full px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${failure.alertSentAt ? 'bg-[#e4f0e7] text-[#2c6b56]' : 'bg-[#fae8df] text-[#aa573f]'}`}>{failure.alertSentAt ? 'Alert sent' : failure.alertBlocked ? 'Blocked — fix Gmail configuration' : failure.alertAttempts ? 'Retry pending' : 'Alert queued'}</span>
                 <time className="mt-2 block font-mono text-[10px] text-[#8a948d]" dateTime={failure.createdAt}>{formatAdminDate(failure.createdAt)}</time>
               </div>
             </div>

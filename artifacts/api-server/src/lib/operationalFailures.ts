@@ -5,6 +5,7 @@ import {
 import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendAdminOperationalFailureEmail } from "./gmail";
+import { emailDiagnosis } from "./emailDiagnostics";
 
 export type OperationalFailureSource =
   | "pre_call_fallback"
@@ -38,6 +39,7 @@ export async function recordOperationalFailure(input: OperationalFailureInput): 
       source: input.source,
       summary: input.summary.slice(0, 200),
       details: safeFailureDetails(input.details),
+      alertBlocked: emailDiagnosis(input.details).configuration,
       businessId: input.businessId ?? null,
       businessName: input.businessName?.slice(0, 200) ?? null,
     })
@@ -52,6 +54,7 @@ export async function deliverOperationalFailureAlerts(): Promise<void> {
     .from(operationalFailuresTable)
     .where(and(
       isNull(operationalFailuresTable.alertSentAt),
+      eq(operationalFailuresTable.alertBlocked, false),
       lte(operationalFailuresTable.alertNextAttemptAt, new Date()),
     ))
     .orderBy(operationalFailuresTable.createdAt)
@@ -68,7 +71,7 @@ export async function deliverOperationalFailureAlerts(): Promise<void> {
         .select()
         .from(operationalFailuresTable)
         .where(eq(operationalFailuresTable.id, item.id));
-      if (!failure || failure.alertSentAt || failure.alertNextAttemptAt > new Date()) return;
+      if (!failure || failure.alertSentAt || failure.alertBlocked || failure.alertNextAttemptAt > new Date()) return;
 
       const attempts = failure.alertAttempts + 1;
       try {
@@ -98,6 +101,7 @@ export async function deliverOperationalFailureAlerts(): Promise<void> {
             alertAttempts: attempts,
             alertNextAttemptAt: new Date(Date.now() + delayMs),
             alertLastError: message,
+            alertBlocked: emailDiagnosis(message).configuration,
           })
           .where(eq(operationalFailuresTable.id, failure.id));
         logger.warn(
@@ -126,5 +130,6 @@ export async function listRecentOperationalFailures() {
     alertAttempts: failure.alertAttempts,
     alertSentAt: failure.alertSentAt?.toISOString() ?? null,
     alertLastError: failure.alertLastError,
+    alertBlocked: failure.alertBlocked,
   }));
 }

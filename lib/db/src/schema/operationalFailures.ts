@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -24,6 +25,7 @@ export const operationalFailuresTable = pgTable(
     alertNextAttemptAt: timestamp("alert_next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
     alertSentAt: timestamp("alert_sent_at", { withTimezone: true }),
     alertLastError: text("alert_last_error"),
+    alertBlocked: boolean("alert_blocked").notNull().default(false),
   },
   (table) => [
     uniqueIndex("operational_failures_event_key_unique").on(table.eventKey),

@@ -100,9 +100,26 @@ function gmailSendFailure(channel: string, status: number, responseBody: string)
   } else if (status === 401) {
     action = "Cached access token discarded; the next attempt will refresh OAuth authorization.";
   } else if (status === 403) {
-    action = "Google denied Gmail sending. Check the existing OAuth send permissions and Google account policy.";
+    action = `Google denied Gmail sending. ${reason ? `Reason: ${reason}. ` : ""}${message ? `${message.slice(0, 300)} ` : ""}Check the existing OAuth send permissions and Google account policy.`;
+  } else if (status === 429 || /rateLimit|quota/i.test(reason)) {
+    action = `Google rate limit or quota reached${reason ? `: ${reason}` : ""}.`;
   }
   return new Error(`Gmail API ${channel} failed (${status}): ${action}`);
+}
+
+/** Recipient is resolved from the authenticated admin on the server, never from browser input. */
+export async function sendAdminTestEmail(recipient: string): Promise<void> {
+  if (!normalizedRecipient(recipient)) throw new Error("No verified admin email is available.");
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Gmail OAuth credentials are not configured.");
+  const raw = [`To: ${recipient}`, "Subject: Corvlio Gmail test", "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8", "", "This is your requested Corvlio Gmail test. No client email was sent."].join("\r\n");
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST", signal: AbortSignal.timeout(15_000),
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ raw: encodeBase64Url(raw) }),
+  });
+  if (!response.ok) throw gmailSendFailure("admin test email", response.status, await response.text());
 }
 
 /** Reuses the existing OAuth email path; plain text only, no card information. */

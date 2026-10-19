@@ -4,6 +4,8 @@ import { sendLeadNotificationEmail } from "./gmail";
 import { recordOperationalFailure } from "./operationalFailures";
 import { runNotificationOutboxNow } from "./notificationService";
 import { logger } from "./logger";
+import { emailDiagnosis } from "./emailDiagnostics";
+import { recordLeadEmailAttempt } from "./emailHealth";
 
 // Historical events default to skipped; only new real-lead events are queued.
 export async function deliverLeadAlertEmails() {
@@ -32,23 +34,27 @@ export async function deliverLeadAlertEmails() {
           phoneNumber: lead.callbackNumber || lead.phoneNumber, issue: lead.issueReason,
         });
         if (!sent) throw new Error("Email channel or owner email is not configured");
+        await recordLeadEmailAttempt(null);
         await tx.update(notificationEventsTable).set({ emailStatus: "delivered", emailAttempts: attempts, emailLastError: null })
           .where(eq(notificationEventsTable.id, event.id));
         return null;
       } catch (error) {
-        const details = error instanceof Error ? error.message : "Email delivery failed";
+        const details = emailDiagnosis(error instanceof Error ? error.message : "Email delivery failed").error;
+        const configuration = emailDiagnosis(details).configuration;
+        const stopped = configuration || attempts >= 5;
+        await recordLeadEmailAttempt(details);
         logger.warn({
           source: "lead_gmail_notification", eventId: event.id, businessId: business.id,
-          attempt: attempts, maxAttempts: 5, willRetry: attempts < 5,
+          attempt: attempts, maxAttempts: 5, willRetry: !stopped,
           error: details.slice(0, 300),
-        }, attempts >= 5 ? "Owner lead email failed; retries exhausted" : "Owner lead email failed; retry scheduled");
+        }, configuration ? "Owner lead email failed; configuration fix required" : attempts >= 5 ? "Owner lead email failed; retries exhausted" : "Owner lead email failed; retry scheduled");
         await tx.update(notificationEventsTable).set({
-          emailStatus: attempts >= 5 ? "failed" : "queued", emailAttempts: attempts,
+          emailStatus: stopped ? "failed" : "queued", emailAttempts: attempts,
           emailNextAttemptAt: new Date(Date.now() + 2 ** attempts * 60_000),
           emailLastError: details.slice(0, 300),
         }).where(eq(notificationEventsTable.id, event.id));
-        if (attempts >= 5) {
-          return { businessId: business.id, businessName: business.businessName, details };
+        if (stopped) {
+          return { businessId: business.id, businessName: business.businessName, details, configuration };
         }
         return null;
       }
@@ -59,7 +65,7 @@ export async function deliverLeadAlertEmails() {
         const inserted = await recordOperationalFailure({
           eventKey: `lead-gmail:${event.id}`,
           source: "lead_gmail_notification",
-          summary: "Owner lead notification failed after five delivery attempts",
+          summary: terminalFailure.configuration ? "Owner lead email blocked by Gmail configuration" : "Owner lead notification failed after five delivery attempts",
           details: terminalFailure.details,
           businessId: terminalFailure.businessId,
           businessName: terminalFailure.businessName,

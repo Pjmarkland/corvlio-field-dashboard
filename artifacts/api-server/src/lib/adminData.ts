@@ -388,5 +388,6 @@ async function listRecentOperationalFailures() {
     alertAttempts: failure.alertAttempts,
     alertSentAt: failure.alertSentAt?.toISOString() ?? null,
     alertLastError: failure.alertLastError,
+    alertBlocked: failure.alertBlocked,
   }));
 }
