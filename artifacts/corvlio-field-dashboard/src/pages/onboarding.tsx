@@ -6,7 +6,7 @@ import { PlanPicker } from '@/components/PlanPicker';
 import { validStartupAge, type PlanId } from '@/lib/invoicePlans';
 import { useUser } from '@clerk/react';
 import { Link, useLocation } from 'wouter';
-import logoUrl from '@/assets/logo.svg';
+import logoUrl from '@/assets/logo-dark.png';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
 import { ServicesOfferedPrompt, ServicesNotOfferedWarning, WebsiteOnboardingPreview } from '@/components/WebsiteOnboardingPreview';

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'wouter';
-import logoUrl from '@/assets/logo.svg';
+import logoUrl from '@/assets/logo-dark.png';
 
 function ClientAgreementPage() {
   const native = Capacitor.isNativePlatform();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { claimWelcome } from '@workspace/api-client-react';
 import { ArrowRight, Building2, PhoneIncoming, PhoneCall, RotateCw } from 'lucide-react';
 import { useLocation } from 'wouter';
-import logoUrl from '@/assets/logo.svg';
+import logoUrl from '@/assets/logo-dark.png';
 
 type Phase = 'loading' | 'ready' | 'error';
 const steps = [

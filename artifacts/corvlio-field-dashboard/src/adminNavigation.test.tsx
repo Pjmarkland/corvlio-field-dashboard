@@ -49,6 +49,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Admin dashboard switching', () => {
+  it('uses the light-text asset for owner navigation while the sign-in page uses the dark-text asset', () => {
+    mount();
+    const ownerLogos = screen.getAllByRole('img', { name: 'Corvlio' });
+    expect(ownerLogos).toHaveLength(2);
+    expect(ownerLogos.every(image => image.getAttribute('src')?.includes('logo-light.png'))).toBe(true);
+    expect(screen.getByTestId('link-mobile-brand').closest('header')?.className).toContain('bg-sidebar');
+  });
+
   it('places Founder Console below Settings and supports switching both ways', () => {
     mount();
     const nav = screen.getByRole('navigation', { name: 'Primary navigation' });

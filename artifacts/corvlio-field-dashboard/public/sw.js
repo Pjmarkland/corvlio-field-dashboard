@@ -1,11 +1,12 @@
 const CACHE_PREFIX = 'corvlio-field-desk-';
-const CACHE_NAME = `${CACHE_PREFIX}v6`;
+const CACHE_NAME = `${CACHE_PREFIX}v7`;
 const SCOPE_URL = new URL(self.registration.scope);
 const OFFLINE_URL = new URL('./', SCOPE_URL).toString();
 const APP_SHELL = [
   OFFLINE_URL,
   new URL('manifest.webmanifest', SCOPE_URL).toString(),
-  new URL('logo.svg', SCOPE_URL).toString(),
+  new URL('logo-dark.png', SCOPE_URL).toString(),
+  new URL('logo-light.png', SCOPE_URL).toString(),
 ];
 
 self.addEventListener('install', (event) => {

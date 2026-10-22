@@ -29,7 +29,8 @@ import { LeadAlertBell } from '@/components/LeadAlertBell';
 import { leadsRefreshInterval } from '@/lib/leadRefresh';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { displayIssue, displayName, displayPhone, nameInitials, usablePhone, preferLeadCallback } from '@/lib/leadDisplay';
-import logoUrl from '@/assets/logo.svg';
+import darkLogoUrl from '@/assets/logo-dark.png';
+import lightLogoUrl from '@/assets/logo-light.png';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -134,7 +135,7 @@ const clerkAppearance = {
   options: {
     logoPlacement: 'inside' as const,
     logoLinkUrl: basePath || '/',
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/logo-dark.png`,
   },
   variables: {
     colorPrimary: '#2563EB',
@@ -291,7 +292,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col bg-sidebar px-4 py-5 text-sidebar-foreground md:flex">
         <Link href="/dashboard" className="mb-10 flex items-center gap-3 px-3" data-testid="link-brand">
           <div>
-            <img src={logoUrl} alt="Corvlio" className="h-auto w-[142px]" />
+            <img src={lightLogoUrl} alt="Corvlio" className="h-auto w-[142px]" />
             <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/55">field desk</p>
           </div>
         </Link>
@@ -316,11 +317,11 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
       </aside>
 
       <main className="pb-24 md:ml-[248px] md:pb-8">
-        <header style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }} className="sticky top-0 z-10 border-b border-border/80 bg-background/95 px-4 pb-3 backdrop-blur-md sm:px-8 md:px-10">
+        <header style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }} className="sticky top-0 z-10 border-b border-sidebar-border bg-sidebar px-4 pb-3 text-sidebar-foreground backdrop-blur-md sm:px-8 md:border-border/80 md:bg-background/95 md:px-10 md:text-foreground">
           <div className="mx-auto flex max-w-[1160px] items-center justify-between">
             <div className="md:hidden">
               <Link href="/dashboard" className="flex items-center gap-2.5" data-testid="link-mobile-brand">
-                <img src={logoUrl} alt="Corvlio" className="h-auto w-[116px]" />
+                <img src={lightLogoUrl} alt="Corvlio" className="h-auto w-[116px]" />
               </Link>
             </div>
             <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex"><span className="h-2 w-2 rounded-full bg-[#49a979]" /> On the road · synced</div>
@@ -681,7 +682,7 @@ export function UnconfiguredAccountScreen({
 }
 
 function PublicHome() {
-  return <main className="grid min-h-[100dvh] place-items-center bg-sidebar px-5 py-10 text-sidebar-foreground"><div className="w-full max-w-md"><div className="mb-6 flex items-center"><img src={logoUrl} alt="Corvlio" className="h-auto w-[104px]" /></div><div className="mb-8 inline-flex items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" /> Built for the road</div><h1 className="max-w-sm text-5xl font-800 leading-[.93] tracking-[-0.06em]">Your next job, one tap away.</h1><p className="mt-6 max-w-sm text-base leading-relaxed text-sidebar-foreground/65">See new receptionist leads, respond quickly, and keep your day moving without opening a desktop dashboard.</p><div className="mt-9 flex flex-col gap-3"><Link href="/sign-in" data-testid="link-public-sign-in" className="flex min-h-13 items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover">Sign in to Field Desk <ArrowUpRight size={17} className="ml-2" /></Link><Link href="/sign-up" data-testid="link-public-sign-up" className="flex min-h-13 items-center justify-center rounded-xl border border-sidebar-border px-5 text-sm font-bold text-sidebar-foreground hover:bg-sidebar-accent">Create your owner account</Link></div><p className="mt-8 font-mono text-[10px] leading-relaxed text-sidebar-foreground/40">Single-owner access for Corvlio clients. Your account keeps the field view private.</p><Link href="/privacy" data-testid="link-public-privacy" className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-sidebar-foreground/55 underline decoration-sidebar-foreground/25 underline-offset-4 hover:text-sidebar-foreground">Privacy policy</Link></div></main>;
+  return <main className="grid min-h-[100dvh] place-items-center bg-sidebar px-5 py-10 text-sidebar-foreground"><div className="w-full max-w-md"><div className="mb-6 flex items-center"><img src={darkLogoUrl} alt="Corvlio" className="h-auto w-[104px]" /></div><div className="mb-8 inline-flex items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" /> Built for the road</div><h1 className="max-w-sm text-5xl font-800 leading-[.93] tracking-[-0.06em]">Your next job, one tap away.</h1><p className="mt-6 max-w-sm text-base leading-relaxed text-sidebar-foreground/65">See new receptionist leads, respond quickly, and keep your day moving without opening a desktop dashboard.</p><div className="mt-9 flex flex-col gap-3"><Link href="/sign-in" data-testid="link-public-sign-in" className="flex min-h-13 items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover">Sign in to Field Desk <ArrowUpRight size={17} className="ml-2" /></Link><Link href="/sign-up" data-testid="link-public-sign-up" className="flex min-h-13 items-center justify-center rounded-xl border border-sidebar-border px-5 text-sm font-bold text-sidebar-foreground hover:bg-sidebar-accent">Create your owner account</Link></div><p className="mt-8 font-mono text-[10px] leading-relaxed text-sidebar-foreground/40">Single-owner access for Corvlio clients. Your account keeps the field view private.</p><Link href="/privacy" data-testid="link-public-privacy" className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-sidebar-foreground/55 underline decoration-sidebar-foreground/25 underline-offset-4 hover:text-sidebar-foreground">Privacy policy</Link></div></main>;
 }
 
 function PrivacyPage() {
@@ -702,7 +703,7 @@ function PrivacyPage() {
       <div className="mx-auto max-w-3xl">
         <Link href="/" data-testid="link-privacy-home" className="mb-10 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Back to Corvlio</Link>
         <header className="border-b border-border pb-8">
-          <div className="mb-5 flex items-center"><img src={logoUrl} alt="Corvlio" className="h-auto w-[174px]" /></div>
+          <div className="mb-5 flex items-center"><img src={darkLogoUrl} alt="Corvlio" className="h-auto w-[174px]" /></div>
           <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">Privacy policy</p>
           <h1 className="text-4xl font-800 leading-none tracking-[-0.055em] sm:text-5xl">Your data stays focused on your business.</h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">Corvlio Field Dashboard helps business owners view and respond to leads captured by their AI phone receptionist. This policy explains, in plain language, what information we handle and why.</p>

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { claimWelcome, setLocation } = vi.hoisted(() => ({ claimWelcome: vi.fn(), setLocation: vi.fn() }));
 vi.mock('@workspace/api-client-react', () => ({ claimWelcome }));
 vi.mock('wouter', () => ({ useLocation: () => ['/welcome', setLocation] }));
-vi.mock('@/assets/logo.svg', () => ({ default: '/logo.svg' }));
+vi.mock('@/assets/logo-dark.png', () => ({ default: '/logo-dark.png' }));
 
 import WelcomePage from './welcome';
 

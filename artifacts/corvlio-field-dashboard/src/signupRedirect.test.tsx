@@ -9,7 +9,8 @@ vi.mock('@clerk/react', () => ({
   SignIn: () => null,
   SignUp: (props: Record<string, unknown>) => { signUpProps(props); return null; },
 }));
-vi.mock('@/assets/logo.svg', () => ({ default: '/logo.svg' }));
+vi.mock('@/assets/logo-dark.png', () => ({ default: '/logo-dark.png' }));
+vi.mock('@/assets/logo-light.png', () => ({ default: '/logo-light.png' }));
 
 import { SignUpPage } from './App';
 
