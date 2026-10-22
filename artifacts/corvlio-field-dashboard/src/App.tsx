@@ -37,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { type PushStatus, usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePushDeepLink } from '@/hooks/usePushDeepLink';
 import { useSignOut } from '@/hooks/useSignOut';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import {
   clearOnboardingConfirmation,
   readOnboardingConfirmation,
@@ -260,8 +261,9 @@ function formatReplyTime(minutes: number | null) {
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
-function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
+export function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
   const [location] = useLocation();
+  const adminAccess = useAdminAccess();
   const profileQ = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
   const isInternal = profileQ.data?.isInternal === true;
   const invoices = useGetOwnerInvoices({ query: {
@@ -281,6 +283,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
     { href: '/completed', label: 'Completed', icon: CheckCircle2 },
     { href: '/stats', label: 'Stats', icon: Signal },
     { href: '/settings', label: 'Settings', icon: SettingsIcon },
+    ...(adminAccess ? [{ href: '/admin', label: 'Founder Console', icon: ShieldCheck }] : []),
   ];
 
   return (
@@ -331,7 +334,7 @@ function AppShell({ children, leads, businessName, onboardingConfirmation }: { c
         <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden" aria-label="Mobile navigation">
+      <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess ? 'grid-cols-5' : 'grid-cols-4'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
         {nav.map(({ href, label, icon: Icon, count }) => {
           const active = location === href || (href === '/dashboard' && location.startsWith('/leads/'));
           return <Link key={href} href={href} data-testid={`link-mobile-${label.toLowerCase()}`} className={`relative flex min-h-14 flex-col items-center gap-1 text-[10px] font-semibold ${active ? 'text-primary' : 'text-muted-foreground'}`}><span className={`grid h-7 w-10 place-items-center rounded-xl ${active ? 'bg-primary/15' : ''}`}><Icon size={19} strokeWidth={active ? 2.5 : 1.8} /></span><span>{label}</span>{count ? <span className="absolute left-1/2 top-0 ml-1 grid h-4 min-w-4 -translate-y-0.5 place-items-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">{count}</span> : null}</Link>;

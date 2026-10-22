@@ -4,6 +4,7 @@ import { Link, useLocation } from 'wouter';
 
 import type { AdminBusinessSummary } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 const BILLING_NAV = { href: '/admin/billing', label: 'Billing', icon: BarChart3 };
 
@@ -66,6 +67,7 @@ export function isNotFoundError(error: unknown) {
 export function AdminShell({ children, title, eyebrow, action }: { children: ReactNode; title: string; eyebrow: string; action?: ReactNode }) {
   const [location] = useLocation();
   const { enabled: billingOn } = useBillingAvailability();
+  const adminAccess = useAdminAccess();
   const navItems = billingOn ? [...ADMIN_NAV, BILLING_NAV] : ADMIN_NAV;
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
   return (
     <div className="admin-console admin-grain flex min-h-[100dvh]">
       <aside className="relative z-10 hidden min-h-[100dvh] w-[248px] shrink-0 flex-col border-r border-[#dfe4dc] bg-[#edf1eb]/90 px-5 py-6 lg:flex">
+        {adminAccess ? <Link href="/dashboard" className="admin-link mb-4 flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#66736c] hover:bg-[#e3eae2] hover:text-[#244d3f]" data-testid="link-admin-back-dashboard"><ArrowLeft size={17} />Back to dashboard</Link> : null}
         <Link href="/admin" className="admin-link mb-12 flex items-center gap-3 rounded-xl px-2 py-1" data-testid="link-admin-brand">
           <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-[#244d3f] text-[#eef6ee] shadow-[0_5px_0_#c8d5c7]"><BarChart3 size={19} strokeWidth={2.3} /></span>
           <span><strong className="block text-[15px] tracking-[-0.03em]">corvlio</strong><span className="admin-label text-[8px]">founder console</span></span>
@@ -109,6 +112,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
             {action}
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-[#dfe4dc]/80 px-5 py-2 lg:hidden sm:px-8" aria-label="Mobile founder console navigation">
+            {adminAccess ? <Link href="/dashboard" className="admin-link whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-[#66736c]" data-testid="link-admin-mobile-back-dashboard"><ArrowLeft size={13} className="mr-1.5 inline-block" />Back to dashboard</Link> : null}
             {navItems.map(({ href, label, icon: Icon }) => {
               const active = href === '/admin' ? location === href : location.startsWith(href);
               return <Link key={href} href={href} data-testid={`link-admin-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c]'}`}><Icon size={13} className="mr-1.5 inline-block" />{label}</Link>;
