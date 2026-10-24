@@ -23,10 +23,16 @@ export type DeletionDependencies = {
   isProtectedUser?: (id: string) => Promise<boolean>;
   cancelStripeResources?: (resources: DeletedAccountBillingResources) => Promise<void>;
   alertStripeCancellationFailure?: (resources: DeletedAccountBillingResources, error: unknown) => Promise<void>;
+  dispatchAccountDeletionAlerts?: () => Promise<void>;
 };
+async function dispatchAccountDeletionAlerts() {
+  const { runNotificationOutboxNow } = await import("./notificationService");
+  await runNotificationOutboxNow();
+}
 const defaults: DeletionDependencies = { pool, deleteUser: id => clerkClient.users.deleteUser(id),
   cancelStripeResources: cancelStripeResourcesForDeletion,
   alertStripeCancellationFailure,
+  dispatchAccountDeletionAlerts,
   isProtectedUser: async id => {
     try {return hasVerifiedAdminEmail((await clerkClient.users.getUser(id)).emailAddresses,parseAdminEmails(process.env.ADMIN_EMAILS));}
     catch(e) {if((e as {status?:number}).status===404)return false;throw e;}
@@ -52,8 +58,8 @@ async function preserveResources(client: SqlClient, businesses: any[], attempts:
   }
   for (const attempt of attempts) {
     const business = businesses.find(b => b.id === attempt.business_id);
-    if (attempt.clerk_user_id !== userId) throw new AccountDeletionError("Phone provisioning ownership changed. Please retry.");
-    if (attempt.business_id && !business) throw new AccountDeletionError("Phone provisioning ownership changed. Please retry.");
+    if (attempt.clerk_user_id !== userId) throw new AccountDeletionError("Phone provisioning ownership conflict. Please retry.");
+    if (attempt.business_id && !business) throw new AccountDeletionError("Ownership conflict in phone provisioning. Please retry.");
     if (attempt.purchased_number && attempt.purchased_number === business?.retell_phone_number) continue;
     // Preserve uncertain purchase journals even when no number was returned.
     await add(`purchase:${attempt.id}`, attempt.business_id, "Deleted account",
@@ -223,11 +229,10 @@ export async function finishIdentityDeletion(userId: string, deps = defaults, al
 
 export async function deleteAccount(userId: string, deps = defaults, alreadyDeleted = false) {
   const cleanup = await removeOwnedAppData(userId, deps);
-  if (cleanup.balanceAlertQueued || cleanup.billingReviewAlertQueued) {
+  if ((cleanup.balanceAlertQueued || cleanup.billingReviewAlertQueued) && deps.dispatchAccountDeletionAlerts) {
     // The operational-failure worker sends the durable alert to PJ/admins.
     // It runs independently and retries if Gmail is temporarily unavailable.
-    const { runNotificationOutboxNow } = await import("./notificationService");
-    void runNotificationOutboxNow().catch(error => logger.warn(
+    void deps.dispatchAccountDeletionAlerts().catch(error => logger.warn(
       { error: error instanceof Error ? error.message : "Unknown outbox error" },
       "Account deletion alert dispatch failed; durable alert remains queued",
     ));

@@ -9,6 +9,16 @@ import {
 } from "../billing/accountDeletion";
 let timer: ReturnType<typeof setInterval> | undefined;
 let running: Promise<void> | null = null;
+type BillingCancellationWorkerDependencies = {
+  pool: Pick<typeof pool, "query">;
+  cancelStripeResources: typeof cancelStripeResourcesForDeletion;
+  alertStripeCancellationFailure: typeof alertStripeCancellationFailure;
+};
+const billingCancellationDefaults: BillingCancellationWorkerDependencies = {
+  pool,
+  cancelStripeResources: cancelStripeResourcesForDeletion,
+  alertStripeCancellationFailure,
+};
 export function startAccountDeletionWorker() {
   if (timer) return;
   const run = () => {
@@ -24,8 +34,8 @@ export function startAccountDeletionWorker() {
   timer.unref();
 }
 
-async function processPendingStripeCancellations() {
-  const claimed = await pool.query(`
+export async function processPendingStripeCancellations(deps = billingCancellationDefaults) {
+  const claimed = await deps.pool.query(`
     WITH due AS (
       SELECT id FROM pending_billing_cancellations
       WHERE (status='pending' AND next_attempt_at <= now())
@@ -48,22 +58,22 @@ async function processPendingStripeCancellations() {
       checkoutSessionId: row.checkout_session_id,
     };
     try {
-      await cancelStripeResourcesForDeletion(resources);
-      await pool.query(
+      await deps.cancelStripeResources(resources);
+      await deps.pool.query(
         `UPDATE pending_billing_cancellations SET status='completed',resolved_at=now(),
          claim_until=NULL,last_error=NULL WHERE id=$1`,
         [row.id],
       );
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 400) : "Unknown Stripe cancellation error";
-      await pool.query(
+      await deps.pool.query(
         `UPDATE pending_billing_cancellations
          SET status='pending',last_error=$2,claim_until=NULL,
            next_attempt_at=now()+LEAST(interval '6 hours',interval '1 minute'*power(2,LEAST(attempts,12)))
          WHERE id=$1`,
         [row.id, message],
       );
-      await alertStripeCancellationFailure(resources, error);
+      await deps.alertStripeCancellationFailure(resources, error);
       logger.warn({ sourceKey: resources.sourceKey }, "Stripe account-deletion cancellation retry scheduled");
     }
   }
