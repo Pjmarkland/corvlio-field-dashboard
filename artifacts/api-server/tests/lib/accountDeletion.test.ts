@@ -129,8 +129,8 @@ describe("account deletion safety", () => {
     await processPendingStripeCancellations(deps);
     expect(cancel).toHaveBeenCalledTimes(2);
     expect(alert).toHaveBeenCalledOnce();
-    expect(pool.query.mock.calls.filter(([sql]) => sql.includes("status='pending'"))).toHaveLength(1);
-    expect(pool.query.mock.calls.filter(([sql]) => sql.includes("status='completed'"))).toHaveLength(1);
+    expect(pool.query.mock.calls.filter(([sql]) => sql.includes("SET status='pending'"))).toHaveLength(1);
+    expect(pool.query.mock.calls.filter(([sql]) => sql.includes("SET status='completed'"))).toHaveLength(1);
   });
   it("alerts admins when an unresolved subscription has no provider identifier", async () => {
     const f = fixture();

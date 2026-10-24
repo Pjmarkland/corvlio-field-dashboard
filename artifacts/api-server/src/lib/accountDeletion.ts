@@ -104,7 +104,10 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
       "SELECT * FROM provisioning_attempts WHERE clerk_user_id = $1 OR business_id = ANY($2::int[]) FOR UPDATE", [userId, ids]);
     await preserveResources(client, businesses, attempts.rows, userId);
     const unpaidByBusiness = new Map<number, Array<{ id: number; business_name: string; monthly_cents: number; setup_cents: number }>>();
-    for (const invoice of unpaid.rows) {
+    const unpaidInvoices = unpaid.rows as Array<{
+      id: number; business_id: number; business_name: string; monthly_cents: number; setup_cents: number;
+    }>;
+    for (const invoice of unpaidInvoices) {
       const list = unpaidByBusiness.get(invoice.business_id) ?? [];
       list.push(invoice);
       unpaidByBusiness.set(invoice.business_id, list);

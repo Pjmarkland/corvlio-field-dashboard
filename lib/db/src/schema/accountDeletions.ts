@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Minimal tombstone/outbox: no email, credentials, lead content or business profile.
 export const accountDeletionsTable = pgTable("account_deletions", {
@@ -41,4 +41,7 @@ export const pendingBillingCancellationsTable = pgTable("pending_billing_cancell
   nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-}, table => [uniqueIndex("pending_billing_cancellations_source_unique").on(table.sourceKey)]);
+}, table => [
+  uniqueIndex("pending_billing_cancellations_source_unique").on(table.sourceKey),
+  index("pending_billing_cancellations_due_idx").on(table.status, table.nextAttemptAt),
+]);

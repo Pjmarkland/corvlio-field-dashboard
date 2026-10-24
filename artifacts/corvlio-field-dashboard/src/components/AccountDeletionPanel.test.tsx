@@ -4,7 +4,7 @@ const m = vi.hoisted(() => ({ mutate: vi.fn(), signOut: vi.fn(), clear: vi.fn(),
 vi.mock('@workspace/api-client-react', () => ({
   useDeleteMyAccount: () => ({ mutateAsync: m.mutate, isPending: false }),
   getGetAccountDeletionEligibilityQueryKey:()=>['eligibility'],
-  useGetAccountDeletionEligibility:()=>({data:{allowed:m.allowed,reason:m.allowed?null:'Admin and internal business owner accounts cannot be deleted from the app.'}}),
+  useGetAccountDeletionEligibility:()=>({data:{allowed:m.allowed,reason:m.allowed?null:'Protected admin and internal business accounts cannot be deleted from this screen.'}}),
 }));
 vi.mock('@clerk/react', () => ({ useClerk: () => ({ signOut: m.signOut }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ clear: m.clear }) }));
@@ -14,16 +14,18 @@ describe('in-app account deletion', () => {
   it('blocks protected accounts with a clear explanation and no deletion request',()=>{
     m.allowed=false;render(<AccountDeletionPanel />);
     expect((screen.getByTestId('button-delete-account') as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Admin and internal business owner accounts cannot/)).toBeTruthy();
+    expect(screen.getByText(/Protected admin and internal business accounts cannot/)).toBeTruthy();
     expect(m.mutate).not.toHaveBeenCalled();
   });
-  it('requires exact DELETE, explains irreversible deletion and manual resource retention', () => {
+  it('requires exact DELETE and explains service shutdown, retained bookkeeping, and balance follow-up', () => {
     render(<AccountDeletionPanel />);
     fireEvent.click(screen.getByTestId('button-delete-account'));
     const button = screen.getByTestId('button-confirm-delete-account') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(screen.getByText(/This deletes your leads/)).toBeTruthy();
-    expect(screen.getByText(/will not be released automatically/)).toBeTruthy();
+    expect(screen.getByText(/queued for release/)).toBeTruthy();
+    expect(screen.getByText(/Any unpaid invoice balance remains due/)).toBeTruthy();
+    expect(screen.getByText(/Invoice and payment records needed for bookkeeping remain/)).toBeTruthy();
     fireEvent.change(screen.getByTestId('input-delete-confirmation'), { target: { value: 'delete' } });
     expect(button.disabled).toBe(true);
     fireEvent.change(screen.getByTestId('input-delete-confirmation'), { target: { value: 'DELETE' } });
@@ -52,14 +54,14 @@ describe('in-app account deletion', () => {
     expect(m.clear).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem(deletionSignOutMarker)).toBe('1');
   });
-  it('keeps the account/session intact on paid-subscription refusal and offers support', async () => {
-    m.mutate.mockRejectedValue({ data: { error: 'Paid subscription active. Contact support.' } });
+  it('keeps the session intact on a retryable failure without directing the owner to support', async () => {
+    m.mutate.mockRejectedValue({ data: { error: 'Account deletion could not safely finish. Please retry.' } });
     render(<AccountDeletionPanel />);
     fireEvent.click(screen.getByTestId('button-delete-account'));
     fireEvent.change(screen.getByTestId('input-delete-confirmation'), { target: { value: 'DELETE' } });
     fireEvent.click(screen.getByTestId('button-confirm-delete-account'));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Paid subscription active'));
-    expect(screen.getByRole('link', { name: 'Contact support' }).getAttribute('href')).toBe('mailto:hello@corvlio.com');
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Please retry'));
+    expect(screen.queryByRole('link', { name: /support/i })).toBeNull();
     expect(m.signOut).not.toHaveBeenCalled(); expect(m.clear).not.toHaveBeenCalled();
   });
 });

@@ -14,28 +14,17 @@ release, protecting other businesses and avoiding irreversible provider changes.
 webhooks, retries, and future admin tools. Do not add provider deletion to an
 otherwise local cleanup flow.
 
-The user requested active/past-due external-subscription refusal with support handoff,
-even when billing UI is disabled. This creates an App Store policy question:
-Apple's account-deletion guidance generally forbids mandatory support flows for
-apps outside highly regulated industries, and requires an immediate-deletion
-option for auto-renewable subscriptions.
+Owners can delete in-app regardless of subscription status, without a support
+handoff. Cancel test-mode Stripe subscriptions immediately; expire pending Checkout
+sessions; persist retries and alert admins if provider cancellation cannot be
+confirmed. Keep outstanding invoices due, retain invoice/payment ledger records,
+cancel reminder jobs, and alert PJ/admins about balances. Never enable live Stripe
+as part of this flow. Admin and internal-business owner accounts remain protected.
 
-**Why:** The requested financial safeguard and Apple's direct-deletion guidance
-are not automatically compatible. Passing an unpaid reviewer account's deletion
-flow does not settle compliance for paid customers.
+**Why:** The user explicitly changed the deletion policy to unblock App Store
+readiness while preserving collection of unpaid balances and financial records.
 
-**How to apply:** Keep the requested safeguard unless the user approves changing
-it. Flag the policy conflict before submission; do not claim App Store compliance
-or approval based solely on the existence of the Delete account button.
-
-Ordinary manual-invoice accounts may self-delete; pending invoices and reminder
-jobs must be canceled as part of removing their data. A previously paid manual
-invoice is not an active external subscription. Admin and internal-business
-owner accounts must be blocked from in-app self-deletion with a clear reason.
-
-**Why:** The user explicitly requested pending-invoice cancellation and protection
-of admins and Corvlio's internal owner during App Store hardening.
-
-**How to apply:** Preserve both UI explanations and server-side protection.
-Exercise real Clerk deletion only on explicitly disposable test identities;
-never test destructive behavior on an admin, internal owner, or existing client.
+**How to apply:** Keep this behavior in the in-app flow and signed Clerk deletion
+webhook. Exercise destructive deletion only on disposable test identities; never
+use an admin, internal owner, or existing client. Review Apple policy separately
+before claiming App Store compliance.
