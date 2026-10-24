@@ -3,12 +3,13 @@ import { EventEmitter } from "node:events";
 
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(), select: vi.fn(), insert: vi.fn(), update: vi.fn(), transaction: vi.fn(),
-  connect: vi.fn(), send: vi.fn(), email: vi.fn(), admin: vi.fn(),
+  connect: vi.fn(), send: vi.fn(), email: vi.fn(), admin: vi.fn(), webPushQuery: vi.fn(),
 }));
 vi.mock("@workspace/db", async () => ({
   ...await import("../../../../lib/db/src/schema/notifications"),
   ...await import("../../../../lib/db/src/schema/businesses"),
   db: mocks,
+  pool: { query: mocks.webPushQuery },
   advisoryLockPool: { connect: mocks.connect },
 }));
 vi.mock("../../src/lib/apnsAdapter", () => ({
@@ -58,6 +59,7 @@ beforeEach(() => {
   mocks.execute.mockResolvedValue({ rows: [{ due: false }] });
   mocks.email.mockResolvedValue(undefined);
   mocks.admin.mockResolvedValue(undefined);
+  mocks.webPushQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mocks.select.mockImplementation(() => ({
     from: (table: unknown) => ({
       where: () => {

@@ -18,7 +18,7 @@ describe("notification poller email isolation", () => {
     dispatch.mockImplementation(channels => channels[0].name === "owner_email" ? pendingEmail : Promise.resolve());
     await expect(runNotificationOutboxNow()).resolves.toBeUndefined();
     expect(dispatch.mock.calls.map(args => args[0].map((channel: { name: string }) => channel.name)))
-      .toEqual([["owner_email", "admin_email"], ["push"]]);
+      .toEqual([["owner_email", "admin_email"], ["web_push"], ["push"]]);
     finishEmail();
   });
 });

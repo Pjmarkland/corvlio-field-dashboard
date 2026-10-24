@@ -1,6 +1,7 @@
 import { db, leadsTable, retellCallRecordsTable, notificationEventsTable } from "@workspace/db";
 import { and, eq, gte, lte, isNull, sql } from "drizzle-orm";
 import { reconcileCall } from "./callReconciliation";
+import { enqueueWebPushDeliveries } from "./webPushService";
 
 type LeadInput = typeof leadsTable.$inferInsert;
 type RecordInput = typeof retellCallRecordsTable.$inferInsert;
@@ -90,7 +91,9 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
           emailStatus: "queued",
           deepLink: `/leads/${leadId}`,
         }).onConflictDoNothing().returning();
-        return inserted.length === 1;
+        if (!inserted[0]) return false;
+        await enqueueWebPushDeliveries(tx, inserted[0].id, leadInput.businessId);
+        return true;
       },
     });
   });

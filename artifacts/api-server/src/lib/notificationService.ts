@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   db,
+  pool,
   advisoryLockPool,
   businessesTable,
   notificationDeliveryAttemptsTable,
@@ -19,6 +20,7 @@ import { deliverLeadAlertEmails } from "./leadAlertEmail";
 import { deliverOperationalFailureAlerts } from "./operationalFailures";
 import { dispatchNotificationChannels } from "./notificationDispatch";
 import { databaseErrorFields } from "@workspace/db/errors";
+import { enqueueWebPushDeliveries, processWebPushOutbox } from "./webPushService";
 
 const POLL_INTERVAL_MS = 5 * 60_000;
 const MAX_POLL_BACKOFF_MS = 15 * 60_000;
@@ -114,7 +116,10 @@ export async function pollBusinessForNewLeads(
           })
           .onConflictDoNothing()
           .returning({ id: notificationEventsTable.id });
-        if (event) newEvents += 1;
+        if (event) {
+          await enqueueWebPushDeliveries(tx, event.id, business.id);
+          newEvents += 1;
+        }
       }
 
       await tx
@@ -427,8 +432,29 @@ async function hasDueNotificationWork(): Promise<boolean> {
   return Boolean(result.rows[0]?.due);
 }
 
+async function hasDueWebPushWork(): Promise<boolean> {
+  const result = await pool.query<{ due: boolean }>(`
+    SELECT (
+      EXISTS (SELECT 1 FROM web_push_subscriptions
+        WHERE expiration_at IS NOT NULL AND expiration_at <= now())
+      OR EXISTS (SELECT 1 FROM web_push_deliveries
+        WHERE (status = 'queued' AND next_attempt_at <= now())
+          OR (status = 'processing' AND claim_until <= now()))
+    ) AS due`);
+  return Boolean(result.rows[0]?.due);
+}
+
 export async function runNotificationPollCycle(): Promise<void> {
-  if (!(await hasDueNotificationWork())) return;
+  const hasExistingChannelWork = await hasDueNotificationWork();
+  let hasWebPushWork = false;
+  try {
+    hasWebPushWork = await hasDueWebPushWork();
+  } catch (error) {
+    // A browser-push schema/configuration issue must not delay native push or
+    // email retries, which continue through their existing independent channel.
+    logger.warn(databaseErrorFields(error), "Could not check the Web Push retry queue");
+  }
+  if (!hasExistingChannelWork && !hasWebPushWork) return;
   if (!(await acquirePollerLease())) {
     logger.debug("Skipping lead poll because another server owns the lease");
     return;
@@ -448,15 +474,22 @@ export async function runNotificationPollCycle(): Promise<void> {
   heartbeat.unref();
 
   try {
+    if (hasWebPushWork) {
+      void dispatchNotificationChannels([
+        { name: "web_push", deliver: processWebPushOutbox },
+      ]);
+    }
     // The owner workspace now reads PostgreSQL leads. Do not also poll legacy
     // Make/Sheets logs: that would generate duplicate or historical alerts.
     // Scheduled retries observe channel failures so DB errors trigger backoff.
     // The immediate new-lead path below remains independent of this sweep.
-    await dispatchNotificationChannels([
-      { name: "owner_email", deliver: deliverLeadAlertEmails },
-      { name: "admin_email", deliver: deliverOperationalFailureAlerts },
-      { name: "push", deliver: processNotificationOutbox },
-    ], { throwOnError: true });
+    if (hasExistingChannelWork) {
+      await dispatchNotificationChannels([
+        { name: "owner_email", deliver: deliverLeadAlertEmails },
+        { name: "admin_email", deliver: deliverOperationalFailureAlerts },
+        { name: "push", deliver: processNotificationOutbox },
+      ], { throwOnError: true });
+    }
     if (renewalError) throw renewalError;
   } finally {
     clearInterval(heartbeat);
@@ -470,6 +503,9 @@ export function runNotificationOutboxNow(): Promise<void> {
   void dispatchNotificationChannels([
     { name: "owner_email", deliver: deliverLeadAlertEmails },
     { name: "admin_email", deliver: deliverOperationalFailureAlerts },
+  ]);
+  void dispatchNotificationChannels([
+    { name: "web_push", deliver: processWebPushOutbox },
   ]);
   return dispatchNotificationChannels([
     { name: "push", deliver: processNotificationOutbox },

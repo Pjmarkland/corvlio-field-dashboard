@@ -36,6 +36,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { type PushStatus, usePushNotifications } from '@/hooks/usePushNotifications';
+import { useWebPushNotifications } from '@/hooks/useWebPushNotifications';
+import { WebPushSettingsRow } from '@/components/WebPushSettingsRow';
 import { usePushDeepLink } from '@/hooks/usePushDeepLink';
 import { useSignOut } from '@/hooks/useSignOut';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
@@ -621,7 +623,9 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
   const billingProfile=useGetBusinessProfile({query:{queryKey:getGetBusinessProfileQueryKey(),retry:false}});
   const { user } = useUser();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
-  const { handleSignOut, isSigningOut } = useSignOut(revoke);
+  const webPush = useWebPushNotifications(user?.id);
+  const revokeBeforeSignOut = Capacitor.isNativePlatform() ? revoke : webPush.revoke;
+  const { handleSignOut, isSigningOut } = useSignOut(revokeBeforeSignOut);
   return <>
     <PageHeading eyebrow="Workspace" title="Settings" description="Keep your business details and field alerts in your hands." />
     <BusinessProfileEditor key={user?.id ?? 'signed-out'} businessName={businessName} retellPhoneNumber={retellPhoneNumber} />
@@ -629,7 +633,9 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
     <NativeBillingSection key={`native-billing-${user?.id}`} />
     <section className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
       <h2 className="mb-4 flex items-center gap-2 font-bold"><ShieldCheck size={17} /> Account controls</h2>
-      <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
+      {Capacitor.isNativePlatform()
+        ? <NotificationStatusRow push={{ pushStatus, pushError, onRegister: register, onRevoke: revoke }} />
+        : <WebPushSettingsRow push={webPush} />}
       {billingProfile.isSuccess && !billingProfile.data?.isInternal && (billingOn || Capacitor.isNativePlatform()) ? <Link href="/billing" data-testid="link-settings-billing" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Billing</span><ChevronRight size={16} /></Link> : null}
       <Link href="/privacy" data-testid="link-settings-privacy" className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Privacy policy</span><ChevronRight size={16} /></Link>
       <Link href="/terms" data-testid="link-settings-terms" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Terms of Service</span><ChevronRight size={16} /></Link>

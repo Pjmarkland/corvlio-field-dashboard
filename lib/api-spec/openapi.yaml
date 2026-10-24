@@ -487,6 +487,80 @@ paths:
           description: Authentication required
         "403":
           description: No business is configured for this account
+  /web-push/config:
+    get:
+      operationId: getWebPushConfig
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Get browser push configuration
+      responses:
+        "200":
+          description: Browser push capability for the signed-in owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebPushConfig"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "503":
+          description: Browser push is misconfigured
+  /web-push-subscriptions:
+    post:
+      operationId: registerWebPushSubscription
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Register or refresh this browser's push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebPushSubscriptionInput"
+      responses:
+        "200":
+          description: Browser subscription registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebPushSubscriptionStatus"
+        "400":
+          description: Invalid browser subscription
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "409":
+          description: This browser subscription belongs to another account
+        "503":
+          description: Browser push is not configured
+    delete:
+      operationId: revokeWebPushSubscription
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Revoke this browser's push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebPushSubscriptionRevoke"
+      responses:
+        "204":
+          description: Browser subscription revoked
+        "400":
+          description: Invalid browser subscription
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
   /notification-devices/{deviceId}:
     delete:
       operationId: revokeNotificationDevice
@@ -1540,6 +1614,56 @@ components:
       required:
         - token
         - platform
+    WebPushConfig:
+      type: object
+      additionalProperties: false
+      required: [available, publicKey]
+      properties:
+        available:
+          type: boolean
+        publicKey:
+          type: ["string", "null"]
+    WebPushSubscriptionInput:
+      type: object
+      additionalProperties: false
+      required: [endpoint, keys]
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        keys:
+          type: object
+          additionalProperties: false
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+              minLength: 1
+              maxLength: 512
+            auth:
+              type: string
+              minLength: 1
+              maxLength: 512
+        expirationTime:
+          type: ["number", "null"]
+          minimum: 0
+    WebPushSubscriptionRevoke:
+      type: object
+      additionalProperties: false
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    WebPushSubscriptionStatus:
+      type: object
+      additionalProperties: false
+      required: [registered]
+      properties:
+        registered:
+          type: boolean
     OwnerDemoCapability:
       type: object
       required: [enabled, production]

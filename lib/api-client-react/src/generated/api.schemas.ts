@@ -737,6 +737,51 @@ export interface NotificationDeviceRegistration {
   enabled?: boolean;
 }
 
+export interface WebPushConfig {
+  available: boolean;
+  /** @nullable */
+  publicKey: string | null;
+}
+
+export type WebPushSubscriptionInputKeys = {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  p256dh: string;
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  auth: string;
+};
+
+export interface WebPushSubscriptionInput {
+  /**
+     * @minLength 1
+     * @maxLength 4096
+     */
+  endpoint: string;
+  keys: WebPushSubscriptionInputKeys;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  expirationTime?: number | null;
+}
+
+export interface WebPushSubscriptionRevoke {
+  /**
+     * @minLength 1
+     * @maxLength 4096
+     */
+  endpoint: string;
+}
+
+export interface WebPushSubscriptionStatus {
+  registered: boolean;
+}
+
 export interface OwnerDemoCapability {
   enabled: boolean;
   production: boolean;

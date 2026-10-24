@@ -9,7 +9,7 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string; `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` — Web Push key pair (Replit Secrets; `VAPID_SUBJECT` is optional and defaults to Corvlio support)
 - `VITE_NATIVE_API_BASE_URL` — (native Capacitor builds only) absolute API origin, e.g. `https://corvlio-field-dashboard--pjmarkland08.replit.app`. Web PWA builds leave this unset and continue to use same-origin relative paths.
 
 ## Stack
@@ -32,8 +32,8 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 - Lead data comes from one fixed Google Sheet through a protected API endpoint. The server refreshes short-lived Google OAuth access tokens from server-only credentials and normalizes the sheet rows before returning them.
 - The current Google Sheets integration is intentionally single-owner and read-only. Per-business sheet selection and status write-back are future work.
 - Clerk is the authentication provider for the single business-owner account; the public root route stays useful for signed-out visitors, while field routes require a signed-in session.
-- Native `tel:` and `sms:` links are used for one-tap contact actions; browser push is intentionally labeled as a future connection until a push provider is selected.
-- The PWA is the first delivery target, with a standalone manifest and a conservative service worker that never caches API or auth requests.
+- Native `tel:` and `sms:` links are used for one-tap contact actions. Native push remains on its existing APNs/FCM path; desktop-browser alerts use VAPID Web Push with business-scoped subscriptions and a separate delivery queue.
+- The PWA uses a standalone manifest and a conservative service worker that never caches API or auth requests, and opens lead details when a push is clicked.
 
 ## Product
 

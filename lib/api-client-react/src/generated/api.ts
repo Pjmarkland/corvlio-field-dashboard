@@ -67,6 +67,10 @@ import type {
   PaymentInstructions,
   PendingRetellRelease,
   StartupEligibilityInput,
+  WebPushConfig,
+  WebPushSubscriptionInput,
+  WebPushSubscriptionRevoke,
+  WebPushSubscriptionStatus,
   WebsitePreview,
   WebsitePreviewInput,
   WelcomeEntry
@@ -1642,6 +1646,225 @@ export const useRegisterNotificationDevice = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRegisterNotificationDeviceMutationOptions(options));
+    }
+
+export const getGetWebPushConfigUrl = () => {
+
+
+
+
+  return `/api/web-push/config`
+}
+
+/**
+ * @summary Get browser push configuration
+ */
+export const getWebPushConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<WebPushConfig> => {
+
+  return customFetch<WebPushConfig>(getGetWebPushConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWebPushConfigQueryKey = () => {
+    return [
+    `/api/web-push/config`
+    ] as const;
+    }
+
+
+export const getGetWebPushConfigQueryOptions = <TData = Awaited<ReturnType<typeof getWebPushConfig>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWebPushConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWebPushConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWebPushConfig>>> = ({ signal }) => getWebPushConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWebPushConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWebPushConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getWebPushConfig>>>
+export type GetWebPushConfigQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get browser push configuration
+ */
+
+export function useGetWebPushConfig<TData = Awaited<ReturnType<typeof getWebPushConfig>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWebPushConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWebPushConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRegisterWebPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/web-push-subscriptions`
+}
+
+/**
+ * @summary Register or refresh this browser's push subscription
+ */
+export const registerWebPushSubscription = async (webPushSubscriptionInput: WebPushSubscriptionInput, options?: Parameters<typeof customFetch>[1]): Promise<WebPushSubscriptionStatus> => {
+
+  return customFetch<WebPushSubscriptionStatus>(getRegisterWebPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(webPushSubscriptionInput)
+  }
+);}
+
+
+
+
+
+export const getRegisterWebPushSubscriptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionInput>}, TContext> => {
+
+const mutationKey = ['registerWebPushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerWebPushSubscription>>, {data: BodyType<WebPushSubscriptionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerWebPushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterWebPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof registerWebPushSubscription>>>
+    export type RegisterWebPushSubscriptionMutationBody = BodyType<WebPushSubscriptionInput>
+    export type RegisterWebPushSubscriptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Register or refresh this browser's push subscription
+ */
+export const useRegisterWebPushSubscription = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerWebPushSubscription>>,
+        TError,
+        {data: BodyType<WebPushSubscriptionInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterWebPushSubscriptionMutationOptions(options));
+    }
+
+export const getRevokeWebPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/web-push-subscriptions`
+}
+
+/**
+ * @summary Revoke this browser's push subscription
+ */
+export const revokeWebPushSubscription = async (webPushSubscriptionRevoke: WebPushSubscriptionRevoke, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRevokeWebPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(webPushSubscriptionRevoke)
+  }
+);}
+
+
+
+
+
+export const getRevokeWebPushSubscriptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionRevoke>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionRevoke>}, TContext> => {
+
+const mutationKey = ['revokeWebPushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeWebPushSubscription>>, {data: BodyType<WebPushSubscriptionRevoke>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  revokeWebPushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeWebPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof revokeWebPushSubscription>>>
+    export type RevokeWebPushSubscriptionMutationBody = BodyType<WebPushSubscriptionRevoke>
+    export type RevokeWebPushSubscriptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke this browser's push subscription
+ */
+export const useRevokeWebPushSubscription = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeWebPushSubscription>>, TError,{data: BodyType<WebPushSubscriptionRevoke>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeWebPushSubscription>>,
+        TError,
+        {data: BodyType<WebPushSubscriptionRevoke>},
+        TContext
+      > => {
+      return useMutation(getRevokeWebPushSubscriptionMutationOptions(options));
     }
 
 export const getRevokeNotificationDeviceUrl = (deviceId: number,) => {

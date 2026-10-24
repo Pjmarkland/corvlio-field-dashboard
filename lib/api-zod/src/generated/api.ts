@@ -648,6 +648,56 @@ export const RegisterNotificationDeviceResponse = zod.object({
 
 
 /**
+ * @summary Get browser push configuration
+ */
+export const GetWebPushConfigResponse = zod.object({
+  "available": zod.boolean(),
+  "publicKey": zod.string().nullable()
+})
+
+
+/**
+ * @summary Register or refresh this browser's push subscription
+ */
+export const registerWebPushSubscriptionBodyEndpointMax = 4096;
+
+export const registerWebPushSubscriptionBodyKeysP256dhMax = 512;
+
+export const registerWebPushSubscriptionBodyKeysAuthMax = 512;
+
+export const registerWebPushSubscriptionBodyExpirationTimeMin = 0;
+
+
+
+export const RegisterWebPushSubscriptionBody = zod.object({
+  "endpoint": zod.string().min(1).max(registerWebPushSubscriptionBodyEndpointMax),
+  "keys": zod.object({
+  "p256dh": zod.string().min(1).max(registerWebPushSubscriptionBodyKeysP256dhMax),
+  "auth": zod.string().min(1).max(registerWebPushSubscriptionBodyKeysAuthMax)
+}),
+  "expirationTime": zod.number().min(registerWebPushSubscriptionBodyExpirationTimeMin).nullish()
+})
+
+export const RegisterWebPushSubscriptionResponse = zod.object({
+  "registered": zod.boolean()
+})
+
+
+/**
+ * @summary Revoke this browser's push subscription
+ */
+export const revokeWebPushSubscriptionBodyEndpointMax = 4096;
+
+
+
+export const RevokeWebPushSubscriptionBody = zod.object({
+  "endpoint": zod.string().min(1).max(revokeWebPushSubscriptionBodyEndpointMax)
+})
+
+export const RevokeWebPushSubscriptionResponse = zod.void()
+
+
+/**
  * @summary Revoke one native push device
  */
 export const revokeNotificationDevicePathDeviceIdMultipleOf = 1;

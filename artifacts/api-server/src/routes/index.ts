@@ -10,6 +10,7 @@ import leadDetailsRouter from "./leadDetails";
 import welcomeRouter from "./welcome";
 import ownerDemoRouter from "./ownerDemo";
 import leadAlertsRouter from "./leadAlerts";
+import webPushRouter from "./webPush";
 import billingRouter from "./billing";
 import accountRouter from "./account";
 import pendingReleasesRouter from "./pendingReleases";
@@ -34,5 +35,6 @@ router.use(retellRouter);
 router.use(welcomeRouter);
 router.use(ownerDemoRouter);
 router.use(leadAlertsRouter);
+router.use(webPushRouter);
 
 export default router;
