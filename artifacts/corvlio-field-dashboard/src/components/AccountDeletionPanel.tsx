@@ -84,7 +84,7 @@ export function DeletedAccountSignOut() {
       try { sessionStorage.removeItem(deletionSignOutMarker); } catch { /* best-effort */ }
       window.location.assign(base || '/');
     }
-    catch { setBusy(false); setError('Sign-out could not finish. Please retry or contact support.'); }
+    catch { setBusy(false); setError('Sign-out could not finish. Please retry.'); }
   };
   return <main className="grid min-h-[100dvh] place-items-center bg-background p-6 text-foreground"><div className="max-w-md">
     <h1 className="text-2xl font-bold">{accepted ? 'Account deletion requested' : 'Finish signing out'}</h1>

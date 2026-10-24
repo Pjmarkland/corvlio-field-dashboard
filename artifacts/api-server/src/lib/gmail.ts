@@ -209,7 +209,8 @@ export async function sendAdminOperationalFailureEmail(input: {
       .filter((email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email));
   const recipients = [...new Set([
     ...configuredRecipients,
-    ...(input.source === "account_deletion_balance" ? ["pj@corvlio.com"] : []),
+    ...(input.source === "account_deletion_balance" || input.source === "account_deletion_billing"
+      ? ["pj@corvlio.com"] : []),
   ])];
   if (recipients.length === 0) return false;
 
@@ -219,6 +220,8 @@ export async function sendAdminOperationalFailureEmail(input: {
   const messageBody = [
     input.source === "account_deletion_balance"
       ? "An outstanding balance needs follow-up after an owner deleted their Corvlio account."
+      : input.source === "account_deletion_billing"
+      ? "A Stripe cancellation needs review after an owner deleted their Corvlio account."
       : "A Corvlio call or lead pipeline failure needs review.",
     "",
     `Source: ${input.source}`,
@@ -231,7 +234,11 @@ export async function sendAdminOperationalFailureEmail(input: {
   ].join("\r\n");
   const rawMessage = [
     `To: ${recipients.join(", ")}`,
-    `Subject: ${input.source === "account_deletion_balance" ? "Corvlio account deletion: balance follow-up" : "Corvlio call pipeline failure"}`,
+    `Subject: ${input.source === "account_deletion_balance"
+      ? "Corvlio account deletion: balance follow-up"
+      : input.source === "account_deletion_billing"
+      ? "Corvlio account deletion: subscription cleanup"
+      : "Corvlio call pipeline failure"}`,
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
     "",

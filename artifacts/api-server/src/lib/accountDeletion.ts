@@ -1,7 +1,14 @@
 import { clerkClient } from "@clerk/express";
+import { createHash } from "node:crypto";
 import { pool } from "@workspace/db";
 import { hasVerifiedAdminEmail, parseAdminEmails } from "../middlewares/requireAdmin";
 import { invoiceNumber } from "../invoicing/policy";
+import {
+  alertStripeCancellationFailure,
+  cancelStripeResourcesForDeletion,
+  type DeletedAccountBillingResources,
+} from "../billing/accountDeletion";
+import { logger } from "./logger";
 type SqlResult = { rows: Record<string, any>[] };
 type SqlQuery = (text: string, values?: any[]) => Promise<SqlResult>;
 type SqlClient = { query: SqlQuery; release: () => void };
@@ -14,8 +21,12 @@ export type DeletionDependencies = {
   pool: { connect: () => Promise<SqlClient>; query: SqlQuery };
   deleteUser: (id: string) => Promise<unknown>;
   isProtectedUser?: (id: string) => Promise<boolean>;
+  cancelStripeResources?: (resources: DeletedAccountBillingResources) => Promise<void>;
+  alertStripeCancellationFailure?: (resources: DeletedAccountBillingResources, error: unknown) => Promise<void>;
 };
 const defaults: DeletionDependencies = { pool, deleteUser: id => clerkClient.users.deleteUser(id),
+  cancelStripeResources: cancelStripeResourcesForDeletion,
+  alertStripeCancellationFailure,
   isProtectedUser: async id => {
     try {return hasVerifiedAdminEmail((await clerkClient.users.getUser(id)).emailAddresses,parseAdminEmails(process.env.ADMIN_EMAILS));}
     catch(e) {if((e as {status?:number}).status===404)return false;throw e;}
@@ -58,7 +69,15 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`account-deletion:${userId}`]);
     const existing = await client.query("SELECT status FROM account_deletions WHERE clerk_user_id = $1", [userId]);
-    if (existing.rows[0]) { await client.query("COMMIT"); return { status: existing.rows[0].status, balanceAlertQueued: false }; }
+    if (existing.rows[0]) {
+      await client.query("COMMIT");
+      return {
+        status: existing.rows[0].status,
+        balanceAlertQueued: false,
+        billingReviewAlertQueued: false,
+        billingCancellations: [] as DeletedAccountBillingResources[],
+      };
+    }
     // Acquire billing's existing lock BEFORE row locks: same ordering as billing.
     const owned = await client.query("SELECT id FROM businesses WHERE clerk_user_id = $1 ORDER BY id", [userId]);
     for (const row of owned.rows) {
@@ -85,10 +104,49 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
       unpaidByBusiness.set(invoice.business_id, list);
     }
     let balanceAlertQueued = false;
+    let billingReviewAlertQueued = false;
+    const billingCancellations: DeletedAccountBillingResources[] = [];
     for (const business of businesses) {
       const invoices = unpaidByBusiness.get(business.id) ?? [];
       const billingAccount = billing.rows.find(row => row.business_id === business.id);
       const billingState = billingAccount?.state as Record<string, unknown> | undefined;
+      const subscriptionId = billingAccount?.stripe_subscription_id
+        ?? (typeof billingState?.subscriptionId === "string" ? billingState.subscriptionId : null);
+      const pendingCheckout = billingState?.pendingCheckout;
+      const checkoutSessionId = pendingCheckout && typeof pendingCheckout === "object"
+        && "id" in pendingCheckout && typeof pendingCheckout.id === "string"
+        ? pendingCheckout.id : null;
+      const terminalSubscription = ["canceled", "incomplete_expired"].includes(String(billingState?.status));
+      const needsCancellation = Boolean(checkoutSessionId || (subscriptionId && !terminalSubscription));
+      const resourceFingerprint = createHash("sha256")
+        .update(`${subscriptionId ?? ""}:${checkoutSessionId ?? ""}`)
+        .digest("hex");
+      if (needsCancellation) {
+        const resources: DeletedAccountBillingResources = {
+          sourceKey: `account-deletion:${business.id}:${resourceFingerprint}`,
+          businessId: business.id,
+          businessName: "Deleted account",
+          subscriptionId: terminalSubscription ? null : subscriptionId,
+          checkoutSessionId,
+        };
+        await client.query(
+          `INSERT INTO pending_billing_cancellations
+            (source_key,business_id,business_name,subscription_id,checkout_session_id)
+           VALUES ($1,$2,$3,$4,$5) ON CONFLICT (source_key) DO NOTHING`,
+          [resources.sourceKey, resources.businessId, resources.businessName, resources.subscriptionId, resources.checkoutSessionId],
+        );
+        billingCancellations.push(resources);
+      } else if (["active", "past_due", "unpaid", "suspended"].includes(String(billingState?.status))) {
+        await client.query(
+          `INSERT INTO operational_failures
+            (event_key,source,summary,details,business_id,business_name)
+           VALUES ($1,'account_deletion_billing','Subscription cleanup needs admin review',
+             'The billing record indicated an active or unresolved subscription but had no Stripe subscription or Checkout session ID.',NULL,$2)
+           ON CONFLICT (event_key) DO NOTHING`,
+          [`account-deletion-billing-missing:${business.id}`, "Deleted account"],
+        );
+        billingReviewAlertQueued = true;
+      }
       const providerPastDue = ["past_due", "unpaid", "suspended"].includes(String(billingState?.status));
       if (invoices.length === 0 && !providerPastDue) continue;
       const amountCents = invoices.reduce((sum, invoice) => sum + invoice.monthly_cents + invoice.setup_cents, 0);
@@ -131,7 +189,7 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     await client.query("DELETE FROM email_health_attempts WHERE actor_user_id=$1",[userId]);
     await client.query("DELETE FROM businesses WHERE clerk_user_id = $1 AND id = ANY($2::int[])", [userId, ids]);
     await client.query("COMMIT");
-    return { status: "pending", balanceAlertQueued };
+    return { status: "pending", balanceAlertQueued, billingReviewAlertQueued, billingCancellations };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -165,11 +223,42 @@ export async function finishIdentityDeletion(userId: string, deps = defaults, al
 
 export async function deleteAccount(userId: string, deps = defaults, alreadyDeleted = false) {
   const cleanup = await removeOwnedAppData(userId, deps);
-  if (cleanup.balanceAlertQueued) {
+  if (cleanup.balanceAlertQueued || cleanup.billingReviewAlertQueued) {
     // The operational-failure worker sends the durable alert to PJ/admins.
     // It runs independently and retries if Gmail is temporarily unavailable.
     const { runNotificationOutboxNow } = await import("./notificationService");
-    void runNotificationOutboxNow();
+    void runNotificationOutboxNow().catch(error => logger.warn(
+      { error: error instanceof Error ? error.message : "Unknown outbox error" },
+      "Account deletion alert dispatch failed; durable alert remains queued",
+    ));
+  }
+  for (const resources of cleanup.billingCancellations) {
+    if (!deps.cancelStripeResources) continue;
+    try {
+      await deps.cancelStripeResources(resources);
+      await deps.pool.query(
+        `UPDATE pending_billing_cancellations SET status='completed',resolved_at=now(),
+         claim_until=NULL,last_error=NULL WHERE source_key=$1`,
+        [resources.sourceKey],
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message.slice(0, 400) : "Unknown Stripe cancellation error";
+      try {
+        await deps.pool.query(
+          `UPDATE pending_billing_cancellations
+           SET status='pending',attempts=attempts+1,last_error=$2,
+             next_attempt_at=now()+interval '5 minutes',claim_until=NULL
+           WHERE source_key=$1`,
+          [resources.sourceKey, message],
+        );
+        await deps.alertStripeCancellationFailure?.(resources, error);
+      } catch (queueError) {
+        logger.error(
+          { error: queueError instanceof Error ? queueError.message : "Unknown retry error" },
+          "Stripe account-deletion cleanup remains queued but retry metadata could not be updated",
+        );
+      }
+    }
   }
   return finishIdentityDeletion(userId, deps, alreadyDeleted);
 }

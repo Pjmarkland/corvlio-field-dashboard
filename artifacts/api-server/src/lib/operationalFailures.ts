@@ -12,7 +12,8 @@ export type OperationalFailureSource =
   | "post_call_webhook"
   | "lead_gmail_notification"
   | "phone_provisioning"
-  | "account_deletion_balance";
+  | "account_deletion_balance"
+  | "account_deletion_billing";
 
 export type OperationalFailureInput = {
   eventKey: string;

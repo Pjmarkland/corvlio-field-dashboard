@@ -22,6 +22,23 @@ CREATE TABLE IF NOT EXISTS pending_retell_releases (
   resolved_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pending_retell_releases_source_unique ON pending_retell_releases(source_key);
+CREATE TABLE IF NOT EXISTS pending_billing_cancellations (
+  id serial PRIMARY KEY,
+  source_key text NOT NULL UNIQUE,
+  business_id integer NOT NULL,
+  business_name text NOT NULL,
+  subscription_id text,
+  checkout_session_id text,
+  status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  claim_until timestamptz,
+  last_error text,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS pending_billing_cancellations_due_idx
+  ON pending_billing_cancellations(status,next_attempt_at);
 -- Accounting rows must outlive deleted business profiles. Remove only the FK;
 -- the immutable numeric business ID and invoice snapshot remain on each invoice.
 DO $$

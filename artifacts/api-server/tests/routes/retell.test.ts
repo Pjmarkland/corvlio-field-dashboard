@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import express from "express";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dynamicVariables } from "../../src/lib/retellVariables";
+import { retellMalformedJsonAlertHandler } from "../../src/lib/retellWebhookAlerts";
 
 const mocks = vi.hoisted(() => ({
   findBusinessByPhoneNumber: vi.fn(),
@@ -117,6 +118,7 @@ beforeAll(async () => {
     next();
   });
   app.use(retellRouter);
+  app.use(retellMalformedJsonAlertHandler);
 
   server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -251,6 +253,10 @@ describe("Retell webhook safety", () => {
     });
     expect(response.status).toBe(401);
     expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: expect.stringMatching(/^retell-webhook-rejected:pre-call:/),
+      summary: expect.stringContaining("invalid signature"),
+    }));
   });
   it("verifies valid pre-call signatures against the exact raw bytes", async () => {
     const raw = '{ "call_inbound": { "to_number" : "+14155550123" } }';
@@ -295,6 +301,61 @@ describe("Retell webhook safety", () => {
     });
     expect(response.status).toBe(401);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: expect.stringMatching(/^retell-webhook-rejected:post-call:/),
+      summary: expect.stringContaining("invalid signature"),
+    }));
+  });
+  it("rate-limits rejected webhook alerts by endpoint and 15-minute bucket", async () => {
+    const baseTime = 1_800_000_000_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(baseTime);
+    mocks.recordOperationalFailure
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    try {
+      for (let index = 0; index < 2; index++) {
+        const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: '{"event":"call_analyzed"}',
+        });
+        expect(response.status).toBe(401);
+      }
+      nowSpy.mockReturnValue(baseTime + 15 * 60_000);
+      const nextWindow = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"event":"call_analyzed"}',
+      });
+      expect(nextWindow.status).toBe(401);
+    } finally {
+      nowSpy.mockRestore();
+    }
+    const alertCalls = mocks.recordOperationalFailure.mock.calls.map(([input]) => input);
+    expect(alertCalls).toHaveLength(3);
+    expect(alertCalls[0].eventKey).toBe(alertCalls[1].eventKey);
+    expect(alertCalls[2].eventKey).not.toBe(alertCalls[0].eventKey);
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledTimes(2);
+  });
+  it("records malformed signed payloads and malformed JSON through the rate-limited alert path", async () => {
+    const invalidPayload = await signedRequest("post-call", JSON.stringify({ event: "call_analyzed" }));
+    expect(invalidPayload.status).toBe(400);
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: expect.stringMatching(/^retell-webhook-rejected:post-call:/),
+      summary: expect.stringContaining("malformed payload"),
+    }));
+
+    const malformedJson = await fetch(`${baseUrl}/webhooks/retell/pre-call`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '{"call_inbound":',
+    });
+    expect(malformedJson.status).toBe(400);
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: expect.stringMatching(/^retell-webhook-rejected:pre-call:/),
+      summary: expect.stringContaining("malformed payload"),
+    }));
   });
   it("records authenticated post-call processing failures for admin alerting", async () => {
     mocks.findBusinessByPhoneNumber.mockRejectedValueOnce(new Error("Database unavailable"));

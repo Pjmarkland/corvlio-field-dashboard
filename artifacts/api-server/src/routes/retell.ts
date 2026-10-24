@@ -165,6 +165,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   );
   if (!phoneNumber) {
     req.log.warn("Retell pre-call webhook has no destination number; using generic message fallback");
+    await alertRejectedRetellWebhook("pre-call", "malformed_payload");
     res.json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
     return;
   }
@@ -205,6 +206,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
 router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const signature = req.get("x-retell-signature");
   if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
+    await alertRejectedRetellWebhook("post-call", "invalid_signature");
     req.log.warn("Rejected Retell post-call webhook with invalid signature");
     res.status(401).json({ error: "Invalid Retell signature" });
     return;
@@ -221,10 +223,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const body = RetellPostCallWebhookBody.safeParse(req.body);
   if (!body.success) {
     req.log.warn({ error: body.error.flatten() }, "Invalid Retell post-call webhook payload");
-    await recordPostCallFailure(req, {
-      summary: "Post-call webhook payload was invalid",
-      details: "The signed payload did not match the expected Retell post-call shape.",
-    });
+    await alertRejectedRetellWebhook("post-call", "malformed_payload");
     res.status(400).json({ error: "Invalid Retell post-call webhook payload" });
     return;
   }
@@ -237,10 +236,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const call = body.data.call;
   if (!call) {
     req.log.warn("Retell post-call webhook is missing the call object");
-    await recordPostCallFailure(req, {
-      summary: "Post-call webhook is missing its call object",
-      details: "The signed payload did not contain a call object.",
-    });
+    await alertRejectedRetellWebhook("post-call", "malformed_payload");
     res.status(400).json({ error: "Retell call object is required" });
     return;
   }
@@ -261,10 +257,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const phoneNumber = call ? callPhoneNumber(call) : null;
   if (!phoneNumber) {
     req.log.warn("Retell call_analyzed webhook is missing call phone numbers");
-    await recordPostCallFailure(req, {
-      summary: "Post-call webhook is missing a phone number",
-      details: "The signed call could not be matched because it had no destination number.",
-    });
+    await alertRejectedRetellWebhook("post-call", "malformed_payload");
     res.status(400).json({ error: "Retell call phone number is required" });
     return;
   }

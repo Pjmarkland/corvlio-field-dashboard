@@ -8,5 +8,5 @@ const { Pool } = require("pg");
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 try {
   await pool.query(await readFile(new URL("./migrate-account-deletion.sql", import.meta.url), "utf8"));
-  console.log("Development-only additive account deletion tables created. No user data changed.");
+  console.log("Development-only account deletion schema applied. Invoice history remains intact.");
 } finally { await pool.end(); }
