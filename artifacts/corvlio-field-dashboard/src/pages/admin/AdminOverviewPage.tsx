@@ -6,6 +6,7 @@ import { getGetAdminOverviewQueryKey, useGetAdminOverview, type AdminBusinessSum
 import AdminCallQuality from './AdminCallQuality';
 import PendingRetellReleases from './PendingRetellReleases';
 import InternalBusinessesSection from './InternalBusinessesSection';
+import AppReviewDemoSection from './AppReviewDemoSection';
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, SectionHeading, formatAdminResponse, formatAdminShortDate } from './AdminShared';
 
 type SortKey = 'createdAt' | 'businessName' | 'onboardingCompletenessPercent' | 'totalLeadCount' | 'uncontactedLeadCount' | 'provisioningStatus';
@@ -71,6 +72,7 @@ export default function AdminOverviewPage() {
   return <AdminShell title="Overview" eyebrow="Founder operations" action={<span className="hidden items-center gap-2 text-xs text-[#76837a] sm:flex"><span className="h-2 w-2 rounded-full bg-[#4e8d70]" />Live read-only snapshot</span>}>
     <PendingRetellReleases />
     <InternalBusinessesSection />
+    <AppReviewDemoSection />
     <section className="mb-8 grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
       <div className="relative overflow-hidden rounded-3xl bg-[#244d3f] p-6 text-[#eff6ee] shadow-[0_16px_40px_rgba(36,77,63,.15)] sm:p-8">
         <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-[#4e8d70]/25" /><div className="absolute -bottom-24 right-20 h-48 w-48 rounded-full border border-[#bad7c2]/20" />

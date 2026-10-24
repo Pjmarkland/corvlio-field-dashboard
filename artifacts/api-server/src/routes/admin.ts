@@ -12,6 +12,7 @@ import { getAdminCallQuality } from "../lib/callQuality";
 import { z } from "zod";
 import { pool } from "@workspace/db";
 import { createInternalBusiness, internalBusinessDirectory, internalBusinessRecord, InternalBusinessError } from "../lib/internalBusinesses";
+import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
 
 const router: IRouter = Router();
 
@@ -43,6 +44,57 @@ router.patch("/admin/internal-businesses/:businessId",async(req,res) => {
     if (!r.rows[0]) {res.sendStatus(404);return;}
     res.json(internalBusinessRecord(r.rows[0]));
   } catch {res.status(503).json({error:"Agent ID could not be saved."});}
+});
+
+const appReviewDemoLinkInput = z.object({
+  email: z.string().trim().email().max(320),
+}).strict();
+
+router.get("/admin/app-review-demo", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(await getAppReviewDemoStatus());
+  } catch (error) {
+    if (error instanceof AppReviewDemoError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    req.log.error({ error: error instanceof Error ? error.message : "Unknown demo status error" }, "App Review demo status failed");
+    res.status(503).json({ error: "App Review demo status is unavailable." });
+  }
+});
+
+router.post("/admin/app-review-demo/reset", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(await resetAppReviewDemo());
+  } catch (error) {
+    if (error instanceof AppReviewDemoError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    req.log.error({ error: error instanceof Error ? error.message : "Unknown demo reset error" }, "App Review demo reset failed");
+    res.status(503).json({ error: "App Review demo could not be reset." });
+  }
+});
+
+router.post("/admin/app-review-demo/link", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const body = appReviewDemoLinkInput.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Enter the reviewer's verified email address." });
+    return;
+  }
+  try {
+    res.json(await linkAppReviewDemoEmail(body.data.email));
+  } catch (error) {
+    if (error instanceof AppReviewDemoError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    req.log.error({ error: error instanceof Error ? error.message : "Unknown demo link error" }, "App Review demo linking failed");
+    res.status(503).json({ error: "The App Review account could not be linked." });
+  }
 });
 
 router.get("/admin/call-quality", async (req, res): Promise<void> => {

@@ -703,6 +703,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InternalBusinessRecord"
+  /admin/app-review-demo:
+    get:
+      operationId: getAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Read App Review demo status
+      description: Requires a verified administrator email. Does not create or modify demo data.
+      responses:
+        "200":
+          description: Current demo business and lead count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/app-review-demo/reset:
+    post:
+      operationId: resetAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Create or reset the isolated App Review demo
+      description: Explicitly replaces only tagged demo leads after safety checks. Never provisions a phone or changes real businesses.
+      responses:
+        "200":
+          description: Demo business with refreshed synthetic leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "404":
+          description: Not found or administrator access is unavailable
+        "409":
+          description: Unsafe or conflicting business data was found
+  /admin/app-review-demo/link:
+    post:
+      operationId: linkAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Link a verified Clerk account to the App Review demo
+      description: Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppReviewDemoLinkInput"
+      responses:
+        "200":
+          description: Demo business linked to the reviewer account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "400":
+          description: Invalid email
+        "404":
+          description: Reviewer account or demo business was not found
+        "409":
+          description: Linking would overwrite a different business owner
   /admin/businesses/{businessId}:
     get:
       operationId: getAdminBusiness
@@ -1359,6 +1422,32 @@ components:
                 type: [string, "null"]
             required: [userId, email, linkedBusinessName]
       required: [businesses, owners]
+    AppReviewDemoStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        exists:
+          type: boolean
+        businessId:
+          type: [number, "null"]
+        businessName:
+          type: [string, "null"]
+        ownerEmail:
+          type: [string, "null"]
+        linked:
+          type: boolean
+        leadCount:
+          type: number
+      required: [exists, businessId, businessName, ownerEmail, linked, leadCount]
+    AppReviewDemoLinkInput:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+          maxLength: 320
+      required: [email]
     BusinessProfile:
       type: object
       additionalProperties: false

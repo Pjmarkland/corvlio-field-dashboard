@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-const h = vi.hoisted(() => ({ native: false, state: {} as Record<string, unknown>, profile: {} as Record<string, unknown>, opts: undefined as unknown, open: vi.fn() }));
+const h = vi.hoisted(() => ({ native: false, state: {} as Record<string, unknown>, profile: {} as Record<string, unknown>, opts: undefined as unknown }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => h.native } }));
-vi.mock('@/lib/nativeInvoiceBrowser', () => ({ openInvoiceWebsite: h.open }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetOwnerInvoicesQueryKey: () => ['inv'],
   getGetBusinessProfileQueryKey: () => ['prof'],
@@ -17,7 +16,7 @@ const data = (o = {}) => ({ businessId: 1, businessName: 'B', plan: 'professiona
 const set = (d: unknown, extra = {}) => { h.state = { data: d, isLoading: false, isError: false, refetch: vi.fn(), ...extra }; };
 
 describe('OwnerInvoicePanel', () => {
-  beforeEach(() => { h.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; h.native = false; h.open.mockReset(); });
+  beforeEach(() => { h.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; h.native = false; });
   it('requested', () => { set(data({ status: 'requested', invoices: [] })); render(<OwnerInvoicePanel />); expect(screen.getByTestId('status-invoice').textContent).toBe('Awaiting approval'); });
   it('awaiting payment on web shows invoice details', () => {
     set(data()); render(<OwnerInvoicePanel />);
@@ -38,11 +37,10 @@ describe('OwnerInvoicePanel', () => {
   });
   it('error retry', () => { const refetch = vi.fn(); set(undefined, { isError: true, refetch }); render(<OwnerInvoicePanel />); fireEvent.click(screen.getByTestId('button-invoice-retry')); expect(refetch).toHaveBeenCalled(); });
   it('legacy renders nothing', () => { set(data({ plan: null, status: 'legacy' })); const { container } = render(<OwnerInvoicePanel />); expect(container.innerHTML).toBe(''); });
-  it('native shows no money or instructions and surfaces launch errors', async () => {
-    h.native = true; set(data()); h.open.mockRejectedValue(new Error('boom')); const { container } = render(<OwnerInvoicePanel />);
-    expect(container.textContent).not.toMatch(/\$|Wire to X|pay\.example/);
-    fireEvent.click(screen.getByTestId('button-open-billing-website'));
-    await waitFor(() => expect(screen.getByTestId('error-open-website').textContent).toBe('boom'));
+  it('native hides invoice data entirely and does not request it', () => {
+    h.native = true; set(data()); const { container } = render(<OwnerInvoicePanel />);
+    expect(container.innerHTML).toBe('');
+    expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(false);
   });
   it('internal business hides panel and disables invoice query', () => {
     h.profile = { isLoading: false, isSuccess: true, data: { isInternal: true } }; set(undefined, { isError: true });

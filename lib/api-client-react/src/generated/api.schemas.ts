@@ -465,6 +465,26 @@ export interface InternalBusinessDirectory {
   owners: InternalBusinessDirectoryOwnersItem[];
 }
 
+export interface AppReviewDemoStatus {
+  exists: boolean;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  /** @nullable */
+  ownerEmail: string | null;
+  linked: boolean;
+  leadCount: number;
+}
+
+export interface AppReviewDemoLinkInput {
+  /**
+     * @maxLength 320
+     * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+     */
+  email: string;
+}
+
 export interface BusinessProfile {
   isInternal?: boolean;
   /** @nullable */

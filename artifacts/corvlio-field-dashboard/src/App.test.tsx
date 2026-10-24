@@ -8,12 +8,16 @@ const {
   mockToast,
   mockGetBusinessProfile,
   mockUpdateBusinessProfile,
+  mockNativeState,
+  mockGetOwnerInvoices,
 } = vi.hoisted(() => ({
   mockRevoke: vi.fn(),
   mockSignOut: vi.fn(),
   mockToast: vi.fn(),
   mockGetBusinessProfile: vi.fn(),
   mockUpdateBusinessProfile: vi.fn(),
+  mockNativeState: { value: false },
+  mockGetOwnerInvoices: vi.fn(),
 }));
 
 vi.mock('@clerk/react', () => ({
@@ -40,8 +44,8 @@ vi.mock('@/components/AccountDeletionPanel', () => ({
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
-    isNativePlatform: () => false,
-    getPlatform: () => 'web',
+    isNativePlatform: () => mockNativeState.value,
+    getPlatform: () => mockNativeState.value ? 'ios' : 'web',
   },
 }));
 
@@ -50,10 +54,14 @@ vi.mock('@workspace/api-client-react', () => ({
   useGetNotificationStatus: vi.fn(),
   useUpdateLeadStatus: vi.fn(),
   getGetLeadsQueryKey: () => ['/api/leads'],
+  getGetOwnerInvoicesQueryKey: () => ['/api/owner/invoices'],
+  useGetOwnerInvoices: (...args: unknown[]) => mockGetOwnerInvoices(...args),
   useGetBusinessProfile: () => mockGetBusinessProfile(),
   useUpdateBusinessProfile: () => ({ isPending: false, mutate: mockUpdateBusinessProfile }),
   getGetBusinessProfileQueryKey: () => ['/api/businesses/me'],
 }));
+vi.mock('@/hooks/useAdminAccess', () => ({ useAdminAccess: () => false }));
+vi.mock('@/components/LeadAlertBell', () => ({ LeadAlertBell: () => null }));
 
 vi.mock('@/assets/logo-dark.png', () => ({ default: '/logo-dark.png' }));
 vi.mock('@/assets/logo-light.png', () => ({ default: '/logo-light.png' }));
@@ -69,7 +77,7 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null }));
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard } from './App';
+import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
@@ -295,5 +303,47 @@ describe('LeadCard navigation', () => {
     fireEvent.click(screen.getByTestId('button-toggle-status-L1'));
     expect(history?.at(-1)).toBe('/dashboard');
     expect(onStatus).toHaveBeenCalledWith('L1', 'contacted');
+  });
+});
+
+describe('native AppShell billing boundaries', () => {
+  afterEach(() => { mockNativeState.value = false; });
+
+  const renderShell = () => {
+    const { hook } = memoryLocation({ path: '/dashboard', record: true });
+    return render(
+      <TestRouter hook={hook}>
+        <AppShell leads={[]} businessName="App Review Demo">
+          <div>Demo dashboard</div>
+        </AppShell>
+      </TestRouter>,
+    );
+  };
+
+  it('does not request owner invoices or show the web-only welcome card in native', () => {
+    mockNativeState.value = true;
+    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false }, isLoading: false, isSuccess: true });
+    mockGetOwnerInvoices.mockReturnValue({
+      data: {
+        plan: null,
+        status: 'legacy',
+        serviceActive: false,
+        provisioningState: 'pending',
+        invoices: [{ number: 'CRV-REVIEW-ONLY', totalCents: 99999 }],
+      },
+    });
+    renderShell();
+
+    expect(mockGetOwnerInvoices.mock.calls.at(-1)?.[0].query.enabled).toBe(false);
+    expect(screen.queryByText(/billing|awaiting payment|CRV-REVIEW-ONLY/i)).toBeNull();
+    expect(screen.getByText('Demo dashboard')).toBeTruthy();
+  });
+
+  it('keeps the owner-invoice query enabled on web', () => {
+    mockNativeState.value = false;
+    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false }, isLoading: false, isSuccess: true });
+    mockGetOwnerInvoices.mockReturnValue({ data: undefined });
+    renderShell();
+    expect(mockGetOwnerInvoices.mock.calls.at(-1)?.[0].query.enabled).toBe(true);
   });
 });

@@ -29,6 +29,8 @@ import type {
   AdminEmailHealth,
   AdminOverview,
   AlertReadReceipt,
+  AppReviewDemoLinkInput,
+  AppReviewDemoStatus,
   BillingAccount,
   BillingAvailability,
   BillingPlanInput,
@@ -2366,6 +2368,228 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateAdminInternalBusinessMutationOptions(options));
+    }
+
+export const getGetAdminAppReviewDemoUrl = () => {
+
+
+
+
+  return `/api/admin/app-review-demo`
+}
+
+/**
+ * Requires a verified administrator email. Does not create or modify demo data.
+ * @summary Read App Review demo status
+ */
+export const getAdminAppReviewDemo = async ( options?: Parameters<typeof customFetch>[1]): Promise<AppReviewDemoStatus> => {
+
+  return customFetch<AppReviewDemoStatus>(getGetAdminAppReviewDemoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminAppReviewDemoQueryKey = () => {
+    return [
+    `/api/admin/app-review-demo`
+    ] as const;
+    }
+
+
+export const getGetAdminAppReviewDemoQueryOptions = <TData = Awaited<ReturnType<typeof getAdminAppReviewDemo>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminAppReviewDemo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminAppReviewDemoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAppReviewDemo>>> = ({ signal }) => getAdminAppReviewDemo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminAppReviewDemo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminAppReviewDemoQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminAppReviewDemo>>>
+export type GetAdminAppReviewDemoQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read App Review demo status
+ */
+
+export function useGetAdminAppReviewDemo<TData = Awaited<ReturnType<typeof getAdminAppReviewDemo>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminAppReviewDemo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminAppReviewDemoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getResetAdminAppReviewDemoUrl = () => {
+
+
+
+
+  return `/api/admin/app-review-demo/reset`
+}
+
+/**
+ * Explicitly replaces only tagged demo leads after safety checks. Never provisions a phone or changes real businesses.
+ * @summary Create or reset the isolated App Review demo
+ */
+export const resetAdminAppReviewDemo = async ( options?: Parameters<typeof customFetch>[1]): Promise<AppReviewDemoStatus> => {
+
+  return customFetch<AppReviewDemoStatus>(getResetAdminAppReviewDemoUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResetAdminAppReviewDemoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAdminAppReviewDemo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetAdminAppReviewDemo>>, TError,void, TContext> => {
+
+const mutationKey = ['resetAdminAppReviewDemo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetAdminAppReviewDemo>>, void> = () => {
+
+
+          return  resetAdminAppReviewDemo(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetAdminAppReviewDemoMutationResult = NonNullable<Awaited<ReturnType<typeof resetAdminAppReviewDemo>>>
+
+    export type ResetAdminAppReviewDemoMutationError = ErrorType<void>
+
+    /**
+ * @summary Create or reset the isolated App Review demo
+ */
+export const useResetAdminAppReviewDemo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAdminAppReviewDemo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetAdminAppReviewDemo>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResetAdminAppReviewDemoMutationOptions(options));
+    }
+
+export const getLinkAdminAppReviewDemoUrl = () => {
+
+
+
+
+  return `/api/admin/app-review-demo/link`
+}
+
+/**
+ * Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
+ * @summary Link a verified Clerk account to the App Review demo
+ */
+export const linkAdminAppReviewDemo = async (appReviewDemoLinkInput: AppReviewDemoLinkInput, options?: Parameters<typeof customFetch>[1]): Promise<AppReviewDemoStatus> => {
+
+  return customFetch<AppReviewDemoStatus>(getLinkAdminAppReviewDemoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(appReviewDemoLinkInput)
+  }
+);}
+
+
+
+
+
+export const getLinkAdminAppReviewDemoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>, TError,{data: BodyType<AppReviewDemoLinkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>, TError,{data: BodyType<AppReviewDemoLinkInput>}, TContext> => {
+
+const mutationKey = ['linkAdminAppReviewDemo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>, {data: BodyType<AppReviewDemoLinkInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  linkAdminAppReviewDemo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LinkAdminAppReviewDemoMutationResult = NonNullable<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>>
+    export type LinkAdminAppReviewDemoMutationBody = BodyType<AppReviewDemoLinkInput>
+    export type LinkAdminAppReviewDemoMutationError = ErrorType<void>
+
+    /**
+ * @summary Link a verified Clerk account to the App Review demo
+ */
+export const useLinkAdminAppReviewDemo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>, TError,{data: BodyType<AppReviewDemoLinkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof linkAdminAppReviewDemo>>,
+        TError,
+        {data: BodyType<AppReviewDemoLinkInput>},
+        TContext
+      > => {
+      return useMutation(getLinkAdminAppReviewDemoMutationOptions(options));
     }
 
 export const getGetAdminBusinessUrl = (businessId: number,) => {

@@ -266,11 +266,12 @@ function formatReplyTime(minutes: number | null) {
 
 export function AppShell({ children, leads, businessName, onboardingConfirmation }: { children: ReactNode; leads: Lead[]; businessName?: string | null; onboardingConfirmation?: OnboardingConfirmation | null }) {
   const [location] = useLocation();
+  const native = Capacitor.isNativePlatform();
   const adminAccess = useAdminAccess();
   const profileQ = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
   const isInternal = profileQ.data?.isInternal === true;
   const invoices = useGetOwnerInvoices({ query: {
-    enabled: profileQ.isSuccess && !isInternal,
+    enabled: !native && profileQ.isSuccess && !isInternal,
     queryKey: getGetOwnerInvoicesQueryKey(), retry: false, staleTime: 15_000,
     refetchInterval: 45_000, refetchOnWindowFocus: true,
   } });
@@ -311,11 +312,11 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
             );
           })}
         </nav>
-        <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/55 p-4">
+        {!native ? <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/55 p-4">
           <div className="mb-3 flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[10px] uppercase tracking-[0.16em]">{activationLabel}</span></div>
           <p className="text-xs leading-relaxed text-sidebar-foreground/65">{isInternal ? 'Internal sales leads appear here when the call webhook is connected. No billing or payment activation is required.' : serviceLive ? 'New calls land here. One tap gets you moving.' : 'Your dashboard will update when your receptionist is ready.'}</p>
           <div className="mt-4 flex items-center gap-2 font-mono text-[10px] text-sidebar-foreground/45"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{isInternal ? 'non-billed lead capture' : serviceLive ? 'listening for leads' : 'service not yet active'}</div>
-        </div>
+        </div> : null}
       </aside>
 
       <main className="pb-24 md:ml-[248px] md:pb-8">
@@ -334,7 +335,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
+        <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{!native && location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
       <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess ? 'grid-cols-5' : 'grid-cols-4'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
@@ -817,11 +818,20 @@ function LeadDataRouter() {
 }
 
 function WelcomeRoute() {
-  return <BusinessSetupGuard><WelcomePage /></BusinessSetupGuard>;
+  return <BusinessSetupGuard>{Capacitor.isNativePlatform() ? <NativeSetupUnavailable /> : <WelcomePage />}</BusinessSetupGuard>;
 }
 
 function OnboardingRoute() {
-  return <BusinessSetupGuard><OnboardingPage /></BusinessSetupGuard>;
+  return <BusinessSetupGuard>{Capacitor.isNativePlatform() ? <NativeSetupUnavailable /> : <OnboardingPage />}</BusinessSetupGuard>;
+}
+
+function NativeSetupUnavailable() {
+  return <main className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center" data-testid="native-setup-unavailable">
+    <div className="max-w-sm">
+      <h1 className="text-2xl font-800 tracking-tight">Business setup is unavailable in this app</h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Please contact Corvlio support for help completing your business setup.</p>
+    </div>
+  </main>;
 }
 
 function AuthenticatedRouter() {

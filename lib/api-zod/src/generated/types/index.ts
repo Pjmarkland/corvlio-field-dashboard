@@ -26,6 +26,8 @@ export * from './adminOperationalFailure';
 export * from './adminOperationalFailureSource';
 export * from './adminOverview';
 export * from './alertReadReceipt';
+export * from './appReviewDemoLinkInput';
+export * from './appReviewDemoStatus';
 export * from './billingAccount';
 export * from './billingAccountLastEvent';
 export * from './billingAccountPlan';

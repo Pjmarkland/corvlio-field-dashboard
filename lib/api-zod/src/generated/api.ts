@@ -886,6 +886,58 @@ export const UpdateAdminInternalBusinessResponse = zod.object({
 
 
 /**
+ * Requires a verified administrator email. Does not create or modify demo data.
+ * @summary Read App Review demo status
+ */
+export const GetAdminAppReviewDemoResponse = zod.object({
+  "exists": zod.boolean(),
+  "businessId": zod.number().nullable(),
+  "businessName": zod.string().nullable(),
+  "ownerEmail": zod.string().nullable(),
+  "linked": zod.boolean(),
+  "leadCount": zod.number()
+})
+
+
+/**
+ * Explicitly replaces only tagged demo leads after safety checks. Never provisions a phone or changes real businesses.
+ * @summary Create or reset the isolated App Review demo
+ */
+export const ResetAdminAppReviewDemoResponse = zod.object({
+  "exists": zod.boolean(),
+  "businessId": zod.number().nullable(),
+  "businessName": zod.string().nullable(),
+  "ownerEmail": zod.string().nullable(),
+  "linked": zod.boolean(),
+  "leadCount": zod.number()
+})
+
+
+/**
+ * Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
+ * @summary Link a verified Clerk account to the App Review demo
+ */
+export const linkAdminAppReviewDemoBodyEmailMax = 320;
+
+
+export const linkAdminAppReviewDemoBodyEmailRegExp = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
+
+
+export const LinkAdminAppReviewDemoBody = zod.object({
+  "email": zod.string().max(linkAdminAppReviewDemoBodyEmailMax).regex(linkAdminAppReviewDemoBodyEmailRegExp)
+})
+
+export const LinkAdminAppReviewDemoResponse = zod.object({
+  "exists": zod.boolean(),
+  "businessId": zod.number().nullable(),
+  "businessName": zod.string().nullable(),
+  "ownerEmail": zod.string().nullable(),
+  "linked": zod.boolean(),
+  "leadCount": zod.number()
+})
+
+
+/**
  * @summary Get a business, its leads, and its Retell call history
  */
 export const getAdminBusinessPathBusinessIdMultipleOf = 1;
