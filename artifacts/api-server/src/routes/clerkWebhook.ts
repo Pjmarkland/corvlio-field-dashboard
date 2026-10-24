@@ -15,8 +15,7 @@ export const clerkDeletionWebhook: RequestHandler = async (req, res) => {
     await deleteAccount(id, undefined, true);
     res.sendStatus(204);
   } catch (error) {
-    // Do not bypass paid-subscription safeguards for external identity deletions.
-    logger.error("Signed Clerk deletion cleanup needs retry or support review.");
-    res.status(error instanceof AccountDeletionError ? error.status : 503).json({ error: "Account cleanup requires retry or support review." });
+    logger.error("Signed Clerk deletion cleanup needs retry.");
+    res.status(error instanceof AccountDeletionError ? error.status : 503).json({ error: "Account cleanup requires retry." });
   }
 };

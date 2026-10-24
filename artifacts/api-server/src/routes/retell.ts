@@ -13,6 +13,7 @@ import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
 import { recordOperationalFailure } from "../lib/operationalFailures";
 import type { OperationalFailureSource } from "../lib/operationalFailures";
+import { alertRejectedRetellWebhook } from "../lib/retellWebhookAlerts";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -145,12 +146,14 @@ function recordPostCallFailure(
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   const signature = req.get("x-retell-signature");
   if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
+    await alertRejectedRetellWebhook("pre-call", "invalid_signature");
     req.log.warn("Rejected Retell pre-call webhook with missing or invalid signature");
     res.status(401).json({ error: "Invalid Retell signature" });
     return;
   }
   const body = RetellPreCallWebhookBody.safeParse(req.body);
   if (!body.success) {
+    await alertRejectedRetellWebhook("pre-call", "malformed_payload");
     req.log.warn({ error: body.error.flatten() }, "Invalid Retell pre-call webhook payload");
     res.status(400).json({ error: "Invalid Retell pre-call webhook payload" });
     return;

@@ -22,6 +22,20 @@ CREATE TABLE IF NOT EXISTS pending_retell_releases (
   resolved_at timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pending_retell_releases_source_unique ON pending_retell_releases(source_key);
+-- Accounting rows must outlive deleted business profiles. Remove only the FK;
+-- the immutable numeric business ID and invoice snapshot remain on each invoice.
+DO $$
+DECLARE constraint_name text;
+BEGIN
+  SELECT c.conname INTO constraint_name
+  FROM pg_constraint c
+  WHERE c.conrelid = 'manual_invoices'::regclass
+    AND c.confrelid = 'businesses'::regclass
+    AND c.contype = 'f';
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE manual_invoices DROP CONSTRAINT %I', constraint_name);
+  END IF;
+END $$;
 -- Stop in-flight onboarding and text-keyed notification writers from restoring
 -- data after deletion. Integer-FK lead/call/billing rows already fail without a business.
 CREATE OR REPLACE FUNCTION guard_deleted_account_data() RETURNS trigger LANGUAGE plpgsql AS $$

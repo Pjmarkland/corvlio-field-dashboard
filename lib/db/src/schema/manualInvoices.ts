@@ -1,5 +1,4 @@
 import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { businessesTable } from "./businesses";
 
 // Separate from the disabled Stripe implementation. Never stores bank credentials.
 export const invoiceSettingsTable = pgTable("invoice_settings", {
@@ -10,7 +9,8 @@ export const invoiceSettingsTable = pgTable("invoice_settings", {
 });
 export const manualInvoicesTable = pgTable("manual_invoices", {
   id: serial("id").primaryKey(),
-  businessId: integer("business_id").notNull().references(() => businessesTable.id, { onDelete: "cascade" }),
+  // Keep the invoice's immutable business snapshot after the owner deletes the app account.
+  businessId: integer("business_id").notNull(),
   businessName: text("business_name").notNull(),
   plan: text("plan").notNull(),
   periodKey: text("period_key").notNull(),

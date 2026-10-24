@@ -34,7 +34,7 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
       }
     } catch (e) {
       const body = e && typeof e === 'object' && 'data' in e ? (e as { data?: { error?: string } }).data : null;
-      setError(body?.error ?? 'Account deletion could not finish. Please retry or contact hello@corvlio.com.');
+      setError(body?.error ?? 'Account deletion could not finish. Please retry.');
     }
   };
   return <section className="mt-4 rounded-2xl border border-destructive/40 bg-card p-5 text-foreground sm:p-6">
@@ -48,18 +48,16 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
       <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader><DialogTitle>Delete your account permanently?</DialogTitle><DialogDescription>
           This deletes your leads, notifications, push registrations, business profile, onboarding data, and Clerk account.
-          Pending invoices and reminders are canceled. You will be signed out. This cannot be undone.
+          Invoice and payment records needed for bookkeeping remain. You will be signed out. This cannot be undone.
         </DialogDescription></DialogHeader>
-        <p className="text-sm leading-relaxed text-muted-foreground">If a Retell phone or agent is assigned, it will not be released automatically.
-          We retain only the minimal resource details needed for an admin to review and release it manually.
-          If Clerk is temporarily unavailable, identity deletion continues automatically after your app data is removed.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">Your receptionist stops receiving calls when deletion is confirmed. Any Retell phone number is queued for release; shared agents are not removed.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">Any unpaid invoice balance remains due after deletion. PJ will follow up by email.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">If Clerk is temporarily unavailable, identity deletion continues automatically after your app data is removed.</p>
         <label className="block text-sm font-semibold" htmlFor="delete-confirmation">Type DELETE to confirm</label>
         <input id="delete-confirmation" data-testid="input-delete-confirmation" value={confirmation}
           disabled={deletion.isPending} autoComplete="off" onChange={e => setConfirmation(e.target.value)}
           className="min-h-12 rounded-xl border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground" />
-        {error ? <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-foreground">
-          <p>{error}</p><a href="mailto:hello@corvlio.com" className="mt-2 inline-block font-bold underline">Contact support</a>
-        </div> : null}
+        {error ? <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-foreground"><p>{error}</p></div> : null}
         <div className="flex flex-wrap justify-end gap-3">
           <button type="button" disabled={deletion.isPending} onClick={() => setOpen(false)} className="min-h-11 rounded-xl border border-border bg-background px-4 text-sm font-semibold">Keep account</button>
           <button type="button" data-testid="button-confirm-delete-account" disabled={confirmation !== 'DELETE' || deletion.isPending}
@@ -95,6 +93,5 @@ export function DeletedAccountSignOut() {
       : 'This page only finishes signing you out. It does not request or confirm account deletion.'}</p>
     <button type="button" disabled={busy} onClick={() => void retry()} className="mt-5 min-h-11 rounded-xl bg-primary px-5 font-bold text-primary-foreground">{busy ? 'Signing out…' : 'Finish signing out'}</button>
     {error ? <p role="alert" className="mt-3 text-foreground">{error}</p> : null}
-    <a href="mailto:hello@corvlio.com" className="mt-4 block underline">Contact support</a>
   </div></main>;
 }

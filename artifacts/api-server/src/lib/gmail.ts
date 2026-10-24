@@ -202,19 +202,24 @@ export async function sendAdminOperationalFailureEmail(input: {
   businessName: string | null;
   occurredAt: string;
 }): Promise<boolean> {
-  const recipients = [...new Set(
+  const configuredRecipients =
     (process.env.ADMIN_EMAILS ?? "")
       .split(",")
       .map((email) => email.trim().toLowerCase())
-      .filter((email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)),
-  )];
+      .filter((email) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email));
+  const recipients = [...new Set([
+    ...configuredRecipients,
+    ...(input.source === "account_deletion_balance" ? ["pj@corvlio.com"] : []),
+  ])];
   if (recipients.length === 0) return false;
 
   const accessToken = await getAccessToken();
   if (!accessToken) return false;
 
   const messageBody = [
-    "A Corvlio call or lead pipeline failure needs review.",
+    input.source === "account_deletion_balance"
+      ? "An outstanding balance needs follow-up after an owner deleted their Corvlio account."
+      : "A Corvlio call or lead pipeline failure needs review.",
     "",
     `Source: ${input.source}`,
     `Failure: ${input.summary}`,
@@ -226,7 +231,7 @@ export async function sendAdminOperationalFailureEmail(input: {
   ].join("\r\n");
   const rawMessage = [
     `To: ${recipients.join(", ")}`,
-    "Subject: Corvlio call pipeline failure",
+    `Subject: ${input.source === "account_deletion_balance" ? "Corvlio account deletion: balance follow-up" : "Corvlio call pipeline failure"}`,
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
     "",

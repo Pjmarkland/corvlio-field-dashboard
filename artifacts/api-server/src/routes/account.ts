@@ -9,7 +9,7 @@ router.get("/account/deletion-eligibility",async(req,res)=>{
   const {userId}=getAuth(req);
   if(!userId){res.sendStatus(401);return;}
   try {res.json(await accountDeletionEligibility(userId));}
-  catch {res.status(503).json({error:"Account protection could not be checked. Deletion is unavailable until it can be verified."});}
+  catch {res.status(503).json({error:"Account protection could not be checked. Please retry before deleting."});}
 });
 router.delete("/account/me", async (req, res) => {
   res.set("Cache-Control", "private, no-store");
@@ -26,7 +26,7 @@ router.delete("/account/me", async (req, res) => {
   } catch (error) {
     if (error instanceof AccountDeletionError) { res.status(error.status).json({ error: error.message }); return; }
     req.log.error("Account deletion could not safely finish; no provider details logged.");
-    res.status(503).json({ error: "Account deletion could not safely finish. Please retry or contact hello@corvlio.com." });
+    res.status(503).json({ error: "Account deletion could not safely finish. Please retry." });
   }
 });
 export default router;

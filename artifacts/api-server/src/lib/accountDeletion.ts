@@ -1,21 +1,13 @@
 import { clerkClient } from "@clerk/express";
 import { pool } from "@workspace/db";
 import { hasVerifiedAdminEmail, parseAdminEmails } from "../middlewares/requireAdmin";
+import { invoiceNumber } from "../invoicing/policy";
 type SqlResult = { rows: Record<string, any>[] };
 type SqlQuery = (text: string, values?: any[]) => Promise<SqlResult>;
 type SqlClient = { query: SqlQuery; release: () => void };
 
 export class AccountDeletionError extends Error {
   constructor(message: string, public status = 409) { super(message); }
-}
-
-export function paidDeletionBlocked(account: { state: Record<string, unknown>; stripe_subscription_id?: string | null }) {
-  const s = account.state;
-  // Always enforce stored obligations, regardless of BILLING_ENABLED or native UI.
-  return Boolean(s.pendingCheckout)
-    || ["active", "past_due", "unpaid", "suspended"].includes(String(s.status))
-    || (Boolean(s.plan || s.subscriptionId || account.stripe_subscription_id)
-      && !["not_subscribed", "canceled", "incomplete_expired"].includes(String(s.status)));
 }
 
 export type DeletionDependencies = {
@@ -29,7 +21,7 @@ const defaults: DeletionDependencies = { pool, deleteUser: id => clerkClient.use
     catch(e) {if((e as {status?:number}).status===404)return false;throw e;}
   },
 };
-const protectedReason = "Admin and internal business owner accounts cannot be deleted from the app. This protects business access. Contact support for a reviewed account change.";
+const protectedReason = "Protected admin and internal business accounts cannot be deleted from this screen.";
 export async function accountDeletionEligibility(userId:string,deps=defaults) {
   if (await deps.isProtectedUser?.(userId)) return {allowed:false,reason:protectedReason};
   const result=await deps.pool.query("SELECT is_internal FROM businesses WHERE clerk_user_id=$1",[userId]);
@@ -49,8 +41,8 @@ async function preserveResources(client: SqlClient, businesses: any[], attempts:
   }
   for (const attempt of attempts) {
     const business = businesses.find(b => b.id === attempt.business_id);
-    if (attempt.clerk_user_id !== userId) throw new AccountDeletionError("Phone provisioning ownership conflict. Contact hello@corvlio.com.");
-    if (attempt.business_id && !business) throw new AccountDeletionError("Ownership conflict in phone provisioning. Contact hello@corvlio.com.");
+    if (attempt.clerk_user_id !== userId) throw new AccountDeletionError("Phone provisioning ownership changed. Please retry.");
+    if (attempt.business_id && !business) throw new AccountDeletionError("Phone provisioning ownership changed. Please retry.");
     if (attempt.purchased_number && attempt.purchased_number === business?.retell_phone_number) continue;
     // Preserve uncertain purchase journals even when no number was returned.
     await add(`purchase:${attempt.id}`, attempt.business_id, "Deleted account",
@@ -66,7 +58,7 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`account-deletion:${userId}`]);
     const existing = await client.query("SELECT status FROM account_deletions WHERE clerk_user_id = $1", [userId]);
-    if (existing.rows[0]) { await client.query("COMMIT"); return existing.rows[0].status; }
+    if (existing.rows[0]) { await client.query("COMMIT"); return { status: existing.rows[0].status, balanceAlertQueued: false }; }
     // Acquire billing's existing lock BEFORE row locks: same ordering as billing.
     const owned = await client.query("SELECT id FROM businesses WHERE clerk_user_id = $1 ORDER BY id", [userId]);
     for (const row of owned.rows) {
@@ -78,30 +70,68 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     const ids = businesses.map(b => b.id);
     if (businesses.some(b=>b.is_internal)) throw new AccountDeletionError(protectedReason,403);
     const billing = await client.query("SELECT * FROM billing_accounts WHERE business_id = ANY($1::int[]) FOR UPDATE", [ids]);
-    if (billing.rows.some(paidDeletionBlocked)) {
-      throw new AccountDeletionError("Account deletion is blocked while a paid subscription is active, past due, or unresolved. Contact hello@corvlio.com for support.");
-    }
+    const unpaid = await client.query(
+      `SELECT id,business_id,business_name,monthly_cents,setup_cents
+       FROM manual_invoices WHERE business_id = ANY($1::int[]) AND paid_at IS NULL ORDER BY id`,
+      [ids],
+    );
     const attempts = await client.query(
       "SELECT * FROM provisioning_attempts WHERE clerk_user_id = $1 OR business_id = ANY($2::int[]) FOR UPDATE", [userId, ids]);
     await preserveResources(client, businesses, attempts.rows, userId);
+    const unpaidByBusiness = new Map<number, Array<{ id: number; business_name: string; monthly_cents: number; setup_cents: number }>>();
+    for (const invoice of unpaid.rows) {
+      const list = unpaidByBusiness.get(invoice.business_id) ?? [];
+      list.push(invoice);
+      unpaidByBusiness.set(invoice.business_id, list);
+    }
+    let balanceAlertQueued = false;
+    for (const business of businesses) {
+      const invoices = unpaidByBusiness.get(business.id) ?? [];
+      const billingAccount = billing.rows.find(row => row.business_id === business.id);
+      const billingState = billingAccount?.state as Record<string, unknown> | undefined;
+      const providerPastDue = ["past_due", "unpaid", "suspended"].includes(String(billingState?.status));
+      if (invoices.length === 0 && !providerPastDue) continue;
+      const amountCents = invoices.reduce((sum, invoice) => sum + invoice.monthly_cents + invoice.setup_cents, 0);
+      const invoiceLines = invoices.map(invoice =>
+        `${invoiceNumber(invoice.id)}: $${((invoice.monthly_cents + invoice.setup_cents) / 100).toFixed(2)}`,
+      );
+      const details = [
+        invoices.length ? `Unpaid manual invoices: ${invoiceLines.join("; ")}.` : "",
+        invoices.length ? `Known manual-invoice balance: $${(amountCents / 100).toFixed(2)}.` : "",
+        providerPastDue
+          ? `Billing provider reports ${String(billingState?.status)}; review its invoice history.`
+          : "",
+      ].filter(Boolean).join(" ");
+      const invoiceBusinessName = invoices[0]?.business_name ?? business.business_name ?? "Deleted account";
+      await client.query(
+        `INSERT INTO operational_failures
+          (event_key,source,summary,details,business_id,business_name)
+         VALUES ($1,'account_deletion_balance','Outstanding balance after account deletion',$2,NULL,$3)
+         ON CONFLICT (event_key) DO NOTHING`,
+        [`account-deletion-balance:${business.id}`, details, invoiceBusinessName],
+      );
+      balanceAlertQueued = true;
+    }
     await client.query("INSERT INTO account_deletions (clerk_user_id, business_ids) VALUES ($1, $2::int[]) ON CONFLICT DO NOTHING", [userId, ids]);
     // Devices are unregistered first; delivery attempts cascade from devices/events.
     await client.query("DELETE FROM notification_devices WHERE clerk_user_id = $1", [userId]);
     for (const table of ["notification_events", "notification_seen_leads", "notification_poll_state"]) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::text[])`, [ids.map(String)]);
     }
-    for (const table of ["billing_notices", "billing_events", "billing_accounts", "operational_failures",
+    for (const table of ["billing_notices", "operational_failures",
       "owner_demo_calls", "retell_call_records", "leads"]) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::int[])`, [ids]);
     }
+    // Keep the financial event ledger, but detach its owner actor and business FK.
+    await client.query("UPDATE billing_events SET business_id = NULL, actor = NULL WHERE business_id = ANY($1::int[])", [ids]);
+    await client.query("DELETE FROM billing_accounts WHERE business_id = ANY($1::int[])", [ids]);
     await client.query("DELETE FROM provisioning_attempts WHERE clerk_user_id = $1 OR business_id = ANY($2::int[])", [userId, ids]);
     // Remove pending invoice/reminder jobs before removing their invoices.
     await client.query("DELETE FROM invoice_emails WHERE invoice_id IN (SELECT id FROM manual_invoices WHERE business_id=ANY($1::int[]))",[ids]);
-    await client.query("DELETE FROM manual_invoices WHERE business_id=ANY($1::int[])",[ids]);
     await client.query("DELETE FROM email_health_attempts WHERE actor_user_id=$1",[userId]);
     await client.query("DELETE FROM businesses WHERE clerk_user_id = $1 AND id = ANY($2::int[])", [userId, ids]);
     await client.query("COMMIT");
-    return "pending";
+    return { status: "pending", balanceAlertQueued };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -134,6 +164,12 @@ export async function finishIdentityDeletion(userId: string, deps = defaults, al
 }
 
 export async function deleteAccount(userId: string, deps = defaults, alreadyDeleted = false) {
-  await removeOwnedAppData(userId, deps);
+  const cleanup = await removeOwnedAppData(userId, deps);
+  if (cleanup.balanceAlertQueued) {
+    // The operational-failure worker sends the durable alert to PJ/admins.
+    // It runs independently and retries if Gmail is temporarily unavailable.
+    const { runNotificationOutboxNow } = await import("./notificationService");
+    void runNotificationOutboxNow();
+  }
   return finishIdentityDeletion(userId, deps, alreadyDeleted);
 }

@@ -11,7 +11,8 @@ export type OperationalFailureSource =
   | "pre_call_fallback"
   | "post_call_webhook"
   | "lead_gmail_notification"
-  | "phone_provisioning";
+  | "phone_provisioning"
+  | "account_deletion_balance";
 
 export type OperationalFailureInput = {
   eventKey: string;

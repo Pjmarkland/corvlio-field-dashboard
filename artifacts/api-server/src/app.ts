@@ -7,6 +7,7 @@ import { publishableKeyFromHost } from "@clerk/shared/keys";
 import type { IncomingMessage } from "node:http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { retellMalformedJsonAlertHandler } from "./lib/retellWebhookAlerts";
 import { billingWebhook } from "./billing/webhook";
 import {
   CLERK_PROXY_PATH,
@@ -59,5 +60,6 @@ app.use(
 );
 
 app.use("/api", router);
+app.use(retellMalformedJsonAlertHandler);
 
 export default app;
