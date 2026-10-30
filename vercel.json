@@ -7,6 +7,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://corvlio-field-dashboard--pjmarkland08.replit.app/api/:path*"
+    },
+    {
+      "source": "/((?!api(?:/|$)).*)",
+      "destination": "/index.html"
     }
   ]
 }
