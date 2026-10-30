@@ -1,0 +1,48 @@
+{
+  "documentation": "Development/test billing settings, not legal advice or final policy. Amounts are USD cents. No call blocking, suspension, automatic tier movement or per-call charges.",
+  "currency": "usd",
+  "plans": [
+    {"id":"startup","label":"Startup","monthlyCents":50000,"setupCents":25000,"callLimit":100},
+    {"id":"starter","label":"Starter","monthlyCents":75000,"setupCents":30000,"callLimit":150},
+    {"id":"professional","label":"Professional","monthlyCents":100000,"setupCents":30000,"callLimit":null},
+    {"id":"managed","label":"Managed","monthlyCents":125000,"setupCents":30000,"callLimit":null}
+  ],
+  "policy": {
+    "failedPaymentGraceBusinessDays": 5,
+    "businessDayTimeZone": "UTC",
+    "businessDayExcludedWeekdays": [0, 6],
+    "businessDayExcludedDates": [],
+    "businessDayDocumentation": "Count Monday-Friday in UTC, starting after the first failed charge; no holiday calendar is defined by the agreement. Add excluded YYYY-MM-DD dates here if approved.",
+    "afterGraceAction": "admin_review_only",
+    "automaticSuspensionEnabled": false,
+    "callBlockingEnabled": false,
+    "callCapThresholdPercentages": [80, 100],
+    "overageAction": "flag_and_suggest_upgrade",
+    "automaticTierChangeEnabled": false,
+    "perCallChargesEnabled": false,
+    "cancellationNoticeDays": 30,
+    "cancellationProrationBehavior": "none",
+    "upgradeProrationBehavior": "none",
+    "setupFeeOncePerBusiness": true,
+    "startupEligibilityBusinessAgeMonths": 18,
+    "startupTransitionMonths": 6,
+    "automaticStartupTransitionEnabled": false,
+    "lateFeesEnabled": false,
+    "lateFeeDocumentation": "Disabled placeholder only. The agreement's legal maximum is unspecified; do not compute or collect late fees.",
+    "offboardingAutomationEnabled": false,
+    "manualDataRetentionDays": null,
+    "manualNumberHoldDays": null,
+    "manualOffboardingDocumentation": "No retention deletion, number release, number hold, or recording export automation. Follow the separately approved manual offboarding process.",
+    "usageFallback": "utc_calendar_month",
+    "nonBlankCallDocumentation": "Completed Retell records or legacy completed lead captures with a real call ID, plus nonempty transcript, summary or caller issue. Distinct call IDs; contacted status is not call completion."
+  },
+  "operations": {
+    "workerIntervalMs": 60000,
+    "stripeRequestTimeoutMs": 15000,
+    "stripeMaxNetworkRetries": 2,
+    "notificationRetryMinutes": 5,
+    "notificationLeaseMinutes": 5,
+    "ownerPath": "/billing",
+    "adminPath": "/admin/billing"
+  }
+}

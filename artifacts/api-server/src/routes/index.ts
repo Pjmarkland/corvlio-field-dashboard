@@ -1,0 +1,40 @@
+import { Router, type IRouter } from "express";
+import businessesRouter from "./businesses";
+import adminRouter from "./admin";
+import adminEmailHealthRouter from "./adminEmailHealth";
+import healthRouter from "./health";
+import leadsRouter from "./leads";
+import notificationsRouter from "./notifications";
+import retellRouter from "./retell";
+import leadDetailsRouter from "./leadDetails";
+import welcomeRouter from "./welcome";
+import ownerDemoRouter from "./ownerDemo";
+import leadAlertsRouter from "./leadAlerts";
+import webPushRouter from "./webPush";
+import billingRouter from "./billing";
+import accountRouter from "./account";
+import pendingReleasesRouter from "./pendingReleases";
+import invoicingRouter from "./invoicing";
+import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
+
+const router: IRouter = Router();
+router.use(accountDeletionGuard);
+router.use(accountRouter);
+router.use(pendingReleasesRouter);
+router.use(invoicingRouter);
+
+router.use(healthRouter);
+router.use(billingRouter);
+router.use(adminEmailHealthRouter);
+router.use(adminRouter);
+router.use(businessesRouter);
+router.use(leadsRouter);
+router.use(leadDetailsRouter);
+router.use(notificationsRouter);
+router.use(retellRouter);
+router.use(welcomeRouter);
+router.use(ownerDemoRouter);
+router.use(leadAlertsRouter);
+router.use(webPushRouter);
+
+export default router;

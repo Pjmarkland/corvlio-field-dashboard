@@ -1,0 +1,28 @@
+- [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
+- [Owner routing safety](owner-routing-safety.md) — routing guards cannot repair missing production ownership; never silently relink businesses by email.
+- [PWA data-source migrations](pwa-data-source-migrations.md) — invalidate installed app shells and legacy client data when replacing a persisted data source.
+- [Google Sheets row writes](google-sheets-row-writes.md) — stable-ID lookup handles normal reorders; strict simultaneous-sort safety needs a lock-bearing Apps Script.
+- [Native asset compositing](native-asset-compositing.md) — preserve output canvases with parenthesized ImageMagick overlays; repeated PNG renders may differ in metadata.
+- [Secure secret submission](secure-secret-submission.md) — wait for the platform’s added-secret confirmation before restarting dependent workflows.
+- [Browser navigation tests](browser-navigation-tests.md) — inject full-page redirects in UI tests because jsdom makes window.location.assign non-spyable.
+- [Retell onboarding fallback](retell-onboarding-fallback.md) — persist core business setup independently from optional Retell phone provisioning.
+- [Onboarding website review](onboarding-website-review.md) — website suggestions require owner review; unknown facts stay blank and scraping failure never blocks manual setup.
+- [Admin route authorization](admin-route-authorization.md) — keep authorization on protected APIs and return a consistent 404 instead of client-side redirects.
+- [OpenAPI Zod generation constraints](openapi-zod-generation-constraints.md) — keep email/URL checks and strict unknown-key rejection explicit at server boundaries with current codegen.
+- [Phone cost safety](phone-cost-safety.md) — demos never purchase or scrape; pending purchases need recovery, and missing pre-call signatures remain allowed during rollout.
+- [Retell transfer isolation](retell-transfer-isolation.md) — inbound LLM overrides do not support per-call tools; shared transfers need enforced business isolation, not just prompting.
+- [Retell release boundaries](retell-release-boundaries.md) — separate agency sales KB dependencies from field intake; pin live versions before changing shared-agent webhook routing.
+- [Call quality semantics](call-quality-semantics.md) — confirmation is not caller ID; preserve unknown historical capture evidence rather than inflating completeness.
+- [Publish expression indexes](publish-expression-indexes.md) — use generated normalization columns and column-only indexes to avoid Publish truncating nested index expressions.
+- [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.
+- [Private lead notes](private-lead-notes.md) — owner-written notes are internal business data, not caller intake or provider context.
+- [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
+- [Billing policy boundary](billing-policy-boundary.md) — approved flag-only billing overrides differ from the agreement; development/test only, no live rollout.
+- [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
+- [Native reviewer boundaries](native-reviewer-boundaries.md) — exclude native payment surfaces; keep manually seeded App Store review data isolated from real customers.
+- [Account deletion boundaries](account-deletion-boundaries.md) — preserve Retell for manual release; paid-support refusal needs Apple policy review before submission.
+- [Lead alert latency](lead-alert-latency.md) — database-cost reductions may slow retry sweeps, never creation-triggered alerts for new leads.
+- [Production DB diagnostics](production-db-diagnostics.md) — unavailable read replicas do not establish primary database health, suspension, or schema state.
+- [Manual invoice boundaries](manual-invoice-boundaries.md) — keep Stripe disabled, preserve existing accounts, and review uncertain Gmail sends instead of risking duplicates.
+- [Gmail configuration boundary](gmail-configuration-boundary.md) — Google Cloud activation belongs to the owner; historical lead failures require explicit batch approval before replay.
+- [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.

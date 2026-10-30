@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+import type { WebsitePreview, WebsitePreviewFields } from '@workspace/api-client-react';
+import { initialForm } from './onboardingSample';
+import { applyWebsiteSuggestions, getReadinessGaps, removeUneditedWebsiteSuggestions, websiteFormFields } from './onboardingWebsite';
+
+function preview(): WebsitePreview {
+  const fields = Object.fromEntries(Object.keys(websiteFormFields).map((key) =>
+    [key, { value: null, evidence: null, sourceUrl: null }],
+  )) as unknown as WebsitePreviewFields;
+  fields.servicesOffered = { value: 'Residential heating repairs and system installation', evidence: 'We offer residential heating repairs and system installation.', sourceUrl: 'https://example.com/services' };
+  fields.serviceArea = { value: 'Oakland and Berkeley', evidence: 'We serve Oakland and Berkeley.', sourceUrl: 'https://example.com/contact' };
+  return { status: 'partial', message: 'Review', fields, missingFields: ['businessHours', 'warrantyInfo'] };
+}
+
+describe('website suggestions and readiness', () => {
+  it('prefills supported blank answers without overwriting the owner or guessing missing answers', () => {
+    const form = applyWebsiteSuggestions({ ...initialForm, serviceArea: 'My confirmed area' }, preview());
+    expect(form.servicesOffered).toBe(preview().fields.servicesOffered.value);
+    expect(form.serviceArea).toBe('My confirmed area');
+    expect(form.businessHours).toBe('');
+    expect(form.warrantyInfo).toBe('');
+    expect(initialForm.timeZone).toBe('');
+  });
+  it('removes unedited suggestions on a website change while preserving owner corrections', () => {
+    const original = { ...initialForm };
+    const applied = applyWebsiteSuggestions(original, preview());
+    applied.serviceArea = 'Owner corrected this area';
+    const restored = removeUneditedWebsiteSuggestions(applied, original, preview());
+    expect(restored.servicesOffered).toBe('');
+    expect(restored.serviceArea).toBe('Owner corrected this area');
+  });
+  it('maps other policies as notes, never into services not offered', () => {
+    const p = preview();
+    p.fields.otherPolicies = { value: 'Cash discount available', evidence: 'Cash discount.', sourceUrl: null };
+    const form = applyWebsiteSuggestions(initialForm, p);
+    expect(form.otherPolicies).toBe('Cash discount available');
+    expect(form.servicesNotOffered).toBe('');
+    expect(websiteFormFields.otherPolicies).toBe('otherPolicies');
+  });
+  it('identifies blank and thin answers, and updates after edits', () => {
+    const gaps = getReadinessGaps({ ...initialForm, pricingPolicy: 'Call us', brandsWorkedWith: 'Carrier, Trane' });
+    expect(gaps).toContainEqual({ key: 'servicesOffered', label: 'Services offered', state: 'blank' });
+    expect(gaps).toContainEqual({ key: 'pricingPolicy', label: 'Pricing / estimates', state: 'thin' });
+    expect(gaps.some(gap => gap.key === 'brandsWorkedWith')).toBe(false);
+    expect(getReadinessGaps({ ...initialForm, servicesOffered: 'Residential heating repairs and installations' }).some(gap => gap.key === 'servicesOffered')).toBe(false);
+  });
+});

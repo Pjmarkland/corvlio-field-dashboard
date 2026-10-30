@@ -1,0 +1,246 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap');
+@layer theme, base, clerk, components, utilities;
+@import 'tailwindcss';
+@import '@clerk/themes/shadcn.css';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-hover: hsl(var(--primary-hover));
+  --color-primary-border: var(--primary-border);
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 216 33% 97%;
+  --foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 214 32% 91%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 214 32% 91%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 213 94% 68%;
+  --secondary: 214 32% 95%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 214 32% 95%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 213 94% 68%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 71% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 214 32% 85%;
+  --ring: 221 83% 53%;
+  --sidebar: 214 68% 14%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 214 48% 26%;
+  --sidebar-primary: 221 83% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 221 83% 53%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 221 83% 53%;
+  --app-font-sans: 'Outfit', sans-serif;
+  --app-font-mono: 'DM Mono', monospace;
+  --radius: 0.9rem;
+  --primary-border: hsl(221 83% 47%);
+  --secondary-border: hsl(214 32% 85%);
+  --muted-border: hsl(214 32% 89%);
+  --accent-border: hsl(213 94% 60%);
+  --destructive-border: hsl(0 60% 45%);
+  --elevate-1: rgba(34, 42, 55, 0.04);
+  --elevate-2: rgba(34, 42, 55, 0.08);
+}
+
+.dark {
+  --background: 214 68% 10%;
+  --foreground: 210 40% 98%;
+  --border: 214 48% 26%;
+  --card: 214 48% 16%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 214 48% 26%;
+  --popover: 214 48% 16%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 214 48% 26%;
+  --muted: 214 48% 22%;
+  --muted-foreground: 215 20% 72%;
+  --input: 214 48% 31%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 213 94% 68%;
+  --secondary: 214 48% 24%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 214 48% 24%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 70% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 221 83% 53%;
+  --sidebar: 214 68% 9%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 214 48% 22%;
+  --sidebar-primary: 221 83% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 221 83% 53%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 221 83% 53%;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { background: hsl(var(--background)); }
+  body { @apply font-sans antialiased bg-background text-foreground; }
+  button, a, input, select { -webkit-tap-highlight-color: transparent; }
+}
+
+@layer components {
+  .bg-primary:is(button, a):hover { background-color: hsl(var(--primary-hover)); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: .45; transform: scale(.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-rise-in { animation: rise-in .42s cubic-bezier(.2,.8,.2,1) both; }
+.animate-pulse-dot { animation: pulse-dot 2.4s ease-in-out infinite; }
+.font-800 { font-weight: 800; }
+.safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.touch-target { min-width: 48px; min-height: 48px; }
+.grid-paper {
+  background-image: linear-gradient(hsl(214 32% 85% / .4) 1px, transparent 1px), linear-gradient(90deg, hsl(214 32% 85% / .4) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Owner-facing inline status colors retain their meaning without light-mode backgrounds. */
+.dark [data-owner-ui] [class~="bg-[#f1e3bb]"] { background-color: hsl(36 62% 18%); }
+.dark [data-owner-ui] [class~="text-[#8c6418]"] { color: hsl(38 92% 72%); }
+.dark [data-owner-ui] [class~="bg-[#d9eee1]"] { background-color: hsl(155 48% 16%); }
+.dark [data-owner-ui] [class~="text-[#398660]"] { color: hsl(145 54% 72%); }
+.dark [data-owner-ui] [class~="bg-[#49a979]"] { background-color: hsl(145 49% 59%); }
+.dark [data-owner-ui] [class~="text-[#49a979]"] { color: hsl(145 60% 73%); }
+.dark [data-owner-ui] [class~="bg-[#c4bcae]"] { background-color: hsl(35 22% 66%); }
+.dark [data-owner-ui] [class~="text-[#427652]"] { color: hsl(145 40% 78%); }
+.dark [data-owner-ui] [class~="bg-[#edf8f0]"] { background-color: hsl(150 40% 13%); }
+.dark [data-owner-ui] [class~="text-[#285f3d]"] { color: hsl(145 43% 83%); }
+.dark [data-owner-ui] [class~="border-[#b9dfc8]"] { border-color: hsl(150 32% 29%); }
+.dark [data-owner-ui] [class~="bg-white/70"] { background-color: hsl(150 35% 19% / .8); }
+.dark [data-owner-ui] [class~="text-[#c84b29]"] { color: hsl(8 75% 72%); }
+
+/* Keep owner-facing controls readable in dark mode without changing Clerk or admin colors. */
+.dark [data-owner-ui] {
+  --primary: 213 94% 68%;
+  --primary-foreground: 214 68% 10%;
+  --primary-hover: 210 100% 78%;
+}
+
+.dark [data-owner-ui] :is(input, textarea, select) {
+  color: hsl(var(--foreground));
+}
+
+.dark [data-owner-ui] :is(input, textarea)::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
+.dark [data-owner-ui] select option {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+}
+
+/* Founder console: a warmer, quieter layer over the field app theme. */
+.admin-console {
+  --admin-ink: #17231f;
+  --admin-ink-soft: #5c6862;
+  --admin-paper: #f4f4ef;
+  --admin-panel: #fbfbf7;
+  --admin-line: #dfe4dc;
+  --admin-moss: #2c6b56;
+  --admin-moss-soft: #e4f0e9;
+  --admin-coral: #c9674d;
+  --admin-coral-soft: #f8e8e1;
+  background:
+    radial-gradient(circle at 82% -5%, rgba(213, 231, 218, .55), transparent 25rem),
+    var(--admin-paper);
+  color: var(--admin-ink);
+}
+
+.admin-console.admin-grain::after,
+.admin-console .admin-grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+}
+
+.admin-console .admin-label {
+  color: var(--admin-ink-soft);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.admin-console .admin-panel {
+  border: 1px solid var(--admin-line);
+  background: color-mix(in srgb, var(--admin-panel) 92%, transparent);
+  box-shadow: 0 1px 2px rgba(23, 35, 31, .03), 0 12px 32px rgba(23, 35, 31, .035);
+}
+
+.admin-console .admin-link {
+  transition: transform .2s ease, color .2s ease, background-color .2s ease;
+}
+
+.admin-console .admin-link:hover {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console .admin-link { transition: none; }
+}
+/* Lead detail action bar sits above the mobile nav (about 81px plus safe area). */
+.detail-action-bar { position: fixed; left: 0; right: 0; z-index: 15; bottom: calc(5.0625rem + env(safe-area-inset-bottom)); }
+.detail-action-spacer { height: calc(5rem + 5.0625rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) {
+  .detail-action-bar { left: 248px; bottom: 0; padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
+  .detail-action-spacer { height: 6rem; }
+}

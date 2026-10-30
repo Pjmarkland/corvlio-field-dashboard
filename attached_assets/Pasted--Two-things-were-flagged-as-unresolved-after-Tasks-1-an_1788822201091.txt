@@ -1,0 +1,16 @@
+"Two things were flagged as unresolved after Tasks #1 and #6, and I want them addressed properly now.
+Issue 1: Status write-back was never built. The original app spec calls for a one-tap Pending/Contacted status toggle that saves back to the source Google Sheet. Both Task #1 and Task #6 explicitly excluded 'Google Sheets write-back' as out of scope — so right now, tapping a lead's status probably doesn't persist anywhere. I need this built for real.
+Issue 2: Stats page numbers were never verified. The Today's Leads page shows 'Avg Reply' and 'This Week' numbers. When Task #1 shipped, the test sheet only had one row, so we couldn't tell if these are computed from real data or still leftover mock values. Now that Business B has 5 leads with varied timestamps and one 'Contacted' row, please check: are these numbers actually calculated from real sheet data, or hardcoded/fake? Fix them to be real if they aren't already, using the same per-business Sheet ID lookup Task #6 built — never a global or hardcoded sheet.
+What I need for the write-back specifically:
+- A way to toggle a lead's status (at minimum Pending ↔ Contacted) from the lead card or detail view.
+- That toggle must write to the correct row in the correct business's Google Sheet — resolved the same way Task #6 resolves reads: signed-in user → linked Business → that Business's Sheet ID. Never write to a hardcoded or wrong-business sheet.
+- Row targeting must be reliable even if rows get reordered or new leads are added — don't rely on row position alone if there's a more stable identifier available (the sheet has a 'Softr Record ID' column that may serve this purpose better than row number).
+- Handle write failures explicitly — if the Google Sheets write fails (auth issue, rate limit, sheet unavailable), show a clear error and don't silently pretend the status changed when it didn't. The UI should not update to 'Contacted' unless the write actually succeeded.
+- Be mindful of Google's Sheets API rate limits (roughly 60 read/write requests per minute per user) — this matters more now that both reads and writes are happening.
+Done looks like:
+- Tapping a lead's status toggle updates the actual Google Sheet row, confirmed by checking the Sheet directly after the change.
+- The change persists across a page reload — it's reading the real updated value back, not just optimistically showing it in the UI.
+- Business A and Business B's writes never cross into each other's sheets.
+- Stats numbers are either confirmed genuinely real (and you tell me how they're calculated), or fixed to be real if they were fake.
+- A failed write shows a clear error state, not a false success.
+Out of scope: push notifications, onboarding UI for new businesses, any status values beyond what the sheet already supports (Pending/Contacted)."

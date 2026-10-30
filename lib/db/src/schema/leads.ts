@@ -1,0 +1,30 @@
+import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { businessesTable } from "./businesses";
+
+export const leadsTable = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id")
+    .notNull()
+    .references(() => businessesTable.id, { onDelete: "cascade" }),
+  callerName: text("caller_name"),
+  retellCallId: text("retell_call_id"),
+  phoneNumber: text("phone_number"),
+  callerId: text("caller_id"),
+  callbackNumber: text("callback_number"),
+  transcript: text("transcript"),
+  summary: text("summary"),
+  recordingUrl: text("recording_url"),
+  privateNotes: text("private_notes"),
+  issueReason: text("issue_reason"),
+  address: text("address"),
+  urgencyLevel: text("urgency_level"),
+  availability: text("availability"),
+  tradeIntakeAnswers: text("trade_intake_answers"),
+  status: text("status").notNull().default("new"),
+  contactedAt: timestamp("contacted_at", { withTimezone: true }),
+  contactedBy: text("contacted_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("leads_retell_call_id_unique").on(table.retellCallId)]);
+
+export type Lead = typeof leadsTable.$inferSelect;
+export type NewLead = typeof leadsTable.$inferInsert;

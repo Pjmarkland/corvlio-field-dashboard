@@ -1,0 +1,2343 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: leads
+    description: Lead operations
+  - name: businesses
+    description: Signed-in owner business profile operations
+  - name: notifications
+    description: Native lead notification operations
+  - name: admin
+    description: Read-only founder administration operations
+paths:
+  /billing/native-summary:
+    get:
+      operationId: getNativeBillingSummary
+      tags: [billing]
+      security:
+        - clerkSession: []
+      summary: Read-only owner billing summary without prices or payment actions
+      responses:
+        "200":
+          description: Persisted billing information; never contacts Stripe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NativeBillingSummary"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business owned by this account
+        "503":
+          description: Summary temporarily unavailable
+  /account/deletion-eligibility:
+    get:
+      operationId: getAccountDeletionEligibility
+      responses:
+        "200":
+          description: Self-service deletion eligibility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionEligibility"
+  /account/me:
+    delete:
+      operationId: deleteMyAccount
+      tags: [businesses]
+      summary: Delete the authenticated account and owned app data
+      security: [{ ClerkSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountDeletionInput" }
+      responses:
+        "200":
+          description: App data and identity deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDeletionResult" }
+        "202":
+          description: App data deleted; identity deletion queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDeletionResult" }
+        "400": { description: Invalid confirmation }
+        "401": { description: Authentication required }
+        "403": { description: Unsafe request origin }
+        "409": { description: Subscription or ownership conflict; contact support }
+        "503": { description: Cannot safely start deletion }
+  /admin/pending-releases:
+    get:
+      operationId: getPendingRetellReleases
+      tags: [admin]
+      security: [{ ClerkSession: [] }]
+      responses:
+        "200":
+          description: Minimal resource records for manual review and release
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PendingRetellRelease" }
+        "404": { description: Not authorized }
+  /admin/pending-releases/{releaseId}/complete:
+    post:
+      operationId: completePendingRetellRelease
+      tags: [admin]
+      security: [{ ClerkSession: [] }]
+      parameters:
+        - in: path
+          name: releaseId
+          required: true
+          schema: { type: number, multipleOf: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManualReleaseInput" }
+      responses:
+        "204": { description: Recorded manual review/release; no Retell API call }
+        "400": { description: Invalid confirmation }
+        "404": { description: Not authorized or unknown record }
+  /user/welcome:
+    post:
+      operationId: claimWelcome
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Claim the verified new user's one-time welcome screen
+      responses:
+        "200":
+          description: Welcome eligibility and next destination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WelcomeEntry"
+        "401":
+          description: Authentication required
+        "403":
+          description: Verified email required
+        "502":
+          description: Welcome could not be checked
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /businesses/me:
+    get:
+      operationId: getBusinessProfile
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Get the signed-in owner's business profile
+      responses:
+        "200":
+          description: Business profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessProfile"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
+        "502":
+          description: Business profile could not be loaded
+    patch:
+      operationId: updateBusinessProfile
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Update the signed-in owner's business profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessProfileUpdate"
+      responses:
+        "200":
+          description: Updated business profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessProfile"
+        "400":
+          description: Invalid or empty business profile update
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
+        "502":
+          description: Business profile could not be updated
+  /businesses/onboarding/website-preview:
+    post:
+      operationId: previewBusinessWebsite
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Preview public website facts without saving business data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebsitePreviewInput"
+      responses:
+        "200":
+          description: Suggestions for owner review, with unsupported fields marked missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsitePreview"
+        "400":
+          description: Invalid or non-public website URL
+        "401":
+          description: Authentication required
+  /admin/call-quality:
+    get:
+      operationId: getAdminCallQuality
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Read-only scorecard for the latest 100 recorded inbound calls
+      responses:
+        "200":
+          description: Call quality scorecard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCallQuality"
+        "404":
+          description: Not found or not authorized
+        "502":
+          description: Unable to load scorecard
+  /businesses/me/demo-call-capability:
+    get:
+      operationId: getOwnerDemoCallCapability
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Read server-controlled availability of owner test calls
+      responses:
+        "200":
+          description: Current runtime availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerDemoCapability"
+        "401":
+          description: Authentication required
+  /businesses/me/demo-call:
+    post:
+      operationId: createOwnerDemoCall
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Place one test call to the owner's confirmed saved number when enabled
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerDemoConfirmation"
+      responses:
+        "200":
+          description: Test call requested
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [callId, message]
+                properties:
+                  callId:
+                    type: string
+                  message:
+                    type: string
+        "400":
+          description: Missing existing number or unconfirmed owner number
+        "401":
+          description: Authentication required
+        "404":
+          description: Not available
+        "429":
+          description: Three attempts per business day have been used
+        "502":
+          description: Provider rejected the call or its outcome is uncertain
+  /notifications/inbox:
+    get:
+      operationId: getLeadAlertInbox
+      tags: [notifications]
+      security:
+        - clerkSession: []
+      summary: Owner-scoped unread real-lead alerts
+      responses:
+        "200":
+          description: Lead alert inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadAlertInbox"
+        "401":
+          description: Authentication required
+    post:
+      operationId: readLeadAlerts
+      tags: [notifications]
+      security:
+        - clerkSession: []
+      summary: Mark only the owner's alerts through an observed event ID as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertReadReceipt"
+      responses:
+        "204":
+          description: Alerts marked read
+        "401":
+          description: Authentication required
+  /leads:
+    get:
+      operationId: getLeads
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: List Google Sheet leads
+      description: Returns normalized lead rows for the signed-in business owner.
+      responses:
+        "200":
+          description: Business lead workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadWorkspace"
+        "401":
+          description: Authentication required
+        "429":
+          description: Google Sheets rate limit reached
+        "502":
+          description: Google Sheets could not be read
+  /leads/{leadId}:
+    get:
+      operationId: getLeadDetail
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Read one lead belonging to the signed-in business
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Private lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetail"
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Lead could not be loaded
+  /leads/{leadId}/notes:
+    patch:
+      operationId: updateLeadNotes
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Save private owner notes on an owned lead
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadNotesInput"
+      responses:
+        "200":
+          description: Updated private lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetail"
+        "400":
+          description: Invalid notes
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Notes could not be saved
+  /leads/{leadId}/status:
+    patch:
+      operationId: updateLeadStatus
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Update a lead status
+      description: Updates one lead in the signed-in business owner's Google Sheet.
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadStatusUpdate"
+      responses:
+        "200":
+          description: Confirmed lead status update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadStatusResult"
+        "400":
+          description: Invalid lead ID or status
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Lead not found in the business sheet
+        "409":
+          description: The stable lead ID is duplicated
+        "429":
+          description: Google Sheets rate limit reached
+        "502":
+          description: Google Sheets could not be updated
+  /notifications/status:
+    get:
+      operationId: getNotificationStatus
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Get notification readiness
+      responses:
+        "200":
+          description: Notification status for the signed-in owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationStatus"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+  /notification-devices:
+    post:
+      operationId: registerNotificationDevice
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Register or refresh a native push device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationDeviceRegistration"
+      responses:
+        "200":
+          description: Registered device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationDevice"
+        "400":
+          description: Invalid registration
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+  /web-push/config:
+    get:
+      operationId: getWebPushConfig
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Get browser push configuration
+      responses:
+        "200":
+          description: Browser push capability for the signed-in owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebPushConfig"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "503":
+          description: Browser push is misconfigured
+  /web-push-subscriptions:
+    post:
+      operationId: registerWebPushSubscription
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Register or refresh this browser's push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebPushSubscriptionInput"
+      responses:
+        "200":
+          description: Browser subscription registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebPushSubscriptionStatus"
+        "400":
+          description: Invalid browser subscription
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "409":
+          description: This browser subscription belongs to another account
+        "503":
+          description: Browser push is not configured
+    delete:
+      operationId: revokeWebPushSubscription
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Revoke this browser's push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebPushSubscriptionRevoke"
+      responses:
+        "204":
+          description: Browser subscription revoked
+        "400":
+          description: Invalid browser subscription
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+  /notification-devices/{deviceId}:
+    delete:
+      operationId: revokeNotificationDevice
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Revoke one native push device
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "204":
+          description: Device revoked
+        "400":
+          description: Invalid device ID
+        "401":
+          description: Authentication required
+        "404":
+          description: Device not found
+  /notifications/poll/run:
+    post:
+      operationId: runNotificationPoll
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Run one poll for the signed-in business
+      description: Development verification endpoint. It is unavailable in production.
+      responses:
+        "200":
+          description: Poll result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPollResult"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Endpoint unavailable in production
+        "429":
+          description: Google Sheets rate limit reached
+        "502":
+          description: Google Sheets could not be read
+  /notifications/outbox:
+    get:
+      operationId: listNotificationOutbox
+      tags: [notifications]
+      security:
+        - clerkSession: []
+        - clerkBearer: []
+      summary: Inspect queued notifications for the signed-in business
+      description: Development verification endpoint. It is unavailable in production.
+      responses:
+        "200":
+          description: Recent notification events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationOutboxEvent"
+        "401":
+          description: Authentication required
+        "403":
+          description: No business is configured for this account
+        "404":
+          description: Endpoint unavailable in production
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get the read-only founder overview
+      description: Requires a verified Clerk email listed in ADMIN_EMAILS. Unauthorized requests receive a not-found response.
+      responses:
+        "200":
+          description: Business overview and global metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/internal-businesses:
+    get:
+      operationId: getAdminInternalBusinesses
+      tags: [admin]
+      responses:
+        "200":
+          description: Internal businesses and eligible admin owners
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessDirectory"
+    post:
+      operationId: createAdminInternalBusiness
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBusinessInput"
+      responses:
+        "200":
+          description: Created internal business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessRecord"
+  /admin/internal-businesses/{businessId}:
+    patch:
+      operationId: updateAdminInternalBusiness
+      tags: [admin]
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBusinessAgentUpdate"
+      responses:
+        "200":
+          description: Updated local agent ID only; no Retell changes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBusinessRecord"
+  /admin/app-review-demo:
+    get:
+      operationId: getAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Read App Review demo status
+      description: Requires a verified administrator email. Does not create or modify demo data.
+      responses:
+        "200":
+          description: Current demo business and lead count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/app-review-demo/reset:
+    post:
+      operationId: resetAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Create or reset the isolated App Review demo
+      description: Explicitly replaces only tagged demo leads after safety checks. Never provisions a phone or changes real businesses.
+      responses:
+        "200":
+          description: Demo business with refreshed synthetic leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "404":
+          description: Not found or administrator access is unavailable
+        "409":
+          description: Unsafe or conflicting business data was found
+  /admin/app-review-demo/link:
+    post:
+      operationId: linkAdminAppReviewDemo
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Link a verified Clerk account to the App Review demo
+      description: Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppReviewDemoLinkInput"
+      responses:
+        "200":
+          description: Demo business linked to the reviewer account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppReviewDemoStatus"
+        "400":
+          description: Invalid email
+        "404":
+          description: Reviewer account or demo business was not found
+        "409":
+          description: Linking would overwrite a different business owner
+  /admin/businesses/{businessId}:
+    get:
+      operationId: getAdminBusiness
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get a business, its leads, and its Retell call history
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "200":
+          description: Business details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessDetail"
+        "400":
+          description: Invalid business ID
+        "404":
+          description: Not found, business missing, or administrator access unavailable
+  /admin/activity:
+    get:
+      operationId: getAdminActivity
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get the global lead activity feed
+      responses:
+        "200":
+          description: Newest leads and global lead counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminActivity"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/email-health:
+    get:
+      operationId: getAdminEmailHealth
+      tags: [admin]
+      security: [{clerkSession: []}]
+      responses:
+        "200":
+          description: Lead and admin-test email health
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AdminEmailHealth"}
+        "404": {description: Administrator access unavailable}
+  /admin/email-health/test:
+    post:
+      operationId: sendAdminEmailTest
+      tags: [admin]
+      security: [{clerkSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmailTestRequest"}
+      responses:
+        "200":
+          description: One test attempt, sent only to the authenticated admin
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EmailTestResult"}
+        "404": {description: Administrator access unavailable}
+        "429": {description: Wait one minute between tests}
+  /admin/email-health/retry:
+    post:
+      operationId: retryAdminLeadEmails
+      tags: [admin]
+      security: [{clerkSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EmailRetryRequest"}
+      responses:
+        "200":
+          description: Confirmed lead emails queued; no unselected message is retried
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EmailRetryResult"}
+        "404": {description: Administrator access unavailable}
+  /billing/availability:
+    get:
+      operationId: getBillingAvailability
+      responses:
+        "200": {description: Billing capability, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAvailability"}}}}
+  /billing:
+    get:
+      operationId: getOwnerBilling
+      responses:
+        "200": {description: Owner billing, content: {application/json: {schema: {$ref: "#/components/schemas/BillingSnapshot"}}}}
+  /billing/checkout:
+    post:
+      operationId: createBillingCheckout
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/BillingPlanInput"}}}}
+      responses:
+        "200": {description: Hosted Checkout, content: {application/json: {schema: {$ref: "#/components/schemas/BillingRedirect"}}}}
+  /billing/portal:
+    post:
+      operationId: createBillingPortal
+      responses:
+        "200": {description: Hosted Portal, content: {application/json: {schema: {$ref: "#/components/schemas/BillingRedirect"}}}}
+  /billing/upgrade:
+    post:
+      operationId: upgradeBillingPlan
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/BillingPlanInput"}}}}
+      responses:
+        "200": {description: Owner upgrade, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /billing/cancel:
+    post:
+      operationId: cancelBilling
+      responses:
+        "200": {description: Written cancellation, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /billing/resume:
+    post:
+      operationId: resumeBilling
+      responses:
+        "200": {description: Resume before effective date, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /admin/billing:
+    get:
+      operationId: getAdminBilling
+      responses:
+        "200": {description: Admin billing, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/BillingSnapshot"}}}}}
+  /admin/billing/{businessId}/startup:
+    patch:
+      operationId: setStartupEligibility
+      parameters:
+        - {in: path, name: businessId, required: true, schema: {type: integer}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/StartupEligibilityInput"}}}}
+      responses:
+        "200": {description: Admin eligibility, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /invoicing/me:
+    get:
+      operationId: getOwnerInvoices
+      tags: [Invoicing]
+      responses:
+        '200':
+          description: Owner invoices and payment instructions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+  /admin/invoicing:
+    get:
+      operationId: getAdminInvoices
+      tags: [Invoicing]
+      responses:
+        '200':
+          description: Businesses and their invoice history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [businesses, settings]
+                properties:
+                  businesses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceOverview'
+                  settings:
+                    $ref: '#/components/schemas/PaymentInstructions'
+  /admin/invoicing/settings:
+    patch:
+      operationId: updateInvoiceSettings
+      tags: [Invoicing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInstructions'
+      responses:
+        '200':
+          description: Saved instructions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInstructions'
+  /admin/invoicing/{businessId}/approve-startup:
+    post:
+      operationId: approveStartupInvoice
+      tags: [Invoicing]
+      parameters:
+        - { name: businessId, in: path, required: true, schema: { type: number } }
+      responses:
+        '200':
+          description: Startup approved and invoice queued for email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+  /admin/invoicing/invoices/{invoiceId}/paid:
+    post:
+      operationId: markManualInvoicePaid
+      tags: [Invoicing]
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualPaymentConfirmation'
+      responses:
+        '200':
+          description: Payment recorded; initial payment queues provisioning
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
+    clerkBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ManualPaymentConfirmation:
+      type: object
+      required: [reference]
+      properties:
+        reference: { type: string, maxLength: 500 }
+    PaymentInstructions:
+      type: object
+      required: [instructions, paymentLink]
+      properties:
+        instructions: { type: string, maxLength: 6000 }
+        paymentLink: { type: string, maxLength: 2048 }
+    ManualInvoice:
+      type: object
+      required: [id, number, businessName, plan, payee, monthlyCents, setupCents, totalCents, issuedAt, dueAt, periodKey, status, paidAt, paymentReference, deliveryStatus, reminderStatus]
+      properties:
+        id: { type: number }
+        number: { type: string }
+        businessName: { type: string }
+        plan: { type: string }
+        payee: { type: string }
+        monthlyCents: { type: number }
+        setupCents: { type: number }
+        totalCents: { type: number }
+        issuedAt: { type: string }
+        dueAt: { type: string }
+        periodKey: { type: string }
+        status: { type: string, enum: [invoiced, paid, overdue] }
+        paidAt: { type: [string, 'null'] }
+        paymentReference: { type: [string, 'null'] }
+        deliveryStatus: { type: string }
+        reminderStatus: { type: string }
+    InvoiceOverview:
+      type: object
+      required: [businessId, businessName, plan, businessAgeMonths, status, serviceActive, provisioningState, invoices, settings]
+      properties:
+        businessId: { type: number }
+        businessName: { type: string }
+        plan: { type: [string, 'null'] }
+        businessAgeMonths: { type: [number, 'null'] }
+        status: { type: string, enum: [legacy, requested, invoiced, paid, overdue] }
+        serviceActive: { type: boolean }
+        provisioningState: { type: string }
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManualInvoice'
+        settings:
+          $ref: '#/components/schemas/PaymentInstructions'
+    AccountDeletionInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, enum: [DELETE] }
+    AccountDeletionResult:
+      type: object
+      required: [status, message]
+      properties:
+        status: { type: string, enum: [completed, pending] }
+        message: { type: string }
+    ManualReleaseInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, enum: [MANUALLY RELEASED] }
+    PendingRetellRelease:
+      type: object
+      required: [id, businessId, businessName, phoneNumber, agentId, provisioningStatus, createdAt]
+      properties:
+        id: { type: number, multipleOf: 1 }
+        businessId: { type: [number, "null"], multipleOf: 1 }
+        businessName: { type: string }
+        phoneNumber: { type: [string, "null"] }
+        agentId: { type: [string, "null"] }
+        provisioningStatus: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    BillingAvailability:
+      type: object
+      properties:
+        enabled: {type: boolean}
+      required: [enabled]
+    AccountDeletionEligibility:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        reason: { type: [string, "null"] }
+      required: [allowed, reason]
+    NativeBillingSummary:
+      type: object
+      properties:
+        planName: { type: [string, "null"] }
+        status: { type: string, enum: [active, past_due, canceled, not_subscribed, requested, invoiced, overdue, paid, legacy] }
+        nextChargeDate: { type: [string, "null"], format: date-time }
+        nextInvoiceDate: { type: [string, "null"], format: date-time }
+        billingEnabled: { type: boolean }
+        hasStripeCustomer: { type: boolean }
+      required: [planName, status, nextChargeDate, billingEnabled, hasStripeCustomer]
+    BillingPlanInput:
+      type: object
+      additionalProperties: false
+      properties:
+        plan: {type: string, enum: [startup, starter, professional, managed]}
+      required: [plan]
+    StartupEligibilityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        eligible: {type: boolean}
+      required: [eligible]
+    BillingRedirect:
+      type: object
+      properties:
+        url: {type: string}
+      required: [url]
+    BillingAccount:
+      type: object
+      properties:
+        plan: {type: [string, "null"], enum: [startup, starter, professional, managed, null]}
+        status: {type: string}
+        customerId: {type: [string, "null"]}
+        subscriptionId: {type: [string, "null"]}
+        periodStart: {type: [string, "null"]}
+        periodEnd: {type: [string, "null"]}
+        paidPeriodEnd: {type: [string, "null"]}
+        pastDueSince: {type: [string, "null"]}
+        graceEndsAt: {type: [string, "null"]}
+        needsAdminReview: {type: boolean}
+        cancelAt: {type: [string, "null"]}
+        cancelRequestedAt: {type: [string, "null"]}
+        cancelRequestedBy: {type: [string, "null"]}
+        startupEligible: {type: boolean}
+        startupTransitionAt: {type: [string, "null"]}
+        setupPaid: {type: boolean}
+        usageFlags: {type: array, items: {type: number}}
+        lastEvent:
+          type: [object, "null"]
+          properties:
+            id: {type: string}
+            type: {type: string}
+            created: {type: number}
+          required: [id, type, created]
+      required: [plan, status, customerId, subscriptionId, periodStart, periodEnd, paidPeriodEnd, pastDueSince, graceEndsAt, needsAdminReview, cancelAt, cancelRequestedAt, cancelRequestedBy, startupEligible, startupTransitionAt, setupPaid, usageFlags, lastEvent]
+    BillingSnapshot:
+      type: object
+      properties:
+        businessId: {type: number}
+        businessName: {type: string}
+        account: {$ref: "#/components/schemas/BillingAccount"}
+        usage:
+          type: object
+          properties:
+            count: {type: number}
+            limit: {type: [number, "null"]}
+            start: {type: string}
+            end: {type: string}
+          required: [count, limit, start, end]
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              label: {type: string}
+              monthlyCents: {type: number}
+              setupCents: {type: number}
+              callLimit: {type: [number, "null"]}
+            required: [id, label, monthlyCents, setupCents, callLimit]
+        policy:
+          type: object
+          properties:
+            cancellationNoticeDays: {type: number}
+            failedPaymentGraceBusinessDays: {type: number}
+            startupEligibilityBusinessAgeMonths: {type: number}
+            startupTransitionMonths: {type: number}
+          required: [cancellationNoticeDays, failedPaymentGraceBusinessDays, startupEligibilityBusinessAgeMonths, startupTransitionMonths]
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              type: {type: string}
+              actor: {type: [string, "null"]}
+              detail: {type: string}
+              createdAt: {type: string}
+            required: [id, type, actor, detail, createdAt]
+      required: [businessId, businessName, account, usage, plans, policy, timeline]
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    AdminCallQuality:
+      type: object
+      required: [totalCalls, completeCalls, completePercent, calls]
+      properties:
+        totalCalls:
+          type: number
+        completeCalls:
+          type: number
+        completePercent:
+          type: [number, "null"]
+        calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/CallQualityRow"
+    CallQualityRow:
+      type: object
+      required: [id, businessName, startedAt, durationMs, nameCaptured, callbackCaptured, issueCaptured, addressCaptured, ending, leadCreated, needsReview, reviewReasons, analysisComplete]
+      properties:
+        id:
+          type: string
+        businessName:
+          type: string
+        startedAt:
+          type: string
+        durationMs:
+          type: [number, "null"]
+        nameCaptured:
+          type: [boolean, "null"]
+        callbackCaptured:
+          type: [boolean, "null"]
+        issueCaptured:
+          type: [boolean, "null"]
+        addressCaptured:
+          type: [boolean, "null"]
+        ending:
+          type: string
+        leadCreated:
+          type: boolean
+        needsReview:
+          type: boolean
+        reviewReasons:
+          type: array
+          items:
+            type: string
+        analysisComplete:
+          type: boolean
+    Lead:
+      type: object
+      properties:
+        tradeIntakeAnswers:
+          type: [string, "null"]
+        callerId:
+          type: [string, "null"]
+        callbackNumber:
+          type: [string, "null"]
+        availability:
+          type: [string, "null"]
+        transcript:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        issue:
+          type: string
+        address:
+          type: string
+        urgency:
+          type: string
+          enum: [urgent, normal, low]
+        status:
+          type: string
+          enum: [pending, contacted]
+        createdAt:
+          type: string
+          format: date-time
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - id
+        - name
+        - phone
+        - issue
+        - address
+        - urgency
+        - status
+        - createdAt
+        - contactedAt
+    LeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          properties:
+            callStartedAt:
+              type: [string, "null"]
+              format: date-time
+            durationMs:
+              type: [number, "null"]
+              multipleOf: 1
+              minimum: 0
+            capturedUrgency:
+              type: [string, "null"]
+            recordingUrl:
+              type: [string, "null"]
+            privateNotes:
+              type: [string, "null"]
+            contactedBy:
+              type: [string, "null"]
+          required: [callStartedAt, durationMs, capturedUrgency, recordingUrl, privateNotes, contactedBy]
+    LeadNotesInput:
+      type: object
+      additionalProperties: false
+      properties:
+        privateNotes:
+          type: string
+          maxLength: 10000
+      required: [privateNotes]
+    WelcomeEntry:
+      type: object
+      properties:
+        showWelcome:
+          type: boolean
+        nextPath:
+          type: string
+          enum: ["/onboarding", "/dashboard"]
+      required: [showWelcome, nextPath]
+    LeadStatusUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [pending, contacted]
+      required:
+        - status
+    LeadStatusResult:
+      type: object
+      properties:
+        leadId:
+          type: string
+        status:
+          type: string
+          enum: [pending, contacted]
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - leadId
+        - status
+        - contactedAt
+    LeadWorkspace:
+      type: object
+      properties:
+        isSample:
+          type: boolean
+        provisioningState:
+          type: string
+        configured:
+          type: boolean
+        businessName:
+          type: [string, "null"]
+        retellPhoneNumber:
+          type: [string, "null"]
+        timeZone:
+          type: [string, "null"]
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
+      required:
+        - configured
+        - businessName
+        - retellPhoneNumber
+        - timeZone
+        - leads
+    InternalBusinessAgentUpdate:
+      type: object
+      properties:
+        retellAgentId:
+          type: [string, "null"]
+      required: [retellAgentId]
+    InternalBusinessInput:
+      type: object
+      properties:
+        businessName:
+          type: string
+        retellPhoneNumber:
+          type: string
+        ownerUserId:
+          type: string
+        retellAgentId:
+          type: [string, "null"]
+      required: [businessName, retellPhoneNumber, ownerUserId]
+    InternalBusinessRecord:
+      type: object
+      properties:
+        id:
+          type: number
+        businessName:
+          type: string
+        retellPhoneNumber:
+          type: string
+        retellAgentId:
+          type: [string, "null"]
+        ownerUserId:
+          type: string
+        ownerEmail:
+          type: string
+      required: [id, businessName, retellPhoneNumber, retellAgentId, ownerUserId, ownerEmail]
+    InternalBusinessDirectory:
+      type: object
+      properties:
+        businesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalBusinessRecord"
+        owners:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              email:
+                type: string
+              linkedBusinessName:
+                type: [string, "null"]
+            required: [userId, email, linkedBusinessName]
+      required: [businesses, owners]
+    AppReviewDemoStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        exists:
+          type: boolean
+        businessId:
+          type: [number, "null"]
+        businessName:
+          type: [string, "null"]
+        ownerEmail:
+          type: [string, "null"]
+        linked:
+          type: boolean
+        leadCount:
+          type: number
+      required: [exists, businessId, businessName, ownerEmail, linked, leadCount]
+    AppReviewDemoLinkInput:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+          maxLength: 320
+      required: [email]
+    BusinessProfile:
+      type: object
+      additionalProperties: false
+      properties:
+        isInternal:
+          type: boolean
+        ownerPhone:
+          type: [string, "null"]
+        leadAlertsEnabled:
+          type: boolean
+        businessHours:
+          type: [string, "null"]
+        timeZone:
+          type: [string, "null"]
+        businessName:
+          type: string
+        agentName:
+          type: [string, "null"]
+        businessType:
+          type: [string, "null"]
+        servicesOffered:
+          type: [string, "null"]
+        businessWebsiteUrl:
+          type: [string, "null"]
+        ownerEmail:
+          type: [string, "null"]
+        serviceArea:
+          type: [string, "null"]
+        personalityToneDescription:
+          type: [string, "null"]
+        servicesNotOffered:
+          type: [string, "null"]
+        majorIssueExamples:
+          type: [string, "null"]
+        pricingPolicy:
+          type: [string, "null"]
+        financingPolicy:
+          type: [string, "null"]
+        brandsWorkedWith:
+          type: [string, "null"]
+        responseTimeCommitment:
+          type: [string, "null"]
+        warrantyInfo:
+          type: [string, "null"]
+        maintenancePlanOfferings:
+          type: [string, "null"]
+        credentials:
+          type: [string, "null"]
+        ownerAvailability:
+          type: [string, "null"]
+        emergencyContactInfo:
+          type: [string, "null"]
+        retellPhoneNumber:
+          type: [string, "null"]
+      required:
+        - businessName
+        - agentName
+        - businessType
+        - servicesOffered
+        - businessWebsiteUrl
+        - ownerEmail
+        - serviceArea
+        - personalityToneDescription
+        - servicesNotOffered
+        - majorIssueExamples
+        - pricingPolicy
+        - financingPolicy
+        - brandsWorkedWith
+        - responseTimeCommitment
+        - warrantyInfo
+        - maintenancePlanOfferings
+        - credentials
+        - ownerAvailability
+        - emergencyContactInfo
+        - retellPhoneNumber
+    BusinessProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        ownerPhone:
+          type: [string, "null"]
+          maxLength: 16
+        leadAlertsEnabled:
+          type: boolean
+        businessHours:
+          type: string
+          maxLength: 500
+        timeZone:
+          type: string
+          maxLength: 100
+        businessName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        agentName:
+          type: [string, "null"]
+          maxLength: 40
+        businessType:
+          type: [string, "null"]
+          maxLength: 200
+        servicesOffered:
+          type: [string, "null"]
+          maxLength: 4000
+        businessWebsiteUrl:
+          type: [string, "null"]
+          maxLength: 2048
+        ownerEmail:
+          type: string
+          maxLength: 320
+        serviceArea:
+          type: [string, "null"]
+          maxLength: 1000
+        personalityToneDescription:
+          type: [string, "null"]
+          maxLength: 4000
+        servicesNotOffered:
+          type: [string, "null"]
+          maxLength: 4000
+        majorIssueExamples:
+          type: [string, "null"]
+          maxLength: 4000
+        pricingPolicy:
+          type: [string, "null"]
+          maxLength: 4000
+        financingPolicy:
+          type: [string, "null"]
+          maxLength: 4000
+        brandsWorkedWith:
+          type: [string, "null"]
+          maxLength: 4000
+        responseTimeCommitment:
+          type: [string, "null"]
+          maxLength: 4000
+        warrantyInfo:
+          type: [string, "null"]
+          maxLength: 4000
+        maintenancePlanOfferings:
+          type: [string, "null"]
+          maxLength: 4000
+        credentials:
+          type: [string, "null"]
+          maxLength: 4000
+        ownerAvailability:
+          type: [string, "null"]
+          maxLength: 4000
+        emergencyContactInfo:
+          type: [string, "null"]
+          maxLength: 4000
+    WebsitePreviewInput:
+      type: object
+      additionalProperties: false
+      properties:
+        websiteUrl:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required: [websiteUrl]
+    WebsitePreviewField:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: [string, "null"]
+          maxLength: 600
+        evidence:
+          type: [string, "null"]
+          maxLength: 400
+        sourceUrl:
+          type: [string, "null"]
+      required: [value, evidence, sourceUrl]
+    WebsitePreviewFields:
+      type: object
+      additionalProperties: false
+      properties:
+        servicesOffered:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        servicesNotOffered:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        serviceArea:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        businessHours:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        businessHoursSuggestion:
+          $ref: "#/components/schemas/WebsiteHoursSuggestion"
+        brandsWorkedWith:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        warrantyInfo:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        emergencyContactInfo:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        financingPolicy:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        pricingPolicy:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        maintenancePlanOfferings:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        credentials:
+          $ref: "#/components/schemas/WebsitePreviewField"
+        otherPolicies:
+          $ref: "#/components/schemas/WebsitePreviewField"
+      required: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials]
+    WebsiteHoursSuggestion:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: [string, "null"]
+          maxLength: 600
+        evidence:
+          type: [string, "null"]
+          maxLength: 400
+        sourceUrl:
+          type: [string, "null"]
+        warning:
+          type: [string, "null"]
+      required: [value, evidence, sourceUrl, warning]
+    WebsitePreview:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [complete, partial, unavailable]
+        message:
+          type: string
+        fields:
+          $ref: "#/components/schemas/WebsitePreviewFields"
+        missingFields:
+          type: array
+          items:
+            type: string
+            enum: [servicesOffered, servicesNotOffered, serviceArea, businessHours, brandsWorkedWith, warrantyInfo, emergencyContactInfo, financingPolicy, pricingPolicy, maintenancePlanOfferings, credentials, otherPolicies]
+      required: [status, message, fields, missingFields]
+    NotificationPlatform:
+      type: string
+      enum: [ios, android]
+    NotificationDeviceRegistration:
+      type: object
+      additionalProperties: false
+      properties:
+        apnsEnvironment:
+          type: string
+          enum: [sandbox, production]
+        token:
+          type: string
+          minLength: 16
+          maxLength: 4096
+        platform:
+          $ref: "#/components/schemas/NotificationPlatform"
+        enabled:
+          type: boolean
+          default: true
+      required:
+        - token
+        - platform
+    WebPushConfig:
+      type: object
+      additionalProperties: false
+      required: [available, publicKey]
+      properties:
+        available:
+          type: boolean
+        publicKey:
+          type: ["string", "null"]
+    WebPushSubscriptionInput:
+      type: object
+      additionalProperties: false
+      required: [endpoint, keys]
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        keys:
+          type: object
+          additionalProperties: false
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+              minLength: 1
+              maxLength: 512
+            auth:
+              type: string
+              minLength: 1
+              maxLength: 512
+        expirationTime:
+          type: ["number", "null"]
+          minimum: 0
+    WebPushSubscriptionRevoke:
+      type: object
+      additionalProperties: false
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    WebPushSubscriptionStatus:
+      type: object
+      additionalProperties: false
+      required: [registered]
+      properties:
+        registered:
+          type: boolean
+    OwnerDemoCapability:
+      type: object
+      required: [enabled, production]
+      properties:
+        enabled:
+          type: boolean
+        production:
+          type: boolean
+    OwnerDemoConfirmation:
+      type: object
+      additionalProperties: false
+      required: [confirmedNumber, confirmed]
+      properties:
+        scenario:
+          type: string
+          enum: [current, after_hours]
+        confirmedNumber:
+          type: string
+        confirmed:
+          type: boolean
+    AlertReadReceipt:
+      type: object
+      additionalProperties: false
+      required: [throughId]
+      properties:
+        throughId:
+          type: number
+          multipleOf: 1
+          minimum: 1
+    LeadAlertInbox:
+      type: object
+      required: [enabled, unreadCount, alerts]
+      properties:
+        enabled:
+          type: boolean
+        unreadCount:
+          type: number
+          multipleOf: 1
+        alerts:
+          type: array
+          items:
+            type: object
+            required: [id, title, body, deepLink, createdAt]
+            properties:
+              id:
+                type: number
+                multipleOf: 1
+              title:
+                type: string
+              body:
+                type: string
+              deepLink:
+                type: string
+              createdAt:
+                type: string
+    NotificationDevice:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        platform:
+          $ref: "#/components/schemas/NotificationPlatform"
+        enabled:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - platform
+        - enabled
+        - lastSeenAt
+    NotificationStatus:
+      type: object
+      properties:
+        enabledDeviceCount:
+          type: number
+          multipleOf: 1
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationDevice"
+        poller:
+          type: object
+          properties:
+            initialized:
+              type: boolean
+            lastSucceededAt:
+              type: [string, "null"]
+              format: date-time
+            lastError:
+              type: [string, "null"]
+          required:
+            - initialized
+            - lastSucceededAt
+            - lastError
+      required:
+        - enabledDeviceCount
+        - devices
+        - poller
+    NotificationPollResult:
+      type: object
+      properties:
+        businessId:
+          type: string
+        baselineCreated:
+          type: boolean
+        rowsRead:
+          type: number
+          multipleOf: 1
+        newEvents:
+          type: number
+          multipleOf: 1
+        duplicateRows:
+          type: number
+          multipleOf: 1
+        polledAt:
+          type: string
+          format: date-time
+      required:
+        - businessId
+        - baselineCreated
+        - rowsRead
+        - newEvents
+        - duplicateRows
+        - polledAt
+    NotificationOutboxEvent:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        leadId:
+          type: string
+        status:
+          type: string
+          enum: [queued, delivered, failed]
+        attempts:
+          type: number
+          multipleOf: 1
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: [string, "null"]
+          format: date-time
+        lastError:
+          type: [string, "null"]
+      required:
+        - id
+        - leadId
+        - status
+        - attempts
+        - createdAt
+        - deliveredAt
+        - lastError
+    AdminOverview:
+      type: object
+      properties:
+        metrics:
+          $ref: "#/components/schemas/AdminMetrics"
+        businesses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminBusinessSummary"
+      required: [metrics, businesses]
+    AdminMetrics:
+      type: object
+      properties:
+        businessCount:
+          type: number
+          multipleOf: 1
+        provisionedBusinessCount:
+          type: number
+          multipleOf: 1
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        zeroLeadBusinessCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedOver24HoursCount:
+          type: number
+          multipleOf: 1
+        activePushDeviceCount:
+          type: number
+          multipleOf: 1
+      required:
+        - businessCount
+        - provisionedBusinessCount
+        - totalLeadCount
+        - zeroLeadBusinessCount
+        - uncontactedLeadCount
+        - uncontactedOver24HoursCount
+        - activePushDeviceCount
+    AdminBusinessSummary:
+      type: object
+      properties:
+        isInternal:
+          type: boolean
+        isSample:
+          type: boolean
+        provisioningState:
+          type: string
+        unusedNumber7Days:
+          type: boolean
+        lastCallAt:
+          type: [string, "null"]
+          format: date-time
+        id:
+          type: number
+          multipleOf: 1
+        businessName:
+          type: string
+        ownerEmail:
+          type: [string, "null"]
+        ownerName:
+          type: [string, "null"]
+        ownerLastSignInAt:
+          type: [string, "null"]
+          format: date-time
+        retellPhoneNumber:
+          type: [string, "null"]
+        provisioningStatus:
+          type: string
+          enum: [ready, partial, pending]
+        createdAt:
+          type: string
+          format: date-time
+        onboardingFieldCount:
+          type: number
+          multipleOf: 1
+        completedOnboardingFieldCount:
+          type: number
+          multipleOf: 1
+        onboardingCompletenessPercent:
+          type: number
+          multipleOf: 1
+        missingOnboardingFields:
+          type: array
+          items:
+            type: string
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        contactedLeadCount:
+          type: number
+          multipleOf: 1
+        averageResponseTimeMs:
+          type: [number, "null"]
+        pushEnabledDeviceCount:
+          type: number
+          multipleOf: 1
+        pushPlatforms:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationPlatform"
+        agreementsAcceptedAt:
+          type: [string, "null"]
+          format: date-time
+        hasNoLeads:
+          type: boolean
+        hasUncontactedOver24Hours:
+          type: boolean
+        oldestUncontactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - id
+        - businessName
+        - ownerEmail
+        - ownerName
+        - ownerLastSignInAt
+        - retellPhoneNumber
+        - provisioningStatus
+        - createdAt
+        - onboardingFieldCount
+        - completedOnboardingFieldCount
+        - onboardingCompletenessPercent
+        - missingOnboardingFields
+        - totalLeadCount
+        - uncontactedLeadCount
+        - contactedLeadCount
+        - averageResponseTimeMs
+        - pushEnabledDeviceCount
+        - pushPlatforms
+        - agreementsAcceptedAt
+        - hasNoLeads
+        - hasUncontactedOver24Hours
+        - oldestUncontactedAt
+    AdminOnboardingAnswers:
+      type: object
+      properties:
+        businessName:
+          type: string
+        agentName:
+          type: [string, "null"]
+        serviceArea:
+          type: [string, "null"]
+        businessType:
+          type: [string, "null"]
+        servicesOffered:
+          type: [string, "null"]
+        majorIssueExamples:
+          type: [string, "null"]
+        personalityToneDescription:
+          type: [string, "null"]
+        servicesNotOffered:
+          type: [string, "null"]
+        pricingPolicy:
+          type: [string, "null"]
+        financingPolicy:
+          type: [string, "null"]
+        brandsWorkedWith:
+          type: [string, "null"]
+        typicalResponseTimeCommitment:
+          type: [string, "null"]
+        warrantyInfo:
+          type: [string, "null"]
+        maintenancePlanOfferings:
+          type: [string, "null"]
+        credentialsCertifications:
+          type: [string, "null"]
+        ownerAvailability:
+          type: [string, "null"]
+        emergencyContactInfo:
+          type: [string, "null"]
+        businessWebsiteUrl:
+          type: [string, "null"]
+        websiteEnrichmentAttemptedAt:
+          type: [string, "null"]
+          format: date-time
+        websiteEnrichmentSources:
+          type: object
+          additionalProperties:
+            type: string
+        agreementsAcceptedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - businessName
+        - agentName
+        - serviceArea
+        - businessType
+        - servicesOffered
+        - majorIssueExamples
+        - personalityToneDescription
+        - servicesNotOffered
+        - pricingPolicy
+        - financingPolicy
+        - brandsWorkedWith
+        - typicalResponseTimeCommitment
+        - warrantyInfo
+        - maintenancePlanOfferings
+        - credentialsCertifications
+        - ownerAvailability
+        - emergencyContactInfo
+        - businessWebsiteUrl
+        - websiteEnrichmentAttemptedAt
+        - websiteEnrichmentSources
+        - agreementsAcceptedAt
+    AdminLeadActivity:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        businessId:
+          type: number
+          multipleOf: 1
+        businessName:
+          type: string
+        callerName:
+          type: [string, "null"]
+        phoneNumber:
+          type: [string, "null"]
+        issueReason:
+          type: [string, "null"]
+        address:
+          type: [string, "null"]
+        urgencyLevel:
+          type: [string, "null"]
+        availability:
+          type: [string, "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        contactedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - id
+        - businessId
+        - businessName
+        - callerName
+        - phoneNumber
+        - issueReason
+        - address
+        - urgencyLevel
+        - availability
+        - status
+        - createdAt
+        - contactedAt
+    AdminCallRecord:
+      type: object
+      properties:
+        id:
+          type: number
+          multipleOf: 1
+        retellCallId:
+          type: string
+        callStartedAt:
+          type: [string, "null"]
+          format: date-time
+        durationMs:
+          type: [number, "null"]
+          multipleOf: 1
+        outcome:
+          type: [string, "null"]
+        recordedAt:
+          type: string
+          format: date-time
+      required: [id, retellCallId, callStartedAt, durationMs, outcome, recordedAt]
+    AdminBusinessDetail:
+      type: object
+      properties:
+        business:
+          $ref: "#/components/schemas/AdminBusinessSummary"
+        onboarding:
+          $ref: "#/components/schemas/AdminOnboardingAnswers"
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminLeadActivity"
+        calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCallRecord"
+      required: [business, onboarding, leads, calls]
+    EmailHealthRecord:
+      type: object
+      required: [at, timestampExact, error, cause, hint]
+      properties:
+        at: {type: string}
+        timestampExact: {type: boolean}
+        error: {type: [string, "null"]}
+        cause: {type: string}
+        hint: {type: string}
+    FailedLeadEmail:
+      type: object
+      required: [id, recipient, createdAt, error, cause, hint]
+      properties:
+        id: {type: number, multipleOf: 1}
+        recipient: {type: [string, "null"]}
+        createdAt: {type: string}
+        error: {type: string}
+        cause: {type: string}
+        hint: {type: string}
+    AdminEmailHealth:
+      type: object
+      required: [lastSuccess, lastFailure, failed, hasMore]
+      properties:
+        lastSuccess:
+          anyOf: [{$ref: "#/components/schemas/EmailHealthRecord"}, {type: "null"}]
+        lastFailure:
+          anyOf: [{$ref: "#/components/schemas/EmailHealthRecord"}, {type: "null"}]
+        failed:
+          type: array
+          items: {$ref: "#/components/schemas/FailedLeadEmail"}
+        hasMore: {type: boolean}
+    EmailTestRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId]
+      properties:
+        requestId: {type: string}
+    EmailTestResult:
+      type: object
+      required: [success, error, cause, hint]
+      properties:
+        success: {type: boolean}
+        error: {type: [string, "null"]}
+        cause: {type: string}
+        hint: {type: string}
+    EmailRetryEntry:
+      type: object
+      required: [id, recipient]
+      properties:
+        id: {type: number, multipleOf: 1, minimum: 1}
+        recipient: {type: string}
+    EmailRetryRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmed, entries]
+      properties:
+        confirmed: {type: boolean, const: true}
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: "#/components/schemas/EmailRetryEntry"}
+    EmailRetryResult:
+      type: object
+      required: [queued]
+      properties:
+        queued: {type: number, multipleOf: 1}
+    AdminActivity:
+      type: object
+      properties:
+        businessCount:
+          type: number
+          multipleOf: 1
+        totalLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedLeadCount:
+          type: number
+          multipleOf: 1
+        uncontactedOver24HoursCount:
+          type: number
+          multipleOf: 1
+        recentLeads:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminLeadActivity"
+        operationalFailures:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOperationalFailure"
+      required:
+        - businessCount
+        - totalLeadCount
+        - uncontactedLeadCount
+        - uncontactedOver24HoursCount
+        - recentLeads
+        - operationalFailures
+    AdminOperationalFailure:
+      type: object
+      properties:
+        alertBlocked:
+          type: boolean
+        id:
+          type: number
+          multipleOf: 1
+        source:
+          type: string
+          enum: [pre_call_fallback, post_call_webhook, lead_gmail_notification, phone_provisioning]
+        summary:
+          type: string
+        details:
+          type: string
+        businessId:
+          type: [number, "null"]
+          multipleOf: 1
+        businessName:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        alertAttempts:
+          type: number
+          multipleOf: 1
+        alertSentAt:
+          type: [string, "null"]
+          format: date-time
+        alertLastError:
+          type: [string, "null"]
+      required:
+        - id
+        - source
+        - summary
+        - details
+        - businessId
+        - businessName
+        - createdAt
+        - alertAttempts
+        - alertSentAt
+        - alertLastError
+

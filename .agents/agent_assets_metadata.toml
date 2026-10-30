@@ -1,0 +1,86 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "bkMbVQ2ocyTMYYoErQZwf"
+uri = "file://corvlio-partaa"
+type = "unspecified"
+title = "corvlio-partaa (part 1 of 3)"
+description = "87 MB — rejoin all 3 parts to get corvlio-latest.zip"
+logical_id = "7d43ed4a-b8ce-4e0c-96ad-60b7fc059410"
+content_hash = "sha256:614c7ba12ca0302c970644387cb6d70272e512fc1e9b888fd60ad082167824f2"
+size = 91226112
+mtime_ms = 1789003952092
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/7d43ed4a-b8ce-4e0c-96ad-60b7fc059410/94d68da1-6829-4fde-a50d-5cb28c739100"
+storage_version_token = "1789003967667779"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "P-WYogzVK9pu96FXcZzgD"
+uri = "file://corvlio-partab"
+type = "unspecified"
+title = "corvlio-partab (part 2 of 3)"
+description = "87 MB"
+logical_id = "bc8e7e5e-21e7-4f6f-b0a7-70d1e9728d6c"
+content_hash = "sha256:1ff7c4beb087feaeac65bfa3a55e407ff29ecf3257a9fdb28b1905cf4e0fb18e"
+size = 91226112
+mtime_ms = 1789003953846
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/bc8e7e5e-21e7-4f6f-b0a7-70d1e9728d6c/d88cd96b-5c9a-4cd9-9ae5-085a41c396d1"
+storage_version_token = "1789003969137666"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "f2SoCzfEEnrBVBPaXOgZa"
+uri = "file://corvlio-partac"
+type = "unspecified"
+title = "corvlio-partac (part 3 of 3)"
+description = "87 MB"
+logical_id = "3f89550b-4dde-4343-a798-1630cc994b39"
+content_hash = "sha256:38fc35ac30afb262661a7e4010cd874e70bc11502ca69c0a76d0aca937ab5658"
+size = 91081124
+mtime_ms = 1789003955872
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/3f89550b-4dde-4343-a798-1630cc994b39/68241916-4e78-4900-9684-f021ecf3e7a1"
+storage_version_token = "1789003970482697"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "cD7_Aewk9smsE5phddGWR"
+uri = "file://screenshots/native-icons-safe-area-preview.png"
+type = "image"
+title = "Corrected native icon mask preview"
+description = "Conservative Corvlio lockup composition shown inside an iOS circular mask, an Android adaptive rounded mask, and a 1.5x adaptive foreground stress test."
+logical_id = "8eeadb2f-3207-4830-a5bd-c5c762512744"
+content_hash = "sha256:08197ae668c0c24c630bcc32877434e6eecafd1cb701958f9ee3a6d24bdf527f"
+size = 257804
+mtime_ms = 1789155952094
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/8eeadb2f-3207-4830-a5bd-c5c762512744/f4ad469e-59c2-4bc9-ba3c-147230620415"
+storage_version_token = "1789155957568965"
+content_type = "image/png"
+
+[[outputs]]
+id = "rIwWQd_LJ2WjQpALV3jN6"
+uri = "file://docs/retell-production-rollout.md"
+type = "text"
+title = "Retell production rollout plan — not executed"
+description = "Production webhook transition, version pinning, knowledge-base dependency review, pilot checks, and rollback steps."
+logical_id = "8bceee20-8227-41ee-8964-9a3840b6870b"
+content_hash = "sha256:45a074b94b82430256c5896829eca7352436334fc415f2d73033e17764c14933"
+size = 7202
+mtime_ms = 1790969762416
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/8bceee20-8227-41ee-8964-9a3840b6870b/8b0e49c5-e7bd-4bec-bdff-9c416368a8c1"
+storage_version_token = "1790970401714429"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "eoAgwdRKIWdnQ2QAr8D7M"
+uri = "file://recovery/corvlio-recovery-review.html"
+type = "html"
+title = "Corvlio recovery review and preview-only SQL"
+description = "Exact findings, copied fields, tested SQL, manual application order and identity/conflict blockers. Nothing has been applied to production."
+logical_id = "1895391f-3846-41a4-af51-1524154ab95a"
+content_hash = "sha256:248674df77d75105effe322e1d71f024692a2602242a54df9745f4f5bb0e02da"
+size = 26717
+mtime_ms = 1791147653214
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0f15e344-bd97-4b94-b7da-de033d661093/1895391f-3846-41a4-af51-1524154ab95a/af4a1a13-ea7d-49fa-8ca6-9a1f8c8cba43"
+storage_version_token = "1791147653832842"
+content_type = "text/html"

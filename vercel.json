@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @workspace/corvlio-field-dashboard run build",
+  "installCommand": "pnpm install",
+  "outputDirectory": "artifacts/corvlio-field-dashboard/dist/public",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://corvlio-field-dashboard--pjmarkland08.replit.app/api/:path*"
+    }
+  ]
+}
