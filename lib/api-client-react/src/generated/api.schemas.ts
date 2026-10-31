@@ -483,6 +483,8 @@ export interface AppReviewDemoLinkInput {
      * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
      */
   email: string;
+  /** Admin-only explicit override that permits linking an exact email match even if it is unverified. */
+  allowUnverifiedEmail?: boolean;
 }
 
 export interface BusinessProfile {

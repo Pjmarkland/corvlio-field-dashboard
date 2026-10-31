@@ -24,6 +24,7 @@ export default function AppReviewDemoSection() {
   const reset = useResetAdminAppReviewDemo();
   const link = useLinkAdminAppReviewDemo();
   const [email, setEmail] = useState("");
+  const [allowUnverifiedEmail, setAllowUnverifiedEmail] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -52,12 +53,21 @@ export default function AppReviewDemoSection() {
     setError("");
     setSuccess("");
     try {
-      await link.mutateAsync({ data: { email: email.trim() } });
+      await link.mutateAsync({
+        data: {
+          email: email.trim(),
+          allowUnverifiedEmail,
+        },
+      });
       setEmail("");
       await refresh();
-      setSuccess("The existing verified Clerk account is linked to App Review Demo.");
+      setSuccess(allowUnverifiedEmail
+        ? "The existing Clerk account is linked using the unverified-email admin override."
+        : "The existing verified Clerk account is linked to App Review Demo.");
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setAllowUnverifiedEmail(false);
     }
   };
 
@@ -101,13 +111,13 @@ export default function AppReviewDemoSection() {
 
         <div className="mt-4 grid gap-2 rounded-xl bg-[#f1f4ee] p-3 text-xs leading-relaxed text-[#536258]">
           <p><strong>Reset scope:</strong> creates or refreshes the clearly labeled sample business profile and eight recent fictional leads. It refuses to change the business if it finds calls, billing or provisioning records, notifications, or leads not tagged as demo data. It never buys a phone or creates a Clerk user.</p>
-          <p><strong>Reviewer account:</strong> create a separate Clerk account, sign in once, and verify its email. Enter that exact verified email below to link the existing account. Linking is refused if the demo is already linked to a different account or this account already owns another business.</p>
+          <p><strong>Reviewer account:</strong> create a separate Clerk account and sign in once. By default, enter its exact verified email. The admin override below allows an exact existing email match even if it is unverified. Linking is refused if the demo is already linked to a different account or this account already owns another business.</p>
         </div>
 
         {data?.linked ? <p className="mt-3 text-xs text-[#647168]">The demo already has an owner. This form will not replace that account.</p> : null}
         <form onSubmit={(event) => void linkReviewer(event)} className="mt-4 grid gap-3 border-t border-[#e1e6df] pt-4 sm:grid-cols-[1fr_auto]" data-testid="form-link-app-review-demo">
           <label className="grid gap-1.5 text-xs font-semibold text-[#536258]" htmlFor="app-review-demo-email">
-            Verified reviewer email
+            Reviewer email
             <input
               id="app-review-demo-email"
               type="email"
@@ -121,6 +131,20 @@ export default function AppReviewDemoSection() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
+          <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-[#536258] sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={allowUnverifiedEmail}
+              disabled={!data?.exists || data.linked || !actionsReady || link.isPending}
+              onChange={(event) => setAllowUnverifiedEmail(event.target.checked)}
+              data-testid="checkbox-allow-unverified-app-review-email"
+              className="h-4 w-4 accent-[#244d3f]"
+            />
+            Allow unverified email (admin override)
+          </label>
+          <p className="text-xs text-[#647168] sm:col-span-2">
+            This only links an exact match to an existing Clerk account. It does not create an account or send email.
+          </p>
           <button
             type="submit"
             data-testid="button-link-app-review-demo"

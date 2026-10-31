@@ -1,5 +1,6 @@
 import {
   GetAdminBusinessParams,
+  LinkAdminAppReviewDemoBody,
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
 import {
@@ -46,7 +47,7 @@ router.patch("/admin/internal-businesses/:businessId",async(req,res) => {
   } catch {res.status(503).json({error:"Agent ID could not be saved."});}
 });
 
-const appReviewDemoLinkInput = z.object({
+const appReviewDemoLinkInput = LinkAdminAppReviewDemoBody.extend({
   email: z.string().trim().email().max(320),
 }).strict();
 
@@ -80,20 +81,52 @@ router.post("/admin/app-review-demo/reset", async (req, res): Promise<void> => {
 
 router.post("/admin/app-review-demo/link", async (req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");
+  const rawInput = req.body as {
+    email?: unknown;
+    allowUnverifiedEmail?: unknown;
+  } | null;
+  const overrideRequested = rawInput?.allowUnverifiedEmail === true;
+  const targetEmail = typeof rawInput?.email === "string"
+    ? rawInput.email.trim().toLowerCase().slice(0, 320)
+    : null;
+  const logOverride = (result: string) => {
+    if (!overrideRequested) return;
+    req.log.info(
+      {
+        adminEmail: typeof res.locals.adminEmail === "string" ? res.locals.adminEmail : null,
+        targetEmail,
+        result,
+      },
+      "App Review Demo unverified email override used",
+    );
+  };
   const body = appReviewDemoLinkInput.safeParse(req.body);
   if (!body.success) {
-    res.status(400).json({ error: "Enter the reviewer's verified email address." });
+    logOverride("invalid_input");
+    res.status(400).json({
+      error: overrideRequested
+        ? "Enter a valid reviewer email address."
+        : "Enter the reviewer's verified email address.",
+    });
     return;
   }
+  const allowUnverifiedEmail = body.data.allowUnverifiedEmail;
+  let overrideResult = "error";
   try {
-    res.json(await linkAppReviewDemoEmail(body.data.email));
+    res.json(await linkAppReviewDemoEmail(body.data.email, allowUnverifiedEmail));
+    overrideResult = "linked";
   } catch (error) {
+    overrideResult = error instanceof AppReviewDemoError
+      ? `refused_${error.status}`
+      : "error";
     if (error instanceof AppReviewDemoError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
     req.log.error({ error: error instanceof Error ? error.message : "Unknown demo link error" }, "App Review demo linking failed");
     res.status(503).json({ error: "The App Review account could not be linked." });
+  } finally {
+    if (allowUnverifiedEmail) logOverride(overrideResult);
   }
 });
 

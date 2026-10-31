@@ -412,27 +412,32 @@ type ClerkEmailAddress = {
   verification: { status: string } | null;
 };
 
-export async function linkAppReviewDemoEmail(email: string): Promise<DemoStatus> {
+export async function linkAppReviewDemoEmail(
+  email: string,
+  allowUnverifiedEmail = false,
+): Promise<DemoStatus> {
   const normalizedEmail = email.trim().toLowerCase();
   const users = (await clerkClient.users.getUserList({
     emailAddress: [normalizedEmail],
     limit: 100,
   })).data;
-  const matchedUsers = users.filter((user) => (
-    user.emailAddresses.some((address: ClerkEmailAddress) =>
-      address.verification?.status === "verified"
-      && address.emailAddress.trim().toLowerCase() === normalizedEmail)
-  ));
+  const matchingAddress = (address: ClerkEmailAddress) => (
+    address.emailAddress.trim().toLowerCase() === normalizedEmail
+    && (allowUnverifiedEmail || address.verification?.status === "verified")
+  );
+  const matchedUsers = users.filter((user) =>
+    user.emailAddresses.some((address: ClerkEmailAddress) => matchingAddress(address)));
   if (matchedUsers.length !== 1) {
     throw new AppReviewDemoError(
-      "No unique Clerk account with this verified email was found. Create and sign in to the demo account first.",
+      allowUnverifiedEmail
+        ? "No unique Clerk account with this exact email was found. Confirm the address and try again."
+        : "No unique Clerk account with this verified email was found. Create and sign in to the demo account first.",
       404,
     );
   }
   const user = matchedUsers[0]!;
-  const verifiedEmail = user.emailAddresses.find((address: ClerkEmailAddress) =>
-    address.verification?.status === "verified"
-    && address.emailAddress.trim().toLowerCase() === normalizedEmail)!.emailAddress.trim();
+  const matchedEmail = user.emailAddresses.find((address: ClerkEmailAddress) =>
+    matchingAddress(address))!.emailAddress.trim();
 
   const client = await pool.connect();
   try {
@@ -481,7 +486,7 @@ export async function linkAppReviewDemoEmail(email: string): Promise<DemoStatus>
       `UPDATE businesses
        SET clerk_user_id = $2, owner_email = $3, updated_at = now()
        WHERE id = $1 AND is_sample = true AND is_internal = false`,
-      [business.id, user.id, verifiedEmail],
+      [business.id, user.id, matchedEmail],
     );
     const leadCount = await client.query<{ count: number }>(
       "SELECT count(*)::int AS count FROM leads WHERE business_id = $1",
@@ -492,7 +497,7 @@ export async function linkAppReviewDemoEmail(email: string): Promise<DemoStatus>
       exists: true,
       businessId: business.id,
       businessName: APP_REVIEW_DEMO_NAME,
-      ownerEmail: verifiedEmail,
+      ownerEmail: matchedEmail,
       linked: true,
       leadCount: Number(leadCount.rows[0]?.count ?? 0),
     };

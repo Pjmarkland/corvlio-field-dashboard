@@ -17,11 +17,22 @@ export function hasVerifiedAdminEmail(
   }>,
   allowedEmails: Set<string>,
 ): boolean {
-  return emailAddresses.some(
+  return getVerifiedAdminEmail(emailAddresses, allowedEmails) !== null;
+}
+
+export function getVerifiedAdminEmail(
+  emailAddresses: Array<{
+    emailAddress: string;
+    verification: { status: string } | null;
+  }>,
+  allowedEmails: Set<string>,
+): string | null {
+  const matched = emailAddresses.find(
     (address) =>
       address.verification?.status === "verified"
       && allowedEmails.has(address.emailAddress.trim().toLowerCase()),
   );
+  return matched?.emailAddress.trim().toLowerCase() ?? null;
 }
 
 export async function requireAdmin(
@@ -43,10 +54,12 @@ export async function requireAdmin(
 
   try {
     const user = await clerkClient.users.getUser(userId);
-    if (!hasVerifiedAdminEmail(user.emailAddresses, allowedEmails)) {
+    const adminEmail = getVerifiedAdminEmail(user.emailAddresses, allowedEmails);
+    if (!adminEmail) {
       res.sendStatus(404);
       return;
     }
+    res.locals.adminEmail = adminEmail;
   } catch (error) {
     req.log.warn(
       { error: error instanceof Error ? error.message : "Unknown Clerk lookup error" },

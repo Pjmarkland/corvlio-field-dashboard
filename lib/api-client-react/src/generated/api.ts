@@ -2529,8 +2529,8 @@ export const getLinkAdminAppReviewDemoUrl = () => {
 }
 
 /**
- * Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
- * @summary Link a verified Clerk account to the App Review demo
+ * Requires an authorized administrator and an existing Clerk account with an exact email match. Email verification is required unless the administrator explicitly enables the unverified-email override. Never creates an account or changes another business.
+ * @summary Link an existing Clerk account to the App Review demo
  */
 export const linkAdminAppReviewDemo = async (appReviewDemoLinkInput: AppReviewDemoLinkInput, options?: Parameters<typeof customFetch>[1]): Promise<AppReviewDemoStatus> => {
 
@@ -2579,7 +2579,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type LinkAdminAppReviewDemoMutationError = ErrorType<void>
 
     /**
- * @summary Link a verified Clerk account to the App Review demo
+ * @summary Link an existing Clerk account to the App Review demo
  */
 export const useLinkAdminAppReviewDemo = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkAdminAppReviewDemo>>, TError,{data: BodyType<AppReviewDemoLinkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

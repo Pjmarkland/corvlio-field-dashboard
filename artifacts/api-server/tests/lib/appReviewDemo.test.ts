@@ -204,6 +204,75 @@ describe("App Review demo", () => {
     expect(mocks.statements.some(({ sql }) => sql.startsWith("DELETE FROM leads"))).toBe(false);
   });
 
+  it("keeps the default lookup verified-only for an unverified email", async () => {
+    mocks.getUserList.mockResolvedValue({
+      data: [{
+        id: "user_reviewer",
+        emailAddresses: [{
+          emailAddress: "reviewer@example.test",
+          verification: { status: "unverified" },
+        }],
+      }],
+    });
+
+    await expect(linkAppReviewDemoEmail("reviewer@example.test")).rejects.toMatchObject({
+      message: "No unique Clerk account with this verified email was found. Create and sign in to the demo account first.",
+      status: 404,
+    });
+    expect(mocks.connect).not.toHaveBeenCalled();
+  });
+
+  it("links one exact unverified email match only when the admin override is enabled", async () => {
+    mocks.businesses = [business()];
+    mocks.getUserList.mockResolvedValue({
+      data: [{
+        id: "user_reviewer",
+        emailAddresses: [{
+          emailAddress: "patrickmarkland00+reviewer@gmail.com",
+          verification: { status: "unverified" },
+        }],
+      }],
+    });
+
+    const result = await linkAppReviewDemoEmail(
+      " PATRICKMARKLAND00+Reviewer@GMAIL.COM ",
+      true,
+    );
+    expect(mocks.getUserList).toHaveBeenCalledWith({
+      emailAddress: ["patrickmarkland00+reviewer@gmail.com"],
+      limit: 100,
+    });
+    expect(result).toMatchObject({
+      ownerEmail: "patrickmarkland00+reviewer@gmail.com",
+      linked: true,
+    });
+    expect(mocks.clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining("SET clerk_user_id = $2"),
+      [52, "user_reviewer", "patrickmarkland00+reviewer@gmail.com"],
+    );
+  });
+
+  it.each([
+    ["no matching account", []],
+    ["multiple matching accounts", [
+      {
+        id: "user_one",
+        emailAddresses: [{ emailAddress: "reviewer@example.test", verification: { status: "unverified" } }],
+      },
+      {
+        id: "user_two",
+        emailAddresses: [{ emailAddress: "reviewer@example.test", verification: { status: "unverified" } }],
+      },
+    ]],
+  ])("refuses the override when there are %s", async (_caseName, users) => {
+    mocks.getUserList.mockResolvedValue({ data: users });
+    await expect(linkAppReviewDemoEmail("reviewer@example.test", true)).rejects.toMatchObject({
+      message: "No unique Clerk account with this exact email was found. Confirm the address and try again.",
+      status: 404,
+    });
+    expect(mocks.connect).not.toHaveBeenCalled();
+  });
+
   it("refuses to link a Clerk account already assigned to another business", async () => {
     mocks.businesses = [business()];
     mocks.getUserList.mockResolvedValue({
@@ -217,6 +286,24 @@ describe("App Review demo", () => {
     });
     mocks.otherOwners = [{ id: 3, business_name: "Existing customer" }];
     await expect(linkAppReviewDemoEmail("reviewer@example.test")).rejects.toThrow(
+      "This account already owns another business",
+    );
+    expect(mocks.statements.some(({ sql }) => sql.includes("SET clerk_user_id = $2"))).toBe(false);
+  });
+
+  it("keeps the other-business ownership guard active for an unverified override", async () => {
+    mocks.businesses = [business()];
+    mocks.otherOwners = [{ id: 3, business_name: "Existing customer" }];
+    mocks.getUserList.mockResolvedValue({
+      data: [{
+        id: "user_reviewer",
+        emailAddresses: [{
+          emailAddress: "reviewer@example.test",
+          verification: { status: "unverified" },
+        }],
+      }],
+    });
+    await expect(linkAppReviewDemoEmail("reviewer@example.test", true)).rejects.toThrow(
       "This account already owns another business",
     );
     expect(mocks.statements.some(({ sql }) => sql.includes("SET clerk_user_id = $2"))).toBe(false);

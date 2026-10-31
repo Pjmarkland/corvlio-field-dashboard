@@ -16,7 +16,7 @@ import type { NextFunction, Request, Response } from "express";
 
 function middlewareArgs() {
   const req = { log: { warn: vi.fn() } } as unknown as Request;
-  const res = { sendStatus: vi.fn() } as unknown as Response;
+  const res = { sendStatus: vi.fn(), locals: {} } as unknown as Response;
   const next = vi.fn() as unknown as NextFunction;
   return { req, res, next };
 }
@@ -88,5 +88,6 @@ describe("admin email access", () => {
     await requireAdmin(authorized.req, authorized.res, authorized.next);
     expect(authorized.next).toHaveBeenCalledOnce();
     expect(authorized.res.sendStatus).not.toHaveBeenCalled();
+    expect(authorized.res.locals.adminEmail).toBe("founder@example.com");
   });
 });

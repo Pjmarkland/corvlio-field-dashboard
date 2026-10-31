@@ -52,6 +52,7 @@ describe("AppReviewDemoSection", () => {
     expect(screen.getByTestId("text-app-review-demo-status").textContent).toBe("8 fictional leads ready");
     expect(screen.getByTestId("text-app-review-demo-owner").textContent).toBe("No reviewer account linked");
     expect((screen.getByTestId("button-link-app-review-demo") as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId("checkbox-allow-unverified-app-review-email") as HTMLInputElement).checked).toBe(false);
   });
 
   it("does not reset unless the admin confirms the limited sample-data reset", async () => {
@@ -73,9 +74,25 @@ describe("AppReviewDemoSection", () => {
     });
     fireEvent.submit(screen.getByTestId("form-link-app-review-demo"));
     await waitFor(() => expect(mocks.link).toHaveBeenCalledWith({
-      data: { email: "reviewer@example.test" },
+      data: { email: "reviewer@example.test", allowUnverifiedEmail: false },
     }));
     expect(screen.getByTestId("success-app-review-demo").textContent).toContain("existing verified Clerk account");
+  });
+
+  it("sends the explicit override only when checked and then turns it back off", async () => {
+    view();
+    fireEvent.change(screen.getByTestId("input-app-review-demo-email"), {
+      target: { value: "reviewer@example.test" },
+    });
+    fireEvent.click(screen.getByTestId("checkbox-allow-unverified-app-review-email"));
+    expect((screen.getByTestId("checkbox-allow-unverified-app-review-email") as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.submit(screen.getByTestId("form-link-app-review-demo"));
+    await waitFor(() => expect(mocks.link).toHaveBeenCalledWith({
+      data: { email: "reviewer@example.test", allowUnverifiedEmail: true },
+    }));
+    expect(screen.getByTestId("success-app-review-demo").textContent).toContain("unverified-email admin override");
+    expect((screen.getByTestId("checkbox-allow-unverified-app-review-email") as HTMLInputElement).checked).toBe(false);
   });
 
   it("prevents linking before the demo business exists", () => {

@@ -914,17 +914,18 @@ export const ResetAdminAppReviewDemoResponse = zod.object({
 
 
 /**
- * Requires an existing Clerk account with the exact verified email. Never creates an account or changes another business.
- * @summary Link a verified Clerk account to the App Review demo
+ * Requires an authorized administrator and an existing Clerk account with an exact email match. Email verification is required unless the administrator explicitly enables the unverified-email override. Never creates an account or changes another business.
+ * @summary Link an existing Clerk account to the App Review demo
  */
 export const linkAdminAppReviewDemoBodyEmailMax = 320;
 
 
 export const linkAdminAppReviewDemoBodyEmailRegExp = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
-
+export const linkAdminAppReviewDemoBodyAllowUnverifiedEmailDefault = false;
 
 export const LinkAdminAppReviewDemoBody = zod.object({
-  "email": zod.string().max(linkAdminAppReviewDemoBodyEmailMax).regex(linkAdminAppReviewDemoBodyEmailRegExp)
+  "email": zod.string().max(linkAdminAppReviewDemoBodyEmailMax).regex(linkAdminAppReviewDemoBodyEmailRegExp),
+  "allowUnverifiedEmail": zod.boolean().default(linkAdminAppReviewDemoBodyAllowUnverifiedEmailDefault).describe('Admin-only explicit override that permits linking an exact email match even if it is unverified.')
 })
 
 export const LinkAdminAppReviewDemoResponse = zod.object({
