@@ -13,18 +13,71 @@
  * IMPORTANT:
  * - Only active in production (Clerk proxying doesn't work for dev instances)
  * - Must be mounted BEFORE express.json() middleware
+ * - Native WebViews send capacitor://localhost origins; normalize upstream
+ *   Origin for Clerk and restore exact-origin CORS headers for those clients.
  *
  * Usage in app.ts:
  *   import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
  *   app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
  */
 
-import type { IncomingHttpHeaders } from 'http';
+import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'http';
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const CLERK_FAPI = 'https://frontend-api.clerk.dev';
 export const CLERK_PROXY_PATH = '/api/__clerk';
+const NATIVE_APP_ORIGINS = new Set([
+  'capacitor://localhost',
+  'ionic://localhost',
+  'https://localhost',
+  'http://localhost',
+]);
+const DEFAULT_ALLOW_METHODS = 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS';
+const DEFAULT_ALLOW_HEADERS = 'Content-Type, Authorization';
+
+function getNativeAppOrigin(origin: string | string[] | undefined): string | undefined {
+  return typeof origin === 'string' && NATIVE_APP_ORIGINS.has(origin)
+    ? origin
+    : undefined;
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value.join(', ') : value;
+}
+
+function appendVaryOrigin(headers: OutgoingHttpHeaders): void {
+  const current = headers.vary;
+  const values = (Array.isArray(current) ? current : [current])
+    .flatMap((value) => typeof value === 'string' ? value.split(',') : [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (!values.some((value) => value.toLowerCase() === 'origin')) {
+    values.push('Origin');
+  }
+  headers.vary = values.join(', ');
+}
+
+function setNativeCorsHeaders(
+  req: { headers: IncomingHttpHeaders },
+  headers: OutgoingHttpHeaders,
+  origin: string,
+): void {
+  headers['access-control-allow-origin'] = origin;
+  headers['access-control-allow-credentials'] = 'true';
+  headers['access-control-allow-headers'] =
+    firstHeaderValue(req.headers['access-control-request-headers'])?.trim()
+    || firstHeaderValue(headers['access-control-allow-headers'])
+    || DEFAULT_ALLOW_HEADERS;
+  headers['access-control-allow-methods'] = DEFAULT_ALLOW_METHODS;
+  appendVaryOrigin(headers);
+}
+
+function getProxyPublicOrigin(req: { headers: IncomingHttpHeaders }): string {
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = getClerkProxyHost(req) || '';
+  return `${protocol}://${host}`;
+}
 
 /**
  * Returns the first effective public hostname for the given request,
@@ -63,7 +116,7 @@ export function clerkProxyMiddleware(): RequestHandler {
     return (_req, _res, next) => next();
   }
 
-  return createProxyMiddleware({
+  const proxyMiddleware = createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
     // Take over the response so it can be re-sent with a Content-Length (see
@@ -73,12 +126,14 @@ export function clerkProxyMiddleware(): RequestHandler {
       path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ''),
     on: {
       proxyReq: (proxyReq, req) => {
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = getClerkProxyHost(req) || '';
-        const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
+        const publicOrigin = getProxyPublicOrigin(req);
+        const proxyUrl = `${publicOrigin}${CLERK_PROXY_PATH}`;
 
         proxyReq.setHeader('Clerk-Proxy-Url', proxyUrl);
         proxyReq.setHeader('Clerk-Secret-Key', secretKey);
+        if (getNativeAppOrigin(req.headers.origin)) {
+          proxyReq.setHeader('Origin', publicOrigin);
+        }
 
         const xff = req.headers['x-forwarded-for'];
         const clientIp =
@@ -98,6 +153,10 @@ export function clerkProxyMiddleware(): RequestHandler {
       // assets) and body-less responses stream through without buffering.
       proxyRes: (proxyRes, req, res) => {
         const headers = { ...proxyRes.headers };
+        const nativeOrigin = getNativeAppOrigin(req.headers.origin);
+        if (nativeOrigin) {
+          setNativeCorsHeaders(req, headers, nativeOrigin);
+        }
         // Transfer-Encoding/Connection are hop-by-hop (RFC 7230 §6.1).
         delete headers['transfer-encoding'];
         delete headers['connection'];
@@ -143,4 +202,20 @@ export function clerkProxyMiddleware(): RequestHandler {
       },
     },
   }) as RequestHandler;
+
+  return (req, res, next) => {
+    const nativeOrigin = getNativeAppOrigin(req.headers.origin);
+    if (req.method === 'OPTIONS' && nativeOrigin) {
+      const headers: OutgoingHttpHeaders = {};
+      setNativeCorsHeaders(req, headers, nativeOrigin);
+      const requestedMethod = firstHeaderValue(req.headers['access-control-request-method'])?.trim();
+      if (requestedMethod) {
+        headers['access-control-allow-methods'] = requestedMethod;
+      }
+      res.writeHead(204, headers);
+      res.end();
+      return;
+    }
+    proxyMiddleware(req, res, next);
+  };
 }
