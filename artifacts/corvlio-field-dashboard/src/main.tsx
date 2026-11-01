@@ -1,3 +1,4 @@
+import './lib/nativeClerkCookieBridge';
 import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';

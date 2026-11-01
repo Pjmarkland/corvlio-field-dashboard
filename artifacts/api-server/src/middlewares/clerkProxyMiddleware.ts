@@ -13,8 +13,8 @@
  * IMPORTANT:
  * - Only active in production (Clerk proxying doesn't work for dev instances)
  * - Must be mounted BEFORE express.json() middleware
- * - Native WebViews cannot rely on Clerk's browser cookies; normalize their
- *   Origin and expose Clerk's Authorization token for the native token flow.
+ * - Native WebViews cannot store Clerk's cross-site __client cookie; normalize
+ *   their Origin and bridge that cookie through X-Native-Clerk-Client.
  *
  * Usage in app.ts:
  *   import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
@@ -34,7 +34,7 @@ const NATIVE_APP_ORIGINS = new Set([
   'http://localhost',
 ]);
 const DEFAULT_ALLOW_METHODS = 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS';
-const DEFAULT_ALLOW_HEADERS = 'Content-Type, Authorization';
+const DEFAULT_ALLOW_HEADERS = 'Content-Type, Authorization, X-Native-Clerk-Client';
 
 function getNativeAppOrigin(origin: string | string[] | undefined): string | undefined {
   return typeof origin === 'string' && NATIVE_APP_ORIGINS.has(origin)
@@ -44,6 +44,64 @@ function getNativeAppOrigin(origin: string | string[] | undefined): string | und
 
 function firstHeaderValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value.join(', ') : value;
+}
+
+function mergeNativeClientCookie(
+  existingCookie: string | undefined,
+  clientValue: string,
+): string {
+  const cookies = (existingCookie ?? '')
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter(Boolean)
+    .filter((cookie) => {
+      const separator = cookie.indexOf('=');
+      return cookie.slice(0, separator < 0 ? undefined : separator).trim() !== '__client';
+    });
+
+  cookies.push(`__client=${clientValue}`);
+  return cookies.join('; ');
+}
+
+function getNativeClientCookieValue(
+  setCookieHeaders: string | string[] | undefined,
+): string | undefined {
+  const setCookies = Array.isArray(setCookieHeaders)
+    ? setCookieHeaders
+    : setCookieHeaders
+      ? [setCookieHeaders]
+      : [];
+  let clientValue: string | undefined;
+
+  for (const setCookie of setCookies) {
+    const [cookiePair, ...attributes] = setCookie.split(';');
+    const separator = cookiePair.indexOf('=');
+    if (separator < 0 || cookiePair.slice(0, separator).trim() !== '__client') {
+      continue;
+    }
+
+    const value = cookiePair.slice(separator + 1).trim();
+    const isExpired = attributes.some((attribute) => {
+      const attributeSeparator = attribute.indexOf('=');
+      if (attributeSeparator < 0) return false;
+
+      const name = attribute.slice(0, attributeSeparator).trim().toLowerCase();
+      const attributeValue = attribute.slice(attributeSeparator + 1).trim();
+      if (name === 'max-age') {
+        const maxAge = Number(attributeValue);
+        return Number.isFinite(maxAge) && maxAge <= 0;
+      }
+      if (name === 'expires') {
+        const expiresAt = Date.parse(attributeValue);
+        return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+      }
+      return false;
+    });
+
+    clientValue = value === '' || isExpired ? '' : value;
+  }
+
+  return clientValue;
 }
 
 function appendHeaderToken(
@@ -82,16 +140,24 @@ function setNativeCorsHeaders(
 ): void {
   headers['access-control-allow-origin'] = origin;
   headers['access-control-allow-credentials'] = 'true';
-  headers['access-control-allow-headers'] = appendHeaderToken(
+  const allowedHeaders = appendHeaderToken(
     firstHeaderValue(req.headers['access-control-request-headers'])?.trim()
     || firstHeaderValue(headers['access-control-allow-headers'])
     || DEFAULT_ALLOW_HEADERS,
     'Authorization',
   );
+  headers['access-control-allow-headers'] = appendHeaderToken(
+    allowedHeaders,
+    'X-Native-Clerk-Client',
+  );
   headers['access-control-allow-methods'] = DEFAULT_ALLOW_METHODS;
-  headers['access-control-expose-headers'] = appendHeaderToken(
+  const exposedHeaders = appendHeaderToken(
     firstHeaderValue(headers['access-control-expose-headers']),
     'Authorization',
+  );
+  headers['access-control-expose-headers'] = appendHeaderToken(
+    exposedHeaders,
+    'X-Native-Clerk-Client',
   );
   appendVaryOrigin(headers);
 }
@@ -159,6 +225,19 @@ export function clerkProxyMiddleware(): RequestHandler {
           if (req.headers.authorization !== undefined) {
             proxyReq.setHeader('Authorization', req.headers.authorization);
           }
+          const nativeClientValue = firstHeaderValue(
+            req.headers['x-native-clerk-client'],
+          )?.trim();
+          if (nativeClientValue) {
+            const incomingCookie = Array.isArray(req.headers.cookie)
+              ? req.headers.cookie.join('; ')
+              : req.headers.cookie;
+            proxyReq.setHeader(
+              'Cookie',
+              mergeNativeClientCookie(incomingCookie, nativeClientValue),
+            );
+          }
+          proxyReq.removeHeader('X-Native-Clerk-Client');
         }
 
         const xff = req.headers['x-forwarded-for'];
@@ -182,6 +261,12 @@ export function clerkProxyMiddleware(): RequestHandler {
         const nativeOrigin = getNativeAppOrigin(req.headers.origin);
         if (nativeOrigin) {
           setNativeCorsHeaders(req, headers, nativeOrigin);
+          const nativeClientValue = getNativeClientCookieValue(
+            proxyRes.headers['set-cookie'],
+          );
+          if (nativeClientValue !== undefined) {
+            headers['x-native-clerk-client'] = nativeClientValue;
+          }
         }
         // Transfer-Encoding/Connection are hop-by-hop (RFC 7230 §6.1).
         delete headers['transfer-encoding'];
