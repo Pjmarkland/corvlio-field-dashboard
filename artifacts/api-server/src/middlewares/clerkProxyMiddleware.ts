@@ -13,8 +13,8 @@
  * IMPORTANT:
  * - Only active in production (Clerk proxying doesn't work for dev instances)
  * - Must be mounted BEFORE express.json() middleware
- * - Native WebViews send capacitor://localhost origins; normalize upstream
- *   Origin for Clerk and restore exact-origin CORS headers for those clients.
+ * - Native WebViews cannot rely on Clerk's browser cookies; normalize their
+ *   Origin and expose Clerk's Authorization token for the native token flow.
  *
  * Usage in app.ts:
  *   import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
@@ -46,6 +46,23 @@ function firstHeaderValue(value: string | string[] | undefined): string | undefi
   return Array.isArray(value) ? value.join(', ') : value;
 }
 
+function appendHeaderToken(
+  value: string | string[] | undefined,
+  token: string,
+): string {
+  const values = (firstHeaderValue(value) ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (values.includes('*')) {
+    return token;
+  }
+  if (!values.some((part) => part.toLowerCase() === token.toLowerCase())) {
+    values.push(token);
+  }
+  return values.join(', ');
+}
+
 function appendVaryOrigin(headers: OutgoingHttpHeaders): void {
   const current = headers.vary;
   const values = (Array.isArray(current) ? current : [current])
@@ -65,11 +82,17 @@ function setNativeCorsHeaders(
 ): void {
   headers['access-control-allow-origin'] = origin;
   headers['access-control-allow-credentials'] = 'true';
-  headers['access-control-allow-headers'] =
+  headers['access-control-allow-headers'] = appendHeaderToken(
     firstHeaderValue(req.headers['access-control-request-headers'])?.trim()
     || firstHeaderValue(headers['access-control-allow-headers'])
-    || DEFAULT_ALLOW_HEADERS;
+    || DEFAULT_ALLOW_HEADERS,
+    'Authorization',
+  );
   headers['access-control-allow-methods'] = DEFAULT_ALLOW_METHODS;
+  headers['access-control-expose-headers'] = appendHeaderToken(
+    firstHeaderValue(headers['access-control-expose-headers']),
+    'Authorization',
+  );
   appendVaryOrigin(headers);
 }
 
@@ -133,6 +156,9 @@ export function clerkProxyMiddleware(): RequestHandler {
         proxyReq.setHeader('Clerk-Secret-Key', secretKey);
         if (getNativeAppOrigin(req.headers.origin)) {
           proxyReq.setHeader('Origin', publicOrigin);
+          if (req.headers.authorization !== undefined) {
+            proxyReq.setHeader('Authorization', req.headers.authorization);
+          }
         }
 
         const xff = req.headers['x-forwarded-for'];
