@@ -740,11 +740,17 @@ function SignInPage() {
   if (new URLSearchParams(window.location.search).get('accountDeleted') === '1') {
     return <DeletedAccountSignOut />;
   }
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} /></div>;
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">{Capacitor.isNativePlatform() ? (
+    // @ts-expect-error Clerk's installed types omit the virtual routing strategy required by Capacitor.
+    <SignIn routing="virtual" forceRedirectUrl={`${basePath}/dashboard`} />
+  ) : <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} />}</div>;
 }
 
 export function SignUpPage() {
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/welcome`} /></div>;
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">{Capacitor.isNativePlatform() ? (
+    // @ts-expect-error Clerk's installed types omit the virtual routing strategy required by Capacitor.
+    <SignUp routing="virtual" forceRedirectUrl={`${basePath}/welcome`} />
+  ) : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/welcome`} />}</div>;
 }
 
 function LeadDataRouter() {
