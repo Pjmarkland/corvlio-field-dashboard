@@ -10,6 +10,7 @@ const {
   mockUpdateBusinessProfile,
   mockNativeState,
   mockGetOwnerInvoices,
+  mockDashboardReports,
 } = vi.hoisted(() => ({
   mockRevoke: vi.fn(),
   mockSignOut: vi.fn(),
@@ -18,6 +19,10 @@ const {
   mockUpdateBusinessProfile: vi.fn(),
   mockNativeState: { value: false },
   mockGetOwnerInvoices: vi.fn(),
+  mockDashboardReports: {
+    callUsage: { data: { count: 18, includedCalls: 100 } },
+    monthlyReport: { isLoading: false, isError: false, data: { enabled: false, month: '2026-11-01', calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [] } },
+  },
 }));
 
 vi.mock('@clerk/react', () => ({
@@ -60,8 +65,8 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetOwnerInvoicesQueryKey: () => ['/api/owner/invoices'],
   useGetOwnerInvoices: (...args: unknown[]) => mockGetOwnerInvoices(...args),
   useGetBusinessProfile: () => mockGetBusinessProfile(),
-  useGetBusinessCallUsage: () => ({ data: { count: 18, includedCalls: 100 } }),
-  useGetBusinessMonthlyResultsReport: () => ({ isLoading: false, isError: false, data: { enabled: false, month: '2026-11-01', calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [] } }),
+  useGetBusinessCallUsage: () => mockDashboardReports.callUsage,
+  useGetBusinessMonthlyResultsReport: () => mockDashboardReports.monthlyReport,
   useUpdateBusinessProfile: () => ({ isPending: false, mutate: mockUpdateBusinessProfile }),
   getGetBusinessProfileQueryKey: () => ['/api/businesses/me'],
 }));
@@ -82,7 +87,7 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell } from './App';
+import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
@@ -377,5 +382,30 @@ describe('native AppShell billing boundaries', () => {
     mockGetOwnerInvoices.mockReturnValue({ data: undefined });
     renderShell();
     expect(mockGetOwnerInvoices.mock.calls.at(-1)?.[0].query.enabled).toBe(true);
+  });
+});
+
+describe('usage and managed report display', () => {
+  it('shows monthly call usage without prices or plan labels', () => {
+    mockDashboardReports.callUsage = { data: { count: 18, includedCalls: 100 } };
+    const { container } = render(<CallUsageLine />);
+    expect(screen.getByTestId('text-call-usage').textContent).toBe('18 of 100 calls this month');
+    expect(container.textContent).not.toMatch(/price|plan|\$/i);
+  });
+
+  it('keeps monthly results hidden until enabled, then renders the report', () => {
+    mockDashboardReports.monthlyReport = {
+      isLoading: false,
+      isError: false,
+      data: { enabled: false, month: '2026-11-01', calls: 4, leadsCaptured: 2, urgentLeads: 1, contactedLeads: 1, pendingLeads: 1, busiestDays: [{ day: '2026-11-01', callCount: 3 }] },
+    } as any;
+    const { rerender } = render(<ManagedMonthlyResultsReport />);
+    expect(screen.queryByTestId('section-managed-monthly-report')).toBeNull();
+
+    mockDashboardReports.monthlyReport.data.enabled = true;
+    rerender(<ManagedMonthlyResultsReport />);
+    expect(screen.getByTestId('section-managed-monthly-report').textContent).toContain('Managed results');
+    expect(screen.getByTestId('section-managed-monthly-report').textContent).toContain('Leads captured');
+    expect(screen.getByTestId('section-managed-monthly-report').textContent).toContain('4');
   });
 });

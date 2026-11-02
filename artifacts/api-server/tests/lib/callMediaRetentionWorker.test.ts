@@ -15,7 +15,7 @@ describe("call media retention", () => {
 
   it("uses one 12-month cutoff, deletes provider media, and clears local transcript and recording", async () => {
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes("FROM retell_call_records r")) {
+      if (sql.includes("SELECT r.id, r.retell_call_id AS call_id")) {
         return { rows: [{ id: 9, call_id: "call-9", business_id: 44, lead_id: 109 }], rowCount: 1 };
       }
       if (sql.includes("FROM leads l")) {
@@ -42,7 +42,7 @@ describe("call media retention", () => {
 
   it("leaves local media intact when Retell deletion fails and logs only the lead ID", async () => {
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes("FROM retell_call_records r")) {
+      if (sql.includes("SELECT r.id, r.retell_call_id AS call_id")) {
         return { rows: [{ id: 9, call_id: "call-9", business_id: 44, lead_id: 109 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 0 };

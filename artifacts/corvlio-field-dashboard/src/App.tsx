@@ -351,13 +351,13 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
   return <div className="mb-7 flex items-end justify-between gap-4 animate-rise-in"><div><div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{eyebrow}</div><h1 className="text-[32px] font-800 leading-[.98] tracking-[-0.055em] sm:text-[40px]">{title}</h1>{description ? <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p> : null}</div>{action}</div>;
 }
 
-function CallUsageLine() {
+export function CallUsageLine() {
   const { data } = useGetBusinessCallUsage();
   if (!data || data.includedCalls === null) return null;
   return <p className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground" data-testid="text-call-usage">{data.count} of {data.includedCalls} calls this month</p>;
 }
 
-function ManagedMonthlyResultsReport() {
+export function ManagedMonthlyResultsReport() {
   const report = useGetBusinessMonthlyResultsReport();
   if (report.isLoading || report.isError || !report.data?.enabled) return null;
   const data = report.data;
