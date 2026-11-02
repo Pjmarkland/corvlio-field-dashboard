@@ -23,6 +23,8 @@ describe('owner call-forwarding instructions', () => {
     expect(text).toContain('owner’s responsibility');
     expect(text).toContain('busy/no-answer');
     expect(text).toContain('Charges and voicemail behavior may vary');
+    expect(text.match(/How to turn it off:/g)).toHaveLength(4);
+    expect(text).toContain('disable forwarding');
   });
 
   it('never creates US wireless dial strings for an international destination', () => {
@@ -39,11 +41,18 @@ describe('owner call-forwarding instructions', () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
     render(<form onSubmit={submit}><CallForwardingHelp phoneNumber="+14155550123" /></form>);
-    for (const label of ['AT&T', 'Verizon', 'T-Mobile', 'VoIP or another phone provider']) {
+    for (const label of ['AT&T', 'Verizon', 'T-Mobile', 'Other carrier, landline, or VoIP']) {
       fireEvent.click(screen.getByText(label));
     }
     expect(submit).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.queryAllByRole('link').some(link => link.getAttribute('href')?.startsWith('tel:'))).toBe(false);
+  });
+
+  it('shows a short setup checklist before a Corvlio number is assigned', () => {
+    render(<CallForwardingHelp />);
+    const help = screen.getByTestId('call-forwarding-help');
+    expect(help.textContent).toContain('After Corvlio assigns your number');
+    expect(help.textContent).toContain('open Settings');
   });
 });

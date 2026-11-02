@@ -2,6 +2,7 @@ import { useGetNativeBusinessSetupStatus, getGetNativeBusinessSetupStatusQueryKe
 import { useUser } from '@clerk/react';
 import { CheckCircle2 } from 'lucide-react';
 import { Link, Redirect } from 'wouter';
+import { CallForwardingHelp } from '@/components/CallForwardingHelp';
 import { NativeOnboardingForm } from '@/pages/onboarding';
 
 export default function NativeBusinessSetupGate() {
@@ -38,6 +39,7 @@ export default function NativeBusinessSetupGate() {
       <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">Setup received</p>
       <h1 className="mt-2 text-2xl font-800 tracking-tight">Thanks{status.data.businessName ? `, ${status.data.businessName}` : ''}.</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Corvlio has your business details. We’ll review the setup and update your Field Desk when it’s ready.</p>
+      <CallForwardingHelp />
       <Link href="/dashboard" data-testid="link-native-setup-dashboard" className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">Go to Field Desk</Link>
     </section>
   </main>;

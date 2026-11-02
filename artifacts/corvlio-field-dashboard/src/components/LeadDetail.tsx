@@ -139,14 +139,12 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
   const duration = formatDuration(lead.durationMs);
   const contacted = lead.status === 'contacted';
   const saving = savingLeadId === lead.id;
-  const urgency = lead.capturedUrgency?.trim();
   const address = lead.address?.trim();
   const recording = safeRecordingUrl(lead.recordingUrl);
   const arrival = formatCallTime(lead.createdAt);
   const contactedAt = contacted ? formatCallTime(lead.contactedAt) : null;
   const byYou = !!user && !!lead.contactedBy && lead.contactedBy === user.id;
   const actor = lead.contactedBy?.trim();
-  const first = displayName(lead.name).split(' ')[0];
   const intake = lead.tradeIntakeAnswers?.trim();
   const summary = lead.summary?.trim();
   const transcript = lead.transcript?.trim();
@@ -155,10 +153,10 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
   return <div className="animate-rise-in" data-testid="lead-detail">
     {back}
     <div className="mb-6 flex items-start gap-4">
-      <div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{nameInitials(lead.name)}</div>
+      <div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[20px] text-lg font-800 ${lead.urgency === 'urgent' ? 'bg-[#b42318] text-white' : 'bg-secondary text-secondary-foreground'}`}>{nameInitials(lead.name)}</div>
       <div className="min-w-0">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          {urgency ? <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-[#c84b29]" data-testid="badge-urgency">{urgency}</span> : null}
+          {lead.urgency === 'urgent' ? <span className="rounded-full bg-[#b42318] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[.08em] text-white shadow-sm" data-testid="badge-urgency">URGENT</span> : lead.urgency === 'low' ? <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground" data-testid="badge-urgency">Low priority</span> : null}
           <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${contacted ? 'text-[#398660]' : 'text-muted-foreground'}`} data-testid="text-detail-status"><span className={`h-1.5 w-1.5 rounded-full ${contacted ? 'bg-[#49a979]' : 'bg-[#c4bcae]'}`} />{contacted ? 'Contacted' : 'Needs response'}</span>
         </div>
         <h1 className="break-words text-[32px] font-800 leading-none tracking-[-0.055em]" data-testid="text-detail-name">{displayName(lead.name)}</h1>
@@ -166,7 +164,7 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
       </div>
     </div>
     <div className="mb-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.17em] text-primary">What they need</p><p className="break-words text-xl font-semibold leading-snug tracking-[-0.02em]" data-testid="text-detail-issue">{displayIssue(lead.issue)}</p></div>
-    <div className="grid grid-cols-2 gap-3"><LeadContactActions leadId={lead.id} phone={dial ? (lead.callbackNumber?.trim() || lead.phone) : null} prefix="detail-" large callLabel={`Call ${first}`} textLabel="Send text" /></div>
+    <div className="grid gap-3"><LeadContactActions leadId={lead.id} phone={dial ? (lead.callbackNumber?.trim() || lead.phone) : null} prefix="detail-" large callLabel="Call customer" textLabel="Text customer" /></div>
     <div className="mt-4 space-y-1 rounded-2xl border border-border bg-card p-3">
       <div className="flex min-h-12 items-center gap-3 px-1"><Phone size={16} className="text-muted-foreground" />{dial ? <CopyNumber value={shownPhone} /> : <span className="text-sm font-semibold" data-testid="text-no-phone">{shownPhone}</span>}</div>
       {address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer" data-testid="link-address-map" className="flex min-h-12 items-start gap-3 px-1 py-2 text-sm font-semibold"><MapPin size={16} className="mt-0.5 shrink-0 text-primary" /><span className="break-words">{address}</span></a> : null}

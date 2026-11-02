@@ -1,5 +1,5 @@
 import { db, leadsTable, retellCallRecordsTable, notificationEventsTable } from "@workspace/db";
-import { and, eq, gte, lte, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, isNull, sql } from "drizzle-orm";
 import { reconcileCall } from "./callReconciliation";
 import { enqueueWebPushDeliveries } from "./webPushService";
 
@@ -96,5 +96,53 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
         return true;
       },
     });
+  });
+}
+
+export async function persistBlankCall(
+  callId: string,
+  input: { businessId: number; callStartedAt: Date | null; durationMs: number | null },
+): Promise<{ inserted: boolean; triggerStreakAlert: boolean; streakStartCallId: string | null }> {
+  return db.transaction(async (tx) => {
+    // Serialize the threshold check per business so simultaneous webhooks cannot
+    // both claim to be the third consecutive failure.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${input.businessId})`);
+    const [record] = await tx
+      .insert(retellCallRecordsTable)
+      .values({
+        businessId: input.businessId,
+        retellCallId: callId,
+        callStartedAt: input.callStartedAt,
+        durationMs: input.durationMs,
+        outcome: "blank_or_failed",
+        analysisComplete: false,
+      })
+      .onConflictDoNothing()
+      .returning({ retellCallId: retellCallRecordsTable.retellCallId });
+    if (!record) return { inserted: false, triggerStreakAlert: false, streakStartCallId: null };
+
+    const recent = await tx
+      .select({
+        retellCallId: retellCallRecordsTable.retellCallId,
+        outcome: retellCallRecordsTable.outcome,
+      })
+      .from(retellCallRecordsTable)
+      .where(eq(retellCallRecordsTable.businessId, input.businessId))
+      .orderBy(
+        desc(sql`COALESCE(${retellCallRecordsTable.callStartedAt}, ${retellCallRecordsTable.recordedAt})`),
+        desc(retellCallRecordsTable.recordedAt),
+      )
+      .limit(4);
+
+    const thresholdReached = recent.length >= 3
+      && recent[0]?.retellCallId === callId
+      && recent.slice(0, 3).every((item) => item.outcome === "blank_or_failed")
+      && (recent.length === 3 || recent[3]?.outcome !== "blank_or_failed");
+
+    return {
+      inserted: true,
+      triggerStreakAlert: thresholdReached,
+      streakStartCallId: thresholdReached ? recent[2]?.retellCallId ?? null : null,
+    };
   });
 }

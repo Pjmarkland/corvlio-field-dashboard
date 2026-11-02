@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LeadContactActions } from '@/components/LeadContactActions';
 import { InstallHint } from '@/components/InstallHint';
-import { displayIssue, displayName, displayPhone, usablePhone, preferLeadCallback } from '@/lib/leadDisplay';
+import { displayIssue, displayName, displayPhone, usablePhone, preferLeadCallback, sortLeadsForDashboard } from '@/lib/leadDisplay';
 import { installPlatform, INSTALL_HINT_KEY } from '@/hooks/useInstallHint';
 
 describe('lead fallbacks', () => {
@@ -23,11 +23,18 @@ describe('contact actions', () => {
     expect(screen.getByTestId('button-text-callback').getAttribute('href')).toBe('sms:+15550188');
     expect(preferLeadCallback({ phone: '+1-555-0101', callbackNumber: ' ' }).phone).toBe('+1-555-0101');
   });
-  it('disables call and text without a usable phone', () => {
+  it('hides call and text without a usable phone', () => {
     render(<LeadContactActions leadId="1" phone="" />);
-    expect((screen.getByTestId('button-call-1') as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByTestId('button-text-1') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId('button-call-1')).toBeNull();
+    expect(screen.queryByTestId('button-text-1')).toBeNull();
     expect(usablePhone('12')).toBeNull();
+  });
+  it('renders a large primary customer call action', () => {
+    render(<LeadContactActions leadId="large" phone="+14155550123" large callLabel="Call customer" />);
+    const call = screen.getByTestId('button-call-large');
+    expect(call.textContent).toContain('Call customer');
+    expect(call.getAttribute('href')).toBe('tel:+14155550123');
+    expect(call.className).toContain('min-h-14');
   });
   it('renders tel/sms links with no automatic status side effects', () => {
     render(<LeadContactActions leadId="2" phone="(415) 555-0123" />);
@@ -35,6 +42,20 @@ describe('contact actions', () => {
     expect(call.getAttribute('href')).toBe('tel:4155550123');
     expect(screen.getByTestId('button-text-2').getAttribute('href')).toBe('sms:4155550123');
     expect(() => { fireEvent.click(call); }).not.toThrow();
+  });
+});
+
+describe('dashboard lead ordering', () => {
+  it('puts pending urgent leads first, then keeps all remaining leads newest first', () => {
+    const leads = [
+      { id: 'normal-new', urgency: 'normal', status: 'pending', createdAt: '2026-10-02T12:00:00Z' },
+      { id: 'urgent-old', urgency: 'urgent', status: 'pending', createdAt: '2026-10-01T12:00:00Z' },
+      { id: 'urgent-done', urgency: 'urgent', status: 'contacted', createdAt: '2026-10-03T12:00:00Z' },
+      { id: 'urgent-new', urgency: 'urgent', status: 'pending', createdAt: '2026-10-04T12:00:00Z' },
+    ];
+    expect(sortLeadsForDashboard(leads).map((lead) => lead.id))
+      .toEqual(['urgent-new', 'urgent-old', 'urgent-done', 'normal-new']);
+    expect(leads[0].id).toBe('normal-new');
   });
 });
 

@@ -6,17 +6,13 @@ type Props = { leadId: string; phone?: string | null; prefix?: string; large?: b
 /** Call/Text links. Tapping never changes lead status; owners mark contacted explicitly. */
 export function LeadContactActions({ leadId, phone, prefix = '', large, callLabel = 'Call', textLabel = 'Text' }: Props) {
   const dial = usablePhone(phone);
-  const base = `touch-target flex items-center justify-center gap-2 rounded-xl px-${large ? 4 : 3} py-2.5 text-sm font-bold`;
-  const off = 'cursor-not-allowed border border-border bg-muted text-muted-foreground opacity-70';
-  const call = dial ? 'bg-primary text-primary-foreground transition-colors hover:bg-primary-hover active:scale-[.98]' : off;
-  const text = dial ? 'border border-border bg-background text-foreground transition-colors hover:bg-muted active:scale-[.98]' : off;
+  if (!dial) return null;
+  const base = `touch-target flex items-center justify-center gap-2 rounded-xl py-2.5 font-bold ${large ? 'px-4' : 'px-3'} text-sm`;
+  const call = 'bg-primary text-primary-foreground transition-colors hover:bg-primary-hover active:scale-[.98]';
+  const text = 'border border-border bg-background text-foreground transition-colors hover:bg-muted active:scale-[.98]';
   const icon = large ? 18 : 16;
-  return <>
-    {dial
-      ? <a href={`tel:${dial}`} data-testid={`button-${prefix}call-${leadId}`} className={`${base} ${call}`}><Phone size={icon} />{callLabel}</a>
-      : <button type="button" disabled aria-disabled="true" data-testid={`button-${prefix}call-${leadId}`} className={`${base} ${call}`}><Phone size={icon} />{callLabel}</button>}
-    {dial
-      ? <a href={`sms:${dial}`} data-testid={`button-${prefix}text-${leadId}`} className={`${base} ${text}`}><MessageSquare size={icon} />{textLabel}</a>
-      : <button type="button" disabled aria-disabled="true" data-testid={`button-${prefix}text-${leadId}`} className={`${base} ${text}`}><MessageSquare size={icon} />{textLabel}</button>}
-  </>;
+  return <div className={large ? 'grid grid-cols-2 gap-2' : 'contents'}>
+    <a href={`tel:${dial}`} data-testid={`button-${prefix}call-${leadId}`} className={`${base} ${large ? 'col-span-2 min-h-14 text-base' : ''} ${call}`}><Phone size={icon} />{callLabel}</a>
+    <a href={`sms:${dial}`} data-testid={`button-${prefix}text-${leadId}`} className={`${base} ${large ? 'col-span-2 min-h-12' : ''} ${text}`}><MessageSquare size={icon} />{textLabel}</a>
+  </div>;
 }

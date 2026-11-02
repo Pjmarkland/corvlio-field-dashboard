@@ -299,6 +299,29 @@ describe('LeadCard navigation', () => {
     expect(link.tagName).toBe('A');
     expect(link.getAttribute('href')).toBe('/leads/L1');
   });
+  it('shows the callback number in a prominent Call customer link', () => {
+    const { hook } = memoryLocation({ path: '/dashboard', record: true });
+    render(<TestRouter hook={hook}><LeadCard lead={{ ...lead, callbackNumber: '+1 (415) 555-0199' }} onStatus={vi.fn()} saving={false} /></TestRouter>);
+    const call = screen.getByTestId('button-call-L1');
+    expect(call.textContent).toContain('Call customer');
+    expect(call.getAttribute('href')).toBe('tel:+14155550199');
+  });
+  it('hides contact links when there is no usable customer number', () => {
+    const { hook } = memoryLocation({ path: '/dashboard', record: true });
+    render(<TestRouter hook={hook}><LeadCard lead={{ ...lead, phone: 'unknown', callbackNumber: null }} onStatus={vi.fn()} saving={false} /></TestRouter>);
+    expect(screen.queryByTestId('button-call-L1')).toBeNull();
+    expect(screen.queryByTestId('button-text-L1')).toBeNull();
+  });
+  it('uses a prominent red urgent badge, a subtle low badge, and no normal badge', () => {
+    const { hook } = memoryLocation({ path: '/dashboard', record: true });
+    const { rerender } = render(<TestRouter hook={hook}><LeadCard lead={{ ...lead, urgency: 'urgent' }} onStatus={vi.fn()} saving={false} /></TestRouter>);
+    expect(screen.getByTestId('urgency-lead-L1').textContent).toBe('URGENT');
+    expect(screen.getByTestId('urgency-lead-L1').className).toContain('bg-[#b42318]');
+    rerender(<TestRouter hook={hook}><LeadCard lead={{ ...lead, urgency: 'low' }} onStatus={vi.fn()} saving={false} /></TestRouter>);
+    expect(screen.getByTestId('urgency-lead-L1').textContent).toBe('Low priority');
+    rerender(<TestRouter hook={hook}><LeadCard lead={lead} onStatus={vi.fn()} saving={false} /></TestRouter>);
+    expect(screen.queryByTestId('urgency-lead-L1')).toBeNull();
+  });
   it('does not navigate from call, text or status buttons', () => {
     const { history, onStatus } = renderCard();
     fireEvent.click(screen.getByTestId('button-call-L1'));

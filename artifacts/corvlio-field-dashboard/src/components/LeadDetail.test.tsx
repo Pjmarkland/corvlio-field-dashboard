@@ -26,12 +26,12 @@ describe('LeadDetailView', () => {
     expect(screen.getByTestId('text-detail-status').textContent).toBe('Needs response');
     expect(screen.queryByTestId('badge-urgency')).toBeNull();
     expect(screen.queryByTestId('section-transcript')).toBeNull();
-    expect((screen.getByTestId('button-detail-call-L1') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId('button-detail-call-L1')).toBeNull();
   });
   it('shows full detail as plain text with collapsed transcript', () => {
-    state.data = { ...base, name: 'Ann', phone: '+15550101', address: '1 Pier', capturedUrgency: 'Emergency', summary: '<img src=x onerror=alert(1)>', transcript: 'agent: hi', recordingUrl: 'https://x.test/a.mp3' };
+    state.data = { ...base, name: 'Ann', phone: '+15550101', address: '1 Pier', urgency: 'urgent', capturedUrgency: 'Emergency', summary: '<img src=x onerror=alert(1)>', transcript: 'agent: hi', recordingUrl: 'https://x.test/a.mp3' };
     const { container } = view();
-    expect(screen.getByTestId('badge-urgency').textContent).toBe('Emergency');
+    expect(screen.getByTestId('badge-urgency').textContent).toBe('URGENT');
     expect(screen.getByTestId('text-summary').textContent).toBe('<img src=x onerror=alert(1)>');
     expect(container.querySelector('img')).toBeNull();
     expect(screen.getByTestId('audio-recording').getAttribute('preload')).toBe('none');

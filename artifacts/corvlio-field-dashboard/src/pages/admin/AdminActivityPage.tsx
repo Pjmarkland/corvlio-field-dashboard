@@ -26,6 +26,8 @@ function LeadActivityRow({ lead }: { lead: AdminLeadActivity }) {
 export default function AdminActivityPage() {
   const { data, isLoading, isError, error, refetch } = useGetAdminActivity({ query: { queryKey: getGetAdminActivityQueryKey(), retry: false } });
   const leads = useMemo(() => [...(data?.recentLeads ?? [])].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [data?.recentLeads]);
+  const blankCalls = useMemo(() => (data?.operationalFailures ?? []).filter((failure) => failure.summary === 'Blank or failed call'), [data?.operationalFailures]);
+  const operationalFailures = useMemo(() => (data?.operationalFailures ?? []).filter((failure) => failure.summary !== 'Blank or failed call'), [data?.operationalFailures]);
   const notFound = Boolean(error && typeof error === 'object' && 'status' in error && (error as { status?: number }).status === 404);
 
   if (isLoading) return <AdminShell title="Lead activity" eyebrow="Founder operations"><AdminLoading label="Loading global lead activity" /></AdminShell>;
@@ -44,11 +46,30 @@ export default function AdminActivityPage() {
       {leads.length === 0 ? <AdminEmpty title="No lead activity yet" description="When a receptionist captures a lead, it will appear here in newest-first order." icon={Radio} /> : <div className="admin-panel overflow-hidden rounded-2xl">{leads.map((lead) => <LeadActivityRow key={lead.id} lead={lead} />)}</div>}
     </section>
     <section className="mt-10">
+      <SectionHeading eyebrow="Call quality" title="Blank or failed calls" detail="Calls with no usable intake, including the number, call time, duration, and business when known." />
+      {blankCalls.length === 0
+        ? <AdminEmpty title="No blank or failed calls" description="Blank or failed inbound calls will appear here without exposing transcripts." icon={Wrench} />
+        : <div className="admin-panel overflow-hidden rounded-2xl">
+          {blankCalls.map((failure) => <article key={failure.id} className="border-b border-[#e1e6df] px-4 py-5 last:border-b-0 sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-800 text-[#25362e]">Blank or failed call</h3>
+                <p className="mt-1 break-words text-sm leading-relaxed text-[#68766c]">{failure.details}</p>
+                <p className="mt-2 text-xs text-[#8a948d]">{failure.businessName ? `Business: ${failure.businessName}` : 'Business: unmatched'} · Recorded {formatAdminDate(failure.createdAt)}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-[#f2ede2] px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-[#75664b]">
+                {failure.businessId && failure.alertBlocked ? 'Alert after 3 consecutive' : failure.alertSentAt ? 'Founder alerted' : failure.alertAttempts ? 'Alert retry pending' : 'Alert queued'}
+              </span>
+            </div>
+          </article>)}
+        </div>}
+    </section>
+    <section className="mt-10">
       <SectionHeading eyebrow="Reliability" title="Operational failures" detail="Call, lead-email, and phone-provisioning failures requiring review." />
-      {data.operationalFailures.length === 0
+      {operationalFailures.length === 0
         ? <AdminEmpty title="No operational failures" description="Recorded pipeline failures will appear here with their alert delivery status." icon={Wrench} />
         : <div className="admin-panel overflow-hidden rounded-2xl">
-          {data.operationalFailures.map((failure) => <article key={failure.id} className="border-b border-[#e1e6df] px-4 py-5 last:border-b-0 sm:px-6">
+          {operationalFailures.map((failure) => <article key={failure.id} className="border-b border-[#e1e6df] px-4 py-5 last:border-b-0 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-sm font-800 text-[#25362e]">{failure.summary}</h3>

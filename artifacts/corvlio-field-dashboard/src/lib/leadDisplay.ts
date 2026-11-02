@@ -27,3 +27,16 @@ export function nameInitials(name?: string | null) {
   if (!n) return '?';
   return n.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }
+
+/** Keep pending urgent work first while preserving newest-first order within each group. */
+export function sortLeadsForDashboard<T extends {
+  urgency: string;
+  status: string;
+  createdAt: string;
+}>(leads: readonly T[]): T[] {
+  return [...leads].sort((a, b) => {
+    const aUrgentPending = a.status === 'pending' && a.urgency === 'urgent' ? 1 : 0;
+    const bUrgentPending = b.status === 'pending' && b.urgency === 'urgent' ? 1 : 0;
+    return bUrgentPending - aUrgentPending || Date.parse(b.createdAt) - Date.parse(a.createdAt);
+  });
+}

@@ -8,10 +8,10 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { runNotificationOutboxNow } from "../lib/notificationService";
-import { persistAnalyzedCall } from "../lib/retellPersistence";
+import { persistAnalyzedCall, persistBlankCall } from "../lib/retellPersistence";
 import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
-import { recordOperationalFailure } from "../lib/operationalFailures";
+import { queueFounderPushNotification, recordOperationalFailure } from "../lib/operationalFailures";
 import type { OperationalFailureSource } from "../lib/operationalFailures";
 import { alertRejectedRetellWebhook } from "../lib/retellWebhookAlerts";
 
@@ -73,6 +73,13 @@ function isBlankCall(call: RetellCall): boolean {
     || !hasMeaningfulValue(call.call_analysis);
 }
 
+function isPendingCallEnded(event: string | undefined, call: RetellCall): boolean {
+  return event === "call_ended"
+    && call.status?.trim().toLowerCase() !== "error"
+    && !(call.duration_ms !== undefined && call.duration_ms <= 0)
+    && !hasMeaningfulValue(call.call_analysis);
+}
+
 function isValidRetellSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   const apiKey = process.env[RETELL_API_KEY_ENV];
   if (!apiKey || !signatureHeader) return false;
@@ -105,17 +112,33 @@ async function recordRetellFailure(
     details: string;
     businessId?: number;
     businessName?: string;
+    eventKey?: string;
+    suppressAlert?: boolean;
+    founderPush?: {
+      eventKey: string;
+      title: string;
+      body: string;
+      deepLink: string;
+    };
   },
 ): Promise<void> {
   try {
     const rawBody = req.rawBody ?? Buffer.from("");
-    const eventKey = `${eventPrefix}:${createHash("sha256").update(rawBody).digest("hex")}`;
+    const eventKey = input.eventKey
+      ?? `${eventPrefix}:${createHash("sha256").update(rawBody).digest("hex")}`;
     const inserted = await recordOperationalFailure({
       eventKey,
       source,
-      ...input,
+      summary: input.summary,
+      details: input.details,
+      businessId: input.businessId,
+      businessName: input.businessName,
+      suppressAlert: input.suppressAlert,
     });
-    if (inserted) {
+    const pushInserted = input.founderPush
+      ? await queueFounderPushNotification(input.founderPush)
+      : false;
+    if (inserted || pushInserted) {
       void runNotificationOutboxNow().catch((error) => {
         req.log.error(
           { error: error instanceof Error ? error.message : "Unknown outbox error" },
@@ -138,6 +161,14 @@ function recordPostCallFailure(
     details: string;
     businessId?: number;
     businessName?: string;
+    eventKey?: string;
+    suppressAlert?: boolean;
+    founderPush?: {
+      eventKey: string;
+      title: string;
+      body: string;
+      deepLink: string;
+    };
   },
 ): Promise<void> {
   return recordRetellFailure(req, "retell-post-call", "post_call_webhook", input);
@@ -240,21 +271,11 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Retell call object is required" });
     return;
   }
-  if (isBlankCall(call)) {
-    req.log.info(
-      {
-        callId: call.call_id ?? null,
-        status: call.status ?? null,
-        durationMs: call.duration_ms ?? null,
-        hasCallAnalysis: hasMeaningfulValue(call.call_analysis),
-      },
-      "Ignoring error, zero-duration, or empty-analysis Retell call",
-    );
+  if (isPendingCallEnded(body.data.event, call)) {
     res.sendStatus(204);
     return;
   }
-
-  const phoneNumber = call ? callPhoneNumber(call) : null;
+  const phoneNumber = callPhoneNumber(call);
   if (!phoneNumber) {
     req.log.warn("Retell call_analyzed webhook is missing call phone numbers");
     await alertRejectedRetellWebhook("post-call", "malformed_payload");
@@ -264,11 +285,77 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
 
   try {
     const business = await findBusinessByPhoneNumber(phoneNumber);
+    const retellCallId = firstString(call.call_id)
+      ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
+    const startedAt = callStartedAt(call.start_timestamp);
+    const occurredAt = startedAt ?? new Date();
+    const durationMs = callDurationMs(call.duration_ms);
+
     if (!business) {
-      req.log.info({ phoneNumber }, "Ignoring Retell call for an unknown business");
+      const eventKey = `retell-unmatched:${retellCallId}`;
+      const durationText = durationMs === null ? "unknown" : `${Math.round(durationMs / 1000)} sec`;
+      await recordPostCallFailure(req, {
+        eventKey,
+        summary: isBlankCall(call) ? "Blank or failed call" : "Retell post-call webhook for unmatched number",
+        details: `Called number: ${phoneNumber}; call time: ${occurredAt.toISOString()}; duration: ${durationText}; business: unmatched number.`,
+        founderPush: {
+          eventKey,
+          title: "Unmatched Retell call",
+          body: `Call to ${phoneNumber} at ${occurredAt.toISOString()} could not be matched to a business.`,
+          deepLink: "/dashboard",
+        },
+      });
       res.sendStatus(204);
       return;
     }
+
+    if (isBlankCall(call)) {
+      req.log.info(
+        {
+          callId: retellCallId,
+          businessId: business.id,
+          status: call.status ?? null,
+          durationMs,
+        },
+        "Recording blank or failed Retell call",
+      );
+      const recorded = await persistBlankCall(retellCallId, {
+        businessId: business.id,
+        callStartedAt: startedAt,
+        durationMs,
+      });
+      if (recorded.inserted) {
+        const details = `Called number: ${phoneNumber}; call time: ${occurredAt.toISOString()}; duration: ${durationMs === null ? "unknown" : `${Math.round(durationMs / 1000)} sec`}; status: ${call.status?.trim() || "unknown"}.`;
+        await recordPostCallFailure(req, {
+          eventKey: `retell-blank:${retellCallId}`,
+          summary: "Blank or failed call",
+          details,
+          businessId: business.id,
+          businessName: business.businessName,
+          suppressAlert: true,
+        });
+
+        if (recorded.triggerStreakAlert && recorded.streakStartCallId) {
+          const eventKey = `retell-blank-streak:${business.id}:${recorded.streakStartCallId}`;
+          await recordPostCallFailure(req, {
+            eventKey,
+            summary: "Three consecutive blank or failed calls",
+            details: `Business: ${business.businessName}; latest called number: ${phoneNumber}; latest call time: ${occurredAt.toISOString()}.`,
+            businessId: business.id,
+            businessName: business.businessName,
+            founderPush: {
+              eventKey,
+              title: "Repeated blank or failed calls",
+              body: `${business.businessName} has had at least three consecutive blank or failed calls.`,
+              deepLink: "/dashboard",
+            },
+          });
+        }
+      }
+      res.sendStatus(204);
+      return;
+    }
+
     if (body.data.event === "call_ended" && !call.call_id) {
       req.log.warn("Call-ended webhook missing call ID; waiting for analyzed event to avoid duplicate legacy leads");
       res.sendStatus(204);
@@ -276,15 +363,13 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     }
 
     const details = extractRetellLead(call);
-    const retellCallId = firstString(call.call_id)
-      ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     if (!call.call_id) req.log.warn("Retell call ID missing; using legacy payload fingerprint");
     const lead = await persistAnalyzedCall(retellCallId, {
       businessId: business.id, ...details,
     }, {
       businessId: business.id, retellCallId,
-      callStartedAt: callStartedAt(call.start_timestamp),
-      durationMs: callDurationMs(call.duration_ms),
+      callStartedAt: startedAt,
+      durationMs,
       outcome: callOutcome(call),
       ...capturedInfo(call, body.data.event === "call_analyzed"),
       analysisComplete: body.data.event === "call_analyzed",

@@ -143,6 +143,10 @@
 .font-800 { font-weight: 800; }
 .safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .touch-target { min-width: 48px; min-height: 48px; }
+[data-owner-ui] :is(button, a) { min-height: 44px; touch-action: manipulation; }
+@media (max-width: 767px) {
+  [data-owner-ui] :is(input, textarea, select) { font-size: 16px; }
+}
 .grid-paper {
   background-image: linear-gradient(hsl(214 32% 85% / .4) 1px, transparent 1px), linear-gradient(90deg, hsl(214 32% 85% / .4) 1px, transparent 1px);
   background-size: 28px 28px;

@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   sendLeadNotificationEmail: vi.fn(),
   runNotificationOutboxNow: vi.fn(),
   persistAnalyzedCall: vi.fn(),
+  persistBlankCall: vi.fn(),
   recordOperationalFailure: vi.fn(),
+  queueFounderPushNotification: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
@@ -36,9 +38,11 @@ vi.mock("../../src/lib/notificationService", () => ({
 }));
 vi.mock("../../src/lib/retellPersistence", () => ({
   persistAnalyzedCall: mocks.persistAnalyzedCall,
+  persistBlankCall: mocks.persistBlankCall,
 }));
 vi.mock("../../src/lib/operationalFailures", () => ({
   recordOperationalFailure: mocks.recordOperationalFailure,
+  queueFounderPushNotification: mocks.queueFounderPushNotification,
 }));
 
 import retellRouter from "../../src/routes/retell";
@@ -138,9 +142,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("RETELL_API_KEY", "retell-unit-test-key");
   mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: true });
+  mocks.persistBlankCall.mockResolvedValue({ inserted: true, triggerStreakAlert: false, streakStartCallId: null });
   mocks.sendLeadNotificationEmail.mockResolvedValue(undefined);
   mocks.runNotificationOutboxNow.mockResolvedValue(undefined);
   mocks.recordOperationalFailure.mockResolvedValue(true);
+  mocks.queueFounderPushNotification.mockResolvedValue(true);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
 });
 
@@ -193,6 +199,9 @@ describe("Retell webhook safety", () => {
     };
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.persistBlankCall).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).not.toHaveBeenCalled();
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
       ...call, recording_url: "https://recordings.example.test/call-partial.wav",
       call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
@@ -214,13 +223,67 @@ describe("Retell webhook safety", () => {
     { status: "ended", duration_ms: 1500, call_analysis: {} },
     { status: "ended", duration_ms: 1500, call_analysis: { call_summary: "   " } },
   ])("does not persist blank or failed calls %#", async state => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, businessName: "Example Heating" }));
     const raw = JSON.stringify({ event: "call_analyzed", call: {
       call_id: "blank-call", to_number: "+14155550123", ...state,
     } });
     expect((await signedRequest("post-call", raw)).status).toBe(204);
-    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.findBusinessByPhoneNumber).toHaveBeenCalledWith("+14155550123");
+    expect(mocks.persistBlankCall).toHaveBeenCalledWith("blank-call", expect.objectContaining({
+      businessId: 1, callStartedAt: null,
+    }));
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
-    expect(mocks.recordOperationalFailure).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: "retell-blank:blank-call",
+      summary: "Blank or failed call",
+      businessId: 1,
+      businessName: "Example Heating",
+      suppressAlert: true,
+    }));
+  });
+  it("records unmatched call failures by call ID and alerts the founder without storing transcripts", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValueOnce(undefined);
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "unmatched-call-42", to_number: "+14155550999", start_timestamp: 1_800_000_000_000,
+      duration_ms: 12000, transcript: "Never include this transcript in an alert",
+      call_analysis: { call_summary: "An intake summary" },
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: "retell-unmatched:unmatched-call-42",
+      summary: "Retell post-call webhook for unmatched number",
+      details: expect.stringContaining("Called number: +14155550999"),
+    }));
+    const failure = mocks.recordOperationalFailure.mock.calls[0][0];
+    expect(failure.details).toContain("12 sec");
+    expect(failure.details).not.toContain("Never include this transcript");
+    expect(mocks.queueFounderPushNotification).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: "retell-unmatched:unmatched-call-42",
+      body: expect.stringContaining("+14155550999"),
+    }));
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+  });
+  it("alerts once when the third consecutive blank call is recorded", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 7, businessName: "Oak Plumbing" }));
+    mocks.persistBlankCall.mockResolvedValue({
+      inserted: true, triggerStreakAlert: true, streakStartCallId: "blank-1",
+    });
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "blank-3", to_number: "+14155550123", duration_ms: 0, call_analysis: {},
+    } });
+    expect((await signedRequest("post-call", raw)).status).toBe(204);
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledTimes(2);
+    expect(mocks.recordOperationalFailure).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      eventKey: "retell-blank:blank-3", suppressAlert: true,
+    }));
+    expect(mocks.recordOperationalFailure).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      eventKey: "retell-blank-streak:7:blank-1",
+      summary: "Three consecutive blank or failed calls",
+    }));
+    expect(mocks.queueFounderPushNotification).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: "retell-blank-streak:7:blank-1",
+    }));
   });
   it.each([
     { direction: "outbound" },

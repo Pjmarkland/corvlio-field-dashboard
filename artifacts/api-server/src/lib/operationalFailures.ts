@@ -1,11 +1,14 @@
 import {
+  businessesTable,
   db,
+  notificationEventsTable,
   operationalFailuresTable,
 } from "@workspace/db";
 import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendAdminOperationalFailureEmail } from "./gmail";
 import { emailDiagnosis } from "./emailDiagnostics";
+import { enqueueWebPushDeliveries } from "./webPushService";
 
 export type OperationalFailureSource =
   | "pre_call_fallback"
@@ -22,6 +25,15 @@ export type OperationalFailureInput = {
   details: string;
   businessId?: number | null;
   businessName?: string | null;
+  /** Individual blank calls are recorded, but only the third consecutive one alerts. */
+  suppressAlert?: boolean;
+};
+
+export type FounderPushInput = {
+  eventKey: string;
+  title: string;
+  body: string;
+  deepLink: string;
 };
 
 function safeFailureDetails(value: string): string {
@@ -41,13 +53,44 @@ export async function recordOperationalFailure(input: OperationalFailureInput): 
       source: input.source,
       summary: input.summary.slice(0, 200),
       details: safeFailureDetails(input.details),
-      alertBlocked: emailDiagnosis(input.details).configuration,
+      alertBlocked: input.suppressAlert === true || emailDiagnosis(input.details).configuration,
       businessId: input.businessId ?? null,
       businessName: input.businessName?.slice(0, 200) ?? null,
     })
     .onConflictDoNothing()
     .returning({ id: operationalFailuresTable.id });
   return Boolean(record);
+}
+
+/** Queue one idempotent push event for each internal Corvlio business account. */
+export async function queueFounderPushNotification(input: FounderPushInput): Promise<boolean> {
+  const targets = await db
+    .select({ id: businessesTable.id })
+    .from(businessesTable)
+    .where(eq(businessesTable.isInternal, true));
+  let insertedAny = false;
+
+  for (const target of targets) {
+    const businessId = String(target.id);
+    const [event] = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(notificationEventsTable)
+        .values({
+          businessId,
+          leadId: `operational:${input.eventKey}`.slice(0, 240),
+          title: input.title.slice(0, 200),
+          body: input.body.slice(0, 1000),
+          deepLink: input.deepLink,
+        })
+        .onConflictDoNothing()
+        .returning({ id: notificationEventsTable.id });
+      if (created) await enqueueWebPushDeliveries(tx, created.id, businessId);
+      return [created];
+    });
+    insertedAny ||= Boolean(event);
+  }
+
+  return insertedAny;
 }
 
 export async function deliverOperationalFailureAlerts(): Promise<void> {
