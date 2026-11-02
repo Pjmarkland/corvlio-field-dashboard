@@ -28,7 +28,9 @@ import type {
   AdminBusinessPlanInput,
   AdminCallQuality,
   AdminEmailHealth,
+  AdminFlaggedLeadsResponse,
   AdminOverview,
+  AdminResolveLeadFlagResult,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
   AppReviewDemoStatus,
@@ -37,6 +39,8 @@ import type {
   BillingPlanInput,
   BillingRedirect,
   BillingSnapshot,
+  BusinessCallUsage,
+  BusinessMonthlyResultsReport,
   BusinessProfile,
   BusinessProfileUpdate,
   CreateOwnerDemoCall200,
@@ -53,10 +57,13 @@ import type {
   InvoiceOverview,
   LeadAlertInbox,
   LeadDetail,
+  LeadInformationFlagInput,
+  LeadInformationFlagResult,
   LeadNotesInput,
   LeadStatusResult,
   LeadStatusUpdate,
   LeadWorkspace,
+  ManagedReportsInput,
   ManualPaymentConfirmation,
   ManualReleaseInput,
   NativeBillingSummary,
@@ -761,6 +768,160 @@ export const useUpdateBusinessProfile = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateBusinessProfileMutationOptions(options));
     }
+
+export const getGetBusinessCallUsageUrl = () => {
+
+
+
+
+  return `/api/businesses/me/call-usage`
+}
+
+/**
+ * @summary Get the signed-in business's current-month call usage
+ */
+export const getBusinessCallUsage = async ( options?: Parameters<typeof customFetch>[1]): Promise<BusinessCallUsage> => {
+
+  return customFetch<BusinessCallUsage>(getGetBusinessCallUsageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBusinessCallUsageQueryKey = () => {
+    return [
+    `/api/businesses/me/call-usage`
+    ] as const;
+    }
+
+
+export const getGetBusinessCallUsageQueryOptions = <TData = Awaited<ReturnType<typeof getBusinessCallUsage>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessCallUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBusinessCallUsageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBusinessCallUsage>>> = ({ signal }) => getBusinessCallUsage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBusinessCallUsage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBusinessCallUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getBusinessCallUsage>>>
+export type GetBusinessCallUsageQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in business's current-month call usage
+ */
+
+export function useGetBusinessCallUsage<TData = Awaited<ReturnType<typeof getBusinessCallUsage>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessCallUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBusinessCallUsageQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBusinessMonthlyResultsReportUrl = () => {
+
+
+
+
+  return `/api/businesses/me/monthly-report`
+}
+
+/**
+ * @summary Get the current-month results report when enabled by an administrator
+ */
+export const getBusinessMonthlyResultsReport = async ( options?: Parameters<typeof customFetch>[1]): Promise<BusinessMonthlyResultsReport> => {
+
+  return customFetch<BusinessMonthlyResultsReport>(getGetBusinessMonthlyResultsReportUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBusinessMonthlyResultsReportQueryKey = () => {
+    return [
+    `/api/businesses/me/monthly-report`
+    ] as const;
+    }
+
+
+export const getGetBusinessMonthlyResultsReportQueryOptions = <TData = Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBusinessMonthlyResultsReportQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>> = ({ signal }) => getBusinessMonthlyResultsReport({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBusinessMonthlyResultsReportQueryResult = NonNullable<Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>>
+export type GetBusinessMonthlyResultsReportQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the current-month results report when enabled by an administrator
+ */
+
+export function useGetBusinessMonthlyResultsReport<TData = Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBusinessMonthlyResultsReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBusinessMonthlyResultsReportQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getPreviewBusinessWebsiteUrl = () => {
 
@@ -1508,6 +1669,149 @@ export function useGetLeadDetail<TData = Awaited<ReturnType<typeof getLeadDetail
 
 
 
+
+export const getDeleteOwnedLeadUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}`
+}
+
+/**
+ * @summary Permanently delete one lead belonging to the signed-in business
+ */
+export const deleteOwnedLead = async (leadId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteOwnedLeadUrl(leadId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteOwnedLeadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnedLead>>, TError,{leadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOwnedLead>>, TError,{leadId: string}, TContext> => {
+
+const mutationKey = ['deleteOwnedLead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOwnedLead>>, {leadId: string}> = (props) => {
+          const {leadId} = props ?? {};
+
+          return  deleteOwnedLead(leadId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOwnedLeadMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOwnedLead>>>
+
+    export type DeleteOwnedLeadMutationError = ErrorType<void>
+
+    /**
+ * @summary Permanently delete one lead belonging to the signed-in business
+ */
+export const useDeleteOwnedLead = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnedLead>>, TError,{leadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOwnedLead>>,
+        TError,
+        {leadId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteOwnedLeadMutationOptions(options));
+    }
+
+export const getFlagLeadInformationUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}/flag`
+}
+
+/**
+ * @summary Flag inaccurate information on an owned lead
+ */
+export const flagLeadInformation = async (leadId: string,
+    leadInformationFlagInput: LeadInformationFlagInput, options?: Parameters<typeof customFetch>[1]): Promise<LeadInformationFlagResult> => {
+
+  return customFetch<LeadInformationFlagResult>(getFlagLeadInformationUrl(leadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(leadInformationFlagInput)
+  }
+);}
+
+
+
+
+
+export const getFlagLeadInformationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof flagLeadInformation>>, TError,{leadId: string;data: BodyType<LeadInformationFlagInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof flagLeadInformation>>, TError,{leadId: string;data: BodyType<LeadInformationFlagInput>}, TContext> => {
+
+const mutationKey = ['flagLeadInformation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof flagLeadInformation>>, {leadId: string;data: BodyType<LeadInformationFlagInput>}> = (props) => {
+          const {leadId,data} = props ?? {};
+
+          return  flagLeadInformation(leadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FlagLeadInformationMutationResult = NonNullable<Awaited<ReturnType<typeof flagLeadInformation>>>
+    export type FlagLeadInformationMutationBody = BodyType<LeadInformationFlagInput>
+    export type FlagLeadInformationMutationError = ErrorType<void>
+
+    /**
+ * @summary Flag inaccurate information on an owned lead
+ */
+export const useFlagLeadInformation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof flagLeadInformation>>, TError,{leadId: string;data: BodyType<LeadInformationFlagInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof flagLeadInformation>>,
+        TError,
+        {leadId: string;data: BodyType<LeadInformationFlagInput>},
+        TContext
+      > => {
+      return useMutation(getFlagLeadInformationMutationOptions(options));
+    }
 
 export const getUpdateLeadNotesUrl = (leadId: string,) => {
 
@@ -2820,6 +3124,226 @@ export function useGetAdminBusiness<TData = Awaited<ReturnType<typeof getAdminBu
 
 
 
+
+export const getUpdateAdminManagedReportsUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}/managed-reports`
+}
+
+/**
+ * @summary Enable or disable managed monthly reports for one business
+ */
+export const updateAdminManagedReports = async (businessId: number,
+    managedReportsInput: ManagedReportsInput, options?: Parameters<typeof customFetch>[1]): Promise<ManagedReportsInput> => {
+
+  return customFetch<ManagedReportsInput>(getUpdateAdminManagedReportsUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(managedReportsInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminManagedReportsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminManagedReports>>, TError,{businessId: number;data: BodyType<ManagedReportsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminManagedReports>>, TError,{businessId: number;data: BodyType<ManagedReportsInput>}, TContext> => {
+
+const mutationKey = ['updateAdminManagedReports'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminManagedReports>>, {businessId: number;data: BodyType<ManagedReportsInput>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  updateAdminManagedReports(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminManagedReportsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminManagedReports>>>
+    export type UpdateAdminManagedReportsMutationBody = BodyType<ManagedReportsInput>
+    export type UpdateAdminManagedReportsMutationError = ErrorType<void>
+
+    /**
+ * @summary Enable or disable managed monthly reports for one business
+ */
+export const useUpdateAdminManagedReports = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminManagedReports>>, TError,{businessId: number;data: BodyType<ManagedReportsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminManagedReports>>,
+        TError,
+        {businessId: number;data: BodyType<ManagedReportsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminManagedReportsMutationOptions(options));
+    }
+
+export const getGetAdminFlaggedLeadsUrl = () => {
+
+
+
+
+  return `/api/admin/flagged-leads`
+}
+
+/**
+ * @summary List unresolved inaccurate-information flags
+ */
+export const getAdminFlaggedLeads = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminFlaggedLeadsResponse> => {
+
+  return customFetch<AdminFlaggedLeadsResponse>(getGetAdminFlaggedLeadsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminFlaggedLeadsQueryKey = () => {
+    return [
+    `/api/admin/flagged-leads`
+    ] as const;
+    }
+
+
+export const getGetAdminFlaggedLeadsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminFlaggedLeads>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminFlaggedLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminFlaggedLeadsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminFlaggedLeads>>> = ({ signal }) => getAdminFlaggedLeads({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminFlaggedLeads>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminFlaggedLeadsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminFlaggedLeads>>>
+export type GetAdminFlaggedLeadsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List unresolved inaccurate-information flags
+ */
+
+export function useGetAdminFlaggedLeads<TData = Awaited<ReturnType<typeof getAdminFlaggedLeads>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminFlaggedLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminFlaggedLeadsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getResolveAdminLeadInformationFlagUrl = (flagId: number,) => {
+
+
+
+
+  return `/api/admin/lead-information-flags/${flagId}/resolve`
+}
+
+/**
+ * @summary Resolve one inaccurate-information flag
+ */
+export const resolveAdminLeadInformationFlag = async (flagId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminResolveLeadFlagResult> => {
+
+  return customFetch<AdminResolveLeadFlagResult>(getResolveAdminLeadInformationFlagUrl(flagId),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveAdminLeadInformationFlagMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>, TError,{flagId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>, TError,{flagId: number}, TContext> => {
+
+const mutationKey = ['resolveAdminLeadInformationFlag'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>, {flagId: number}> = (props) => {
+          const {flagId} = props ?? {};
+
+          return  resolveAdminLeadInformationFlag(flagId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveAdminLeadInformationFlagMutationResult = NonNullable<Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>>
+
+    export type ResolveAdminLeadInformationFlagMutationError = ErrorType<void>
+
+    /**
+ * @summary Resolve one inaccurate-information flag
+ */
+export const useResolveAdminLeadInformationFlag = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>, TError,{flagId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveAdminLeadInformationFlag>>,
+        TError,
+        {flagId: number},
+        TContext
+      > => {
+      return useMutation(getResolveAdminLeadInformationFlagMutationOptions(options));
+    }
 
 export const getGetAdminActivityUrl = () => {
 

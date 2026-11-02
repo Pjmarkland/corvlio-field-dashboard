@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BusinessProfileUpdateAiPromisePolicy } from './businessProfileUpdateAiPromisePolicy';
 
 export interface BusinessProfileUpdate {
   /**
@@ -109,4 +110,13 @@ export interface BusinessProfileUpdate {
      * @nullable
      */
   emergencyContactInfo?: string | null;
+  /** @nullable */
+  emergencyAvailable?: boolean | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone?: string | null;
+  /** @nullable */
+  aiPromisePolicy?: BusinessProfileUpdateAiPromisePolicy;
 }

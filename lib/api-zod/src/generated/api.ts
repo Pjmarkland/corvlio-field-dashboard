@@ -94,6 +94,10 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get the signed-in owner's business profile
  */
+export const getBusinessProfileResponseEmergencyEscalationPhoneMax = 16;
+
+
+
 export const GetBusinessProfileResponse = zod.object({
   "isInternal": zod.boolean().optional(),
   "ownerPhone": zod.string().nullish(),
@@ -119,6 +123,9 @@ export const GetBusinessProfileResponse = zod.object({
   "credentials": zod.string().nullable(),
   "ownerAvailability": zod.string().nullable(),
   "emergencyContactInfo": zod.string().nullable(),
+  "emergencyAvailable": zod.boolean().nullable(),
+  "emergencyEscalationPhone": zod.string().max(getBusinessProfileResponseEmergencyEscalationPhoneMax).nullable(),
+  "aiPromisePolicy": zod.union([zod.literal('callback_only'),zod.literal('appointment_windows'),zod.literal(null)]).nullable(),
   "retellPhoneNumber": zod.string().nullable()
 })
 
@@ -170,6 +177,8 @@ export const updateBusinessProfileBodyOwnerAvailabilityMax = 4000;
 
 export const updateBusinessProfileBodyEmergencyContactInfoMax = 4000;
 
+export const updateBusinessProfileBodyEmergencyEscalationPhoneMax = 16;
+
 
 
 export const UpdateBusinessProfileBody = zod.object({
@@ -195,8 +204,15 @@ export const UpdateBusinessProfileBody = zod.object({
   "maintenancePlanOfferings": zod.string().max(updateBusinessProfileBodyMaintenancePlanOfferingsMax).nullish(),
   "credentials": zod.string().max(updateBusinessProfileBodyCredentialsMax).nullish(),
   "ownerAvailability": zod.string().max(updateBusinessProfileBodyOwnerAvailabilityMax).nullish(),
-  "emergencyContactInfo": zod.string().max(updateBusinessProfileBodyEmergencyContactInfoMax).nullish()
+  "emergencyContactInfo": zod.string().max(updateBusinessProfileBodyEmergencyContactInfoMax).nullish(),
+  "emergencyAvailable": zod.boolean().nullish(),
+  "emergencyEscalationPhone": zod.string().max(updateBusinessProfileBodyEmergencyEscalationPhoneMax).nullish(),
+  "aiPromisePolicy": zod.union([zod.literal('callback_only'),zod.literal('appointment_windows'),zod.literal(null)]).nullish()
 })
+
+export const updateBusinessProfileResponseEmergencyEscalationPhoneMax = 16;
+
+
 
 export const UpdateBusinessProfileResponse = zod.object({
   "isInternal": zod.boolean().optional(),
@@ -223,7 +239,67 @@ export const UpdateBusinessProfileResponse = zod.object({
   "credentials": zod.string().nullable(),
   "ownerAvailability": zod.string().nullable(),
   "emergencyContactInfo": zod.string().nullable(),
+  "emergencyAvailable": zod.boolean().nullable(),
+  "emergencyEscalationPhone": zod.string().max(updateBusinessProfileResponseEmergencyEscalationPhoneMax).nullable(),
+  "aiPromisePolicy": zod.union([zod.literal('callback_only'),zod.literal('appointment_windows'),zod.literal(null)]).nullable(),
   "retellPhoneNumber": zod.string().nullable()
+})
+
+
+/**
+ * @summary Get the signed-in business's current-month call usage
+ */
+export const getBusinessCallUsageResponseCountMin = 0;
+export const getBusinessCallUsageResponseCountMultipleOf = 1;
+
+export const getBusinessCallUsageResponseIncludedCallsMin = 0;
+export const getBusinessCallUsageResponseIncludedCallsMultipleOf = 1;
+
+
+
+export const GetBusinessCallUsageResponse = zod.object({
+  "count": zod.number().min(getBusinessCallUsageResponseCountMin).multipleOf(getBusinessCallUsageResponseCountMultipleOf),
+  "includedCalls": zod.number().min(getBusinessCallUsageResponseIncludedCallsMin).multipleOf(getBusinessCallUsageResponseIncludedCallsMultipleOf).nullable(),
+  "periodStart": zod.coerce.date(),
+  "periodEnd": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get the current-month results report when enabled by an administrator
+ */
+export const getBusinessMonthlyResultsReportResponseCallsMin = 0;
+export const getBusinessMonthlyResultsReportResponseCallsMultipleOf = 1;
+
+export const getBusinessMonthlyResultsReportResponseLeadsCapturedMin = 0;
+export const getBusinessMonthlyResultsReportResponseLeadsCapturedMultipleOf = 1;
+
+export const getBusinessMonthlyResultsReportResponseUrgentLeadsMin = 0;
+export const getBusinessMonthlyResultsReportResponseUrgentLeadsMultipleOf = 1;
+
+export const getBusinessMonthlyResultsReportResponseContactedLeadsMin = 0;
+export const getBusinessMonthlyResultsReportResponseContactedLeadsMultipleOf = 1;
+
+export const getBusinessMonthlyResultsReportResponsePendingLeadsMin = 0;
+export const getBusinessMonthlyResultsReportResponsePendingLeadsMultipleOf = 1;
+
+export const getBusinessMonthlyResultsReportResponseBusiestDaysItemCallCountMin = 0;
+export const getBusinessMonthlyResultsReportResponseBusiestDaysItemCallCountMultipleOf = 1;
+
+
+
+export const GetBusinessMonthlyResultsReportResponse = zod.object({
+  "enabled": zod.boolean(),
+  "month": zod.coerce.date(),
+  "calls": zod.number().min(getBusinessMonthlyResultsReportResponseCallsMin).multipleOf(getBusinessMonthlyResultsReportResponseCallsMultipleOf),
+  "leadsCaptured": zod.number().min(getBusinessMonthlyResultsReportResponseLeadsCapturedMin).multipleOf(getBusinessMonthlyResultsReportResponseLeadsCapturedMultipleOf),
+  "urgentLeads": zod.number().min(getBusinessMonthlyResultsReportResponseUrgentLeadsMin).multipleOf(getBusinessMonthlyResultsReportResponseUrgentLeadsMultipleOf),
+  "contactedLeads": zod.number().min(getBusinessMonthlyResultsReportResponseContactedLeadsMin).multipleOf(getBusinessMonthlyResultsReportResponseContactedLeadsMultipleOf),
+  "pendingLeads": zod.number().min(getBusinessMonthlyResultsReportResponsePendingLeadsMin).multipleOf(getBusinessMonthlyResultsReportResponsePendingLeadsMultipleOf),
+  "busiestDays": zod.array(zod.object({
+  "day": zod.coerce.date(),
+  "callCount": zod.number().min(getBusinessMonthlyResultsReportResponseBusiestDaysItemCallCountMin).multipleOf(getBusinessMonthlyResultsReportResponseBusiestDaysItemCallCountMultipleOf)
+}))
 })
 
 
@@ -388,7 +464,11 @@ export const submitNativeBusinessSetupBodyOwnerEmailMax = 320;
 export const submitNativeBusinessSetupBodyOwnerEmailRegExp = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
 export const submitNativeBusinessSetupBodyBusinessTypeMax = 200;
 
-export const submitNativeBusinessSetupBodyServicesOfferedMax = 4000;
+export const submitNativeBusinessSetupBodyServicesOfferedMax = 500;
+
+export const submitNativeBusinessSetupBodyServicesNotOfferedMax = 500;
+
+export const submitNativeBusinessSetupBodyEmergencyEscalationPhoneMax = 16;
 
 export const submitNativeBusinessSetupBodyServiceAreaMax = 4000;
 
@@ -409,6 +489,10 @@ export const SubmitNativeBusinessSetupBody = zod.object({
   "ownerEmail": zod.string().max(submitNativeBusinessSetupBodyOwnerEmailMax).regex(submitNativeBusinessSetupBodyOwnerEmailRegExp),
   "businessType": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessTypeMax),
   "servicesOffered": zod.string().min(1).max(submitNativeBusinessSetupBodyServicesOfferedMax),
+  "servicesNotOffered": zod.string().min(1).max(submitNativeBusinessSetupBodyServicesNotOfferedMax),
+  "emergencyAvailable": zod.boolean(),
+  "emergencyEscalationPhone": zod.string().max(submitNativeBusinessSetupBodyEmergencyEscalationPhoneMax).nullable(),
+  "aiPromisePolicy": zod.enum(['callback_only', 'appointment_windows']),
   "serviceArea": zod.string().min(1).max(submitNativeBusinessSetupBodyServiceAreaMax),
   "majorIssueExamples": zod.string().min(1).max(submitNativeBusinessSetupBodyMajorIssueExamplesMax),
   "businessHours": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessHoursMax),
@@ -587,6 +671,42 @@ export const GetLeadDetailResponse = zod.object({
 
 
 /**
+ * @summary Permanently delete one lead belonging to the signed-in business
+ */
+
+
+
+export const DeleteOwnedLeadParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const DeleteOwnedLeadResponse = zod.void()
+
+
+/**
+ * @summary Flag inaccurate information on an owned lead
+ */
+
+
+
+export const FlagLeadInformationParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const flagLeadInformationBodyReasonMax = 500;
+
+
+
+export const FlagLeadInformationBody = zod.object({
+  "reason": zod.string().max(flagLeadInformationBodyReasonMax).optional()
+})
+
+export const FlagLeadInformationResponse = zod.object({
+  "flagged": zod.boolean()
+})
+
+
+/**
  * @summary Save private owner notes on an owned lead
  */
 
@@ -596,7 +716,7 @@ export const UpdateLeadNotesParams = zod.object({
   "leadId": zod.coerce.string().min(1)
 })
 
-export const updateLeadNotesBodyPrivateNotesMax = 10000;
+export const updateLeadNotesBodyPrivateNotesMax = 500;
 
 
 
@@ -864,6 +984,7 @@ export const GetAdminOverviewResponse = zod.object({
   "activePushDeviceCount": zod.number().multipleOf(getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf)
 }),
   "businesses": zod.array(zod.object({
+  "managedReportsEnabled": zod.boolean().optional(),
   "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
   "provisioningState": zod.string().optional(),
@@ -1039,6 +1160,7 @@ export const getAdminBusinessResponseCallsItemDurationMsMultipleOf = 1;
 
 export const GetAdminBusinessResponse = zod.object({
   "business": zod.object({
+  "managedReportsEnabled": zod.boolean().optional(),
   "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
   "provisioningState": zod.string().optional(),
@@ -1085,6 +1207,9 @@ export const GetAdminBusinessResponse = zod.object({
   "credentialsCertifications": zod.string().nullable(),
   "ownerAvailability": zod.string().nullable(),
   "emergencyContactInfo": zod.string().nullable(),
+  "emergencyAvailable": zod.boolean().nullish(),
+  "emergencyEscalationPhone": zod.string().nullish(),
+  "aiPromisePolicy": zod.union([zod.literal('callback_only'),zod.literal('appointment_windows'),zod.literal(null)]).nullish(),
   "businessWebsiteUrl": zod.string().nullable(),
   "websiteEnrichmentAttemptedAt": zod.coerce.date().nullable(),
   "websiteEnrichmentSources": zod.record(zod.string(), zod.string()),
@@ -1112,6 +1237,65 @@ export const GetAdminBusinessResponse = zod.object({
   "outcome": zod.string().nullable(),
   "recordedAt": zod.coerce.date()
 }))
+})
+
+
+/**
+ * @summary Enable or disable managed monthly reports for one business
+ */
+export const updateAdminManagedReportsPathBusinessIdMultipleOf = 1;
+
+
+
+export const UpdateAdminManagedReportsParams = zod.object({
+  "businessId": zod.coerce.number().min(1).multipleOf(updateAdminManagedReportsPathBusinessIdMultipleOf)
+})
+
+export const UpdateAdminManagedReportsBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const UpdateAdminManagedReportsResponse = zod.object({
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * @summary List unresolved inaccurate-information flags
+ */
+export const getAdminFlaggedLeadsResponseItemsItemFlagIdMultipleOf = 1;
+
+export const getAdminFlaggedLeadsResponseItemsItemBusinessIdMultipleOf = 1;
+
+export const getAdminFlaggedLeadsResponseItemsItemLeadIdMultipleOf = 1;
+
+
+
+export const GetAdminFlaggedLeadsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "flagId": zod.number().multipleOf(getAdminFlaggedLeadsResponseItemsItemFlagIdMultipleOf),
+  "businessId": zod.number().multipleOf(getAdminFlaggedLeadsResponseItemsItemBusinessIdMultipleOf),
+  "businessName": zod.string(),
+  "leadId": zod.number().multipleOf(getAdminFlaggedLeadsResponseItemsItemLeadIdMultipleOf),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Resolve one inaccurate-information flag
+ */
+export const resolveAdminLeadInformationFlagPathFlagIdMultipleOf = 1;
+
+
+
+export const ResolveAdminLeadInformationFlagParams = zod.object({
+  "flagId": zod.coerce.number().min(1).multipleOf(resolveAdminLeadInformationFlagPathFlagIdMultipleOf)
+})
+
+export const ResolveAdminLeadInformationFlagResponse = zod.object({
+  "resolved": zod.boolean()
 })
 
 

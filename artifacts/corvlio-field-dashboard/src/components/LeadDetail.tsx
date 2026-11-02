@@ -1,13 +1,13 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useUser } from '@clerk/react';
-import { getGetLeadDetailQueryKey, useGetLeadDetail, useUpdateLeadNotes, type LeadDetail } from '@workspace/api-client-react';
-import { ArrowLeft, CalendarClock, Check, Clock3, Copy, MapPin, Phone } from 'lucide-react';
+import { getGetLeadDetailQueryKey, getGetLeadsQueryKey, useDeleteOwnedLead, useFlagLeadInformation, useGetLeadDetail, useUpdateLeadNotes, type LeadDetail } from '@workspace/api-client-react';
+import { ArrowLeft, CalendarClock, Check, Clock3, Copy, MapPin, Phone, Trash2 } from 'lucide-react';
 import { LeadContactActions } from '@/components/LeadContactActions';
 import { displayIssue, displayName, displayPhone, nameInitials, usablePhone } from '@/lib/leadDisplay';
 
-const MAX_NOTES = 10000;
+const MAX_NOTES = 500;
 type Status = 'pending' | 'contacted';
 
 export function formatCallTime(value?: string | null, now = new Date()) {
@@ -77,6 +77,7 @@ function Notes({ lead, queryKey }: { lead: LeadDetail; queryKey: readonly unknow
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const lastSaved = useRef(lead.privateNotes ?? '');
   const draftRef = useRef(draft);
+  const savingRef = useRef(false);
   draftRef.current = draft;
   const mutate = useRef(save.mutate);
   mutate.current = save.mutate;
@@ -87,24 +88,27 @@ function Notes({ lead, queryKey }: { lead: LeadDetail; queryKey: readonly unknow
   }, [lead.privateNotes]);
   const dirty = draft !== lastSaved.current;
   const submit = () => {
+    if (savingRef.current || draftRef.current === lastSaved.current) return;
+    savingRef.current = true;
     const sent = draft;
     setState('saving');
     mutate.current({ leadId, data: { privateNotes: sent } }, {
       onSuccess: (res) => {
+        savingRef.current = false;
         const saved = (res as Partial<LeadDetail> | undefined)?.privateNotes;
         const server = typeof saved === 'string' ? saved : saved === null ? '' : (sent.trim() ? sent : '');
         lastSaved.current = server;
         qc.setQueryData<LeadDetail>(queryKey, (old) => old ? { ...old, privateNotes: server === '' ? null : server } : old);
         if (draftRef.current === sent) { setDraft(server); draftRef.current = server; setState('saved'); } else setState('idle');
       },
-      onError: () => setState('error'),
+      onError: () => { savingRef.current = false; setState('error'); },
     });
   };
   return <Section title="Private notes" testId="section-notes">
     <label htmlFor="lead-notes" className="sr-only">Private notes</label>
-    <textarea id="lead-notes" data-testid="input-notes" value={draft} maxLength={MAX_NOTES} rows={5} onChange={(e) => { setDraft(e.target.value); if (state !== 'saving') setState('idle'); }} placeholder="Only you can see these notes." className="w-full rounded-xl border border-border bg-background p-3 text-sm" />
+     <textarea id="lead-notes" data-testid="input-notes" value={draft} maxLength={MAX_NOTES} rows={5} onBlur={() => { if (draftRef.current !== lastSaved.current) submit(); }} onChange={(e) => { setDraft(e.target.value); if (state !== 'saving') setState('idle'); }} placeholder="Only you can see these notes." className="w-full rounded-xl border border-border bg-background p-3 text-sm" />
     <div className="mt-2 flex items-center justify-between gap-3">
-      <span className="text-xs text-muted-foreground" role="status" data-testid="text-notes-state">{state === 'saving' ? 'Saving…' : state === 'error' ? 'Notes were not saved. Try again.' : state === 'saved' && !dirty ? 'Saved' : dirty ? 'Unsaved changes' : `${draft.length}/${MAX_NOTES}`}</span>
+       <span className="text-xs text-muted-foreground" role="status" data-testid="text-notes-state">{state === 'saving' ? 'Saving…' : state === 'error' ? 'Notes were not saved. Try again.' : state === 'saved' && !dirty ? 'Saved' : `${draft.length}/${MAX_NOTES}${dirty ? ' · Unsaved changes' : ''}`}</span>
       <button type="button" onClick={submit} disabled={!dirty || state === 'saving'} data-testid="button-save-notes" className="min-h-10 rounded-xl border border-border px-4 text-sm font-bold text-primary disabled:opacity-55">Save notes</button>
     </div>
   </Section>;
@@ -112,7 +116,15 @@ function Notes({ lead, queryKey }: { lead: LeadDetail; queryKey: readonly unknow
 
 export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: string; onStatus: (id: string, s: Status) => void; savingLeadId: string | null }) {
   const { user, isLoaded } = useUser();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const flagMutation = useFlagLeadInformation();
+  const deleteMutation = useDeleteOwnedLead();
+  const [showFlagForm, setShowFlagForm] = useState(false);
+  const [flagReason, setFlagReason] = useState('');
+  const [flagMessage, setFlagMessage] = useState('');
+  const [deleteMessage, setDeleteMessage] = useState('');
   const scopedKey = [...getGetLeadDetailQueryKey(leadId), user?.id ?? ''] as const;
   const { data, isLoading, isError, error, refetch } = useGetLeadDetail(leadId, { query: {
     queryKey: scopedKey as unknown as ReturnType<typeof getGetLeadDetailQueryKey>,
@@ -149,6 +161,24 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
   const summary = lead.summary?.trim();
   const transcript = lead.transcript?.trim();
   const availability = lead.availability?.trim();
+  const submitFlag = () => {
+    setFlagMessage('');
+    flagMutation.mutate({ leadId: lead.id, data: flagReason.trim() ? { reason: flagReason.trim() } : {} }, {
+      onSuccess: () => { setShowFlagForm(false); setFlagReason(''); setFlagMessage('Thanks. This lead was sent for review.'); },
+      onError: () => setFlagMessage('The report could not be sent. Try again.'),
+    });
+  };
+  const deleteLead = () => {
+    if (!window.confirm('Permanently delete this lead, including its transcript, summary, and personal details? This cannot be undone.')) return;
+    setDeleteMessage('');
+    deleteMutation.mutate({ leadId: lead.id }, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
+        navigate('/dashboard');
+      },
+      onError: () => setDeleteMessage('The lead could not be deleted. It has not been removed; try again later.'),
+    });
+  };
 
   return <div className="animate-rise-in" data-testid="lead-detail">
     {back}
@@ -179,10 +209,16 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
       {contactedAt ? <li className="flex items-center gap-2" data-testid="activity-contacted"><Check size={14} className="text-[#49a979]" />Contacted {contactedAt}{byYou ? ` by You${user?.fullName ? ` (${user.fullName})` : ''}` : actor ? ` by account ${actor}` : ''}</li> : null}
     </ul></Section>
     <Notes key={`${user?.id}:${lead.id}`} lead={lead} queryKey={scopedKey} />
+    <Section title="Lead information" testId="section-lead-information">
+      <p className="text-sm text-muted-foreground">If a detail looks inaccurate, report it for review. Your reason is optional.</p>
+      {!showFlagForm ? <button type="button" onClick={() => setShowFlagForm(true)} data-testid="button-flag-lead" className="mt-3 min-h-10 rounded-xl border border-border px-4 text-sm font-semibold">Report inaccurate information</button>
+        : <div className="mt-3 space-y-2"><label htmlFor="lead-flag-reason" className="block text-xs font-semibold">Reason (optional)</label><textarea id="lead-flag-reason" data-testid="input-flag-reason" maxLength={500} rows={3} value={flagReason} onChange={(event) => setFlagReason(event.target.value)} className="w-full rounded-xl border border-border bg-background p-3 text-sm" /><div className="flex gap-2"><button type="button" onClick={submitFlag} disabled={flagMutation.isPending} data-testid="button-submit-flag" className="min-h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-55">{flagMutation.isPending ? 'Sending…' : 'Send report'}</button><button type="button" onClick={() => setShowFlagForm(false)} className="min-h-10 rounded-xl border border-border px-4 text-sm font-semibold">Cancel</button></div></div>}
+      {flagMessage ? <p role="status" data-testid="text-flag-status" className="mt-2 text-xs text-muted-foreground">{flagMessage}</p> : null}
+    </Section>
     <div className="detail-action-spacer" />
     <div className="detail-action-bar border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md" data-testid="bar-detail-actions"><div className="mx-auto max-w-[1160px]">
       {!contacted ? <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'contacted')} data-testid={`button-mark-contacted-${lead.id}`} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground disabled:cursor-wait disabled:opacity-55"><Check size={16} /> {saving ? 'Saving…' : 'Mark contacted'}</button>
         : <button type="button" disabled={saving} onClick={() => onStatus(lead.id, 'pending')} data-testid={`button-reopen-${lead.id}`} className="min-h-12 w-full rounded-xl border border-border text-sm font-bold text-foreground disabled:cursor-wait disabled:opacity-55">{saving ? 'Saving…' : 'Reopen lead'}</button>}
-    </div></div>
+     <div className="mt-2 flex flex-col items-center gap-2"><button type="button" onClick={deleteLead} disabled={deleteMutation.isPending} data-testid="button-delete-lead" className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-55"><Trash2 size={14} />{deleteMutation.isPending ? 'Deleting…' : 'Delete lead'}</button>{deleteMessage ? <p role="alert" data-testid="text-delete-lead-error" className="text-xs text-destructive">{deleteMessage}</p> : null}</div></div></div>
   </div>;
 }

@@ -19,6 +19,8 @@ import {
   WEBSITE_ENRICHMENT_FIELDS,
   type WebsiteEnrichmentField,
 } from "../lib/businessDirectory";
+import { pool } from "@workspace/db";
+import { config as billingConfig } from "../billing/policy";
 import { normalizeWebsiteUrl, previewBusinessWebsite, unavailableWebsitePreview, UnsafeWebsiteUrlError } from "../lib/websiteEnrichment";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
@@ -57,6 +59,9 @@ const BUSINESS_PROFILE_COLUMN_BY_FIELD: Record<BusinessProfileField, string> = {
   credentials: "credentialsCertifications",
   ownerAvailability: "ownerAvailability",
   emergencyContactInfo: "emergencyContactInfo",
+  emergencyAvailable: "emergencyAvailable",
+  emergencyEscalationPhone: "emergencyEscalationPhone",
+  aiPromisePolicy: "aiPromisePolicy",
 };
 
 const ENRICHMENT_FIELD_BY_PROFILE_FIELD: Partial<
@@ -103,6 +108,10 @@ function toBusinessProfile(business: OwnedBusiness) {
     credentials: business.credentialsCertifications,
     ownerAvailability: business.ownerAvailability,
     emergencyContactInfo: business.emergencyContactInfo,
+    emergencyAvailable: business.emergencyAvailable ?? null,
+    emergencyEscalationPhone: business.emergencyEscalationPhone ?? null,
+    aiPromisePolicy: business.aiPromisePolicy === "appointment_windows" ? "appointment_windows"
+      : business.aiPromisePolicy === "callback_only" ? "callback_only" : null,
     retellPhoneNumber: business.retellPhoneNumber,
   };
 }
@@ -147,6 +156,118 @@ router.get("/businesses/me", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/businesses/me/call-usage", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.status(404).json({ error: "No business is configured for this account" }); return; }
+    const now = new Date();
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const result = await pool.query<{ count: number | string }>(
+      `SELECT count(*)::int AS count
+       FROM retell_call_records
+       WHERE business_id = $1 AND call_started_at >= $2 AND call_started_at < $3
+         AND COALESCE(duration_ms, 0) > 0`,
+      [business.id, periodStart, periodEnd],
+    );
+    const plan = billingConfig.plans.find((entry) => entry.id === business.chosenPlan);
+    res.json({
+      count: Number(result.rows[0]?.count ?? 0),
+      includedCalls: plan?.callLimit ?? null,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+    });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Business call usage could not be loaded");
+    res.status(502).json({ error: "Business call usage could not be loaded" });
+  }
+});
+
+router.get("/businesses/me/monthly-report", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.status(404).json({ error: "No business is configured for this account" }); return; }
+    const timeZone = business.timeZone || "America/New_York";
+    if (!business.managedReportsEnabled) {
+      const period = await pool.query<{ month: string }>(
+        "SELECT to_char(now() AT TIME ZONE $1, 'YYYY-MM-01') AS month",
+        [timeZone],
+      );
+      res.json({
+        enabled: false, month: period.rows[0]?.month ?? new Date().toISOString().slice(0, 7) + "-01",
+        calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [],
+      });
+      return;
+    }
+    const result = await pool.query<{
+      month: string;
+      calls: number | string;
+      leads_captured: number | string;
+      urgent_leads: number | string;
+      contacted_leads: number | string;
+      pending_leads: number | string;
+      busiest_days: Array<{ day: string; callCount: number }> | string | null;
+    }>(
+      `WITH bounds AS (
+         SELECT date_trunc('month', now() AT TIME ZONE $2) AS local_start,
+                date_trunc('month', now() AT TIME ZONE $2) + interval '1 month' AS local_end
+       ), call_stats AS (
+         SELECT count(*)::int AS calls
+         FROM retell_call_records r, bounds b
+         WHERE r.business_id = $1 AND r.call_started_at >= timezone($2, b.local_start)
+           AND r.call_started_at < timezone($2, b.local_end) AND COALESCE(r.duration_ms, 0) > 0
+       ), lead_stats AS (
+         SELECT count(*)::int AS leads_captured,
+           count(*) FILTER (WHERE COALESCE(urgency_level, '') ~* '(urgent|high|emergency|same.day)')::int AS urgent_leads,
+           count(*) FILTER (WHERE lower(status) IN ('contacted','complete','completed','done'))::int AS contacted_leads,
+           count(*) FILTER (WHERE lower(status) NOT IN ('contacted','complete','completed','done'))::int AS pending_leads
+         FROM leads l, bounds b
+         WHERE l.business_id = $1 AND l.created_at >= timezone($2, b.local_start)
+           AND l.created_at < timezone($2, b.local_end)
+       ), busiest AS (
+         SELECT json_agg(json_build_object('day', to_char(day, 'YYYY-MM-DD'), 'callCount', call_count)
+                         ORDER BY call_count DESC, day DESC) AS days
+         FROM (
+           SELECT (r.call_started_at AT TIME ZONE $2)::date AS day, count(*)::int AS call_count
+           FROM retell_call_records r, bounds b
+           WHERE r.business_id = $1 AND r.call_started_at >= timezone($2, b.local_start)
+             AND r.call_started_at < timezone($2, b.local_end) AND COALESCE(r.duration_ms, 0) > 0
+           GROUP BY 1 ORDER BY call_count DESC, day DESC LIMIT 3
+         ) daily
+       )
+       SELECT to_char(b.local_start, 'YYYY-MM-01') AS month, c.calls, l.leads_captured,
+              l.urgent_leads, l.contacted_leads, l.pending_leads, COALESCE(d.days, '[]'::json) AS busiest_days
+       FROM bounds b CROSS JOIN call_stats c CROSS JOIN lead_stats l CROSS JOIN busiest d`,
+      [business.id, timeZone],
+    );
+    const row = result.rows[0];
+    let busiestDays: Array<{ day: string; callCount: number }> = [];
+    try {
+      const parsed = typeof row?.busiest_days === "string" ? JSON.parse(row.busiest_days) : row?.busiest_days;
+      if (Array.isArray(parsed)) busiestDays = parsed;
+    } catch { /* Invalid aggregate output is represented as an empty chart, not raw data. */ }
+    res.json({
+      enabled: true,
+      month: row?.month ?? new Date().toISOString().slice(0, 7) + "-01",
+      calls: Number(row?.calls ?? 0),
+      leadsCaptured: Number(row?.leads_captured ?? 0),
+      urgentLeads: Number(row?.urgent_leads ?? 0),
+      contactedLeads: Number(row?.contacted_leads ?? 0),
+      pendingLeads: Number(row?.pending_leads ?? 0),
+      busiestDays,
+    });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Managed monthly report could not be loaded");
+    res.status(502).json({ error: "Managed monthly report could not be loaded" });
+  }
+});
+
 router.patch("/businesses/me", async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   setPrivateOwnerResponseHeaders(res);
@@ -164,6 +285,10 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
   const businessName = body.data.businessName?.trim();
   if (body.data.ownerPhone && !/^\+[1-9]\d{7,14}$/.test(body.data.ownerPhone.trim())) {
     res.status(400).json({ error: "Owner phone must include a country code, for example +14155550123" });
+    return;
+  }
+  if (body.data.emergencyEscalationPhone && !/^\+[1-9]\d{7,14}$/.test(body.data.emergencyEscalationPhone.trim())) {
+    res.status(400).json({ error: "Emergency escalation phone must include a country code, for example +14155550123" });
     return;
   }
   if ((body.data.businessHours?.trim() && !parseBusinessHours(body.data.businessHours))
@@ -206,6 +331,16 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
       res.status(404).json({ error: "No business is configured for this account" });
       return;
     }
+    const emergencyAvailable = Object.prototype.hasOwnProperty.call(body.data, "emergencyAvailable")
+      ? body.data.emergencyAvailable
+      : currentBusiness.emergencyAvailable;
+    const emergencyPhone = Object.prototype.hasOwnProperty.call(body.data, "emergencyEscalationPhone")
+      ? body.data.emergencyEscalationPhone
+      : currentBusiness.emergencyEscalationPhone;
+    if (emergencyAvailable === true && (!emergencyPhone || !/^\+[1-9]\d{7,14}$/.test(emergencyPhone.trim()))) {
+      res.status(400).json({ error: "Add an emergency escalation phone when 24/7 emergency calls are enabled." });
+      return;
+    }
 
     const changes: Parameters<typeof updateOwnedBusiness>[2] = {};
     for (
@@ -222,6 +357,7 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
         [databaseField]: typeof normalizedValue === "boolean" || requiredValue ? normalizedValue : normalizedValue || null,
       });
     }
+    if (body.data.emergencyAvailable === false) changes.emergencyEscalationPhone = null;
 
     const websiteEnrichmentSources = {
       ...(currentBusiness.websiteEnrichmentSources ?? {}),
@@ -350,11 +486,17 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
   const answers = [
     body.data.businessType,
     body.data.servicesOffered,
+    body.data.servicesNotOffered,
     body.data.serviceArea,
     body.data.majorIssueExamples,
   ];
   if (answers.some((value) => !value.trim())) {
-    res.status(400).json({ error: "Business type, services, service area, and urgent-issue examples are required." });
+    res.status(400).json({ error: "Business type, services offered and excluded, service area, and urgent-issue examples are required." });
+    return;
+  }
+  if (body.data.emergencyAvailable && (!body.data.emergencyEscalationPhone
+    || !/^\+[1-9]\d{7,14}$/.test(body.data.emergencyEscalationPhone.trim()))) {
+    res.status(400).json({ error: "Add a valid country-code emergency escalation phone when 24/7 emergency calls are enabled." });
     return;
   }
   if (!body.data.businessHours.trim() || !parseBusinessHours(body.data.businessHours)
@@ -389,13 +531,16 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
       ownerEmail: body.data.ownerEmail.trim(),
       businessType: body.data.businessType.trim(),
       servicesOffered: body.data.servicesOffered.trim(),
+      servicesNotOffered: body.data.servicesNotOffered.trim(),
+      emergencyAvailable: body.data.emergencyAvailable,
+      emergencyEscalationPhone: body.data.emergencyAvailable ? body.data.emergencyEscalationPhone?.trim() ?? null : null,
+      aiPromisePolicy: body.data.aiPromisePolicy,
       serviceArea: body.data.serviceArea.trim(),
       majorIssueExamples: body.data.majorIssueExamples.trim(),
       businessHours: body.data.businessHours.trim(),
       timeZone: body.data.timeZone.trim(),
       agentName: body.data.agentName?.trim() || null,
       personalityToneDescription: "",
-      servicesNotOffered: "",
       otherPolicies: "",
       pricingPolicy: "",
       financingPolicy: "",
@@ -438,12 +583,12 @@ const OnboardBusinessBody = z.object({
   businessName: z.string().min(1),
   agentName: z.string().trim().max(40).optional(),
   businessType: z.string().optional(),
-  servicesOffered: z.string().max(4000).optional(),
+  servicesOffered: z.string().trim().min(1).max(500),
+  servicesNotOffered: z.string().trim().min(1).max(500),
   businessWebsiteUrl: z.string().trim().max(2048).optional().or(z.literal("")),
   ownerEmail: z.string().email(),
   serviceArea: z.string().optional(),
   personalityToneDescription: z.string().optional(),
-  servicesNotOffered: z.string().optional(),
   otherPolicies: z.string().trim().max(4000).optional(),
   majorIssueExamples: z.string().optional(),
   pricingPolicy: z.string().optional(),
@@ -455,6 +600,9 @@ const OnboardBusinessBody = z.object({
   credentials: z.string().optional(),
   ownerAvailability: z.string().optional(),
   emergencyContactInfo: z.string().optional(),
+  emergencyAvailable: z.boolean(),
+  emergencyEscalationPhone: z.string().trim().max(16).nullable(),
+  aiPromisePolicy: z.enum(["callback_only", "appointment_windows"]),
   websiteScrapePreviewed: z.boolean().optional(),
   websiteSuggestionsReviewed: z.boolean().optional(),
   websitePreviewAttempted: z.boolean().optional(),
@@ -485,6 +633,15 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   }
   if (body.data.websiteScrapePreviewed && body.data.websiteSuggestionsReviewed !== true) {
     res.status(400).json({ error: "Review the website suggestions and missing fields before saving." });
+    return;
+  }
+  if (!body.data.servicesOffered?.trim() || !body.data.servicesNotOffered.trim()) {
+    res.status(400).json({ error: "Add short descriptions of services offered and services not offered (enter None if there are no exclusions)." });
+    return;
+  }
+  if (body.data.emergencyAvailable && (!body.data.emergencyEscalationPhone
+    || !/^\+[1-9]\d{7,14}$/.test(body.data.emergencyEscalationPhone.trim()))) {
+    res.status(400).json({ error: "Add a valid country-code emergency escalation phone when 24/7 emergency calls are enabled." });
     return;
   }
   if (body.data.websitePreviewAttempted && !body.data.servicesOffered?.trim()
@@ -524,6 +681,9 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     credentialsCertifications: body.data.credentials,
     ownerAvailability: body.data.ownerAvailability,
     emergencyContactInfo: body.data.emergencyContactInfo,
+    emergencyAvailable: body.data.emergencyAvailable,
+    emergencyEscalationPhone: body.data.emergencyAvailable ? body.data.emergencyEscalationPhone : null,
+    aiPromisePolicy: body.data.aiPromisePolicy,
     agreementsAcceptedAt: new Date(),
   };
   const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() || "";

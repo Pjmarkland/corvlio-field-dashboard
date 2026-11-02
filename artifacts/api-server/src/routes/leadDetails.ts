@@ -1,9 +1,10 @@
 import { getAuth } from "@clerk/express";
-import { GetLeadDetailResponse, UpdateLeadNotesBody } from "@workspace/api-zod";
-import { db, leadsTable, retellCallRecordsTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { FlagLeadInformationBody, GetLeadDetailResponse, UpdateLeadNotesBody } from "@workspace/api-zod";
+import { db, leadInfoFlagsTable, leadsTable, notificationEventsTable, retellCallRecordsTable } from "@workspace/db";
+import { and, eq, or } from "drizzle-orm";
 import { Router } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
+import { deleteRetellCall } from "../lib/retellCallDeletion";
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.patch("/leads/:leadId/notes", async (req, res): Promise<void> => {
   const id = parseLeadId(req.params.leadId);
   if (id === null) { res.status(404).json({ error: "Lead not found" }); return; }
   const input = UpdateLeadNotesBody.strict().safeParse(req.body);
-  if (!input.success) { res.status(400).json({ error: "Notes must be text up to 10,000 characters" }); return; }
+   if (!input.success) { res.status(400).json({ error: "Notes must be text up to 500 characters" }); return; }
   try {
     const business = await findBusinessByClerkUserId(userId);
     if (!business) { res.status(404).json({ error: "Lead not found" }); return; }
@@ -91,6 +92,78 @@ router.patch("/leads/:leadId/notes", async (req, res): Promise<void> => {
   } catch (error) {
     req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Unable to save private lead notes");
     res.status(502).json({ error: "Unable to save private lead notes" });
+  }
+});
+
+router.post("/leads/:leadId/flag", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  const id = parseLeadId(req.params.leadId);
+  if (id === null) { res.status(404).json({ error: "Lead not found" }); return; }
+  const input = FlagLeadInformationBody.strict().safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: "Optional flag reason must be 500 characters or fewer." }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business || !await loadOwnedLead(id, business.id)) {
+      res.status(404).json({ error: "Lead not found" });
+      return;
+    }
+    await db.insert(leadInfoFlagsTable).values({
+      businessId: business.id,
+      leadId: id,
+      reason: input.data.reason?.trim() || null,
+    }).onConflictDoNothing();
+    res.json({ flagged: true });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Lead information flag could not be saved");
+    res.status(502).json({ error: "Lead information flag could not be saved" });
+  }
+});
+
+router.delete("/leads/:leadId", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  const id = parseLeadId(req.params.leadId);
+  if (id === null) { res.status(404).json({ error: "Lead not found" }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.status(404).json({ error: "Lead not found" }); return; }
+    const [lead] = await db.select({ retellCallId: leadsTable.retellCallId })
+      .from(leadsTable).where(ownedLeadFilter(id, business.id)).limit(1);
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    let callId = lead.retellCallId;
+    if (!callId) {
+      const [record] = await db.select({ retellCallId: retellCallRecordsTable.retellCallId })
+        .from(retellCallRecordsTable)
+        .where(and(eq(retellCallRecordsTable.businessId, business.id), eq(retellCallRecordsTable.leadId, id)))
+        .limit(1);
+      callId = record?.retellCallId ?? null;
+    }
+    if (callId) {
+      try { await deleteRetellCall(callId); }
+      catch (error) {
+        req.log.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Retell call data deletion failed; lead remains available for retry");
+        res.status(502).json({ error: "Call media could not be deleted. The lead was not removed; try again later." });
+        return;
+      }
+    }
+    await db.transaction(async (tx) => {
+      await tx.delete(notificationEventsTable).where(and(
+        eq(notificationEventsTable.businessId, String(business.id)),
+        eq(notificationEventsTable.leadId, String(id)),
+      ));
+      await tx.delete(retellCallRecordsTable).where(and(
+        eq(retellCallRecordsTable.businessId, business.id),
+        callId
+          ? or(eq(retellCallRecordsTable.leadId, id), eq(retellCallRecordsTable.retellCallId, callId))
+          : eq(retellCallRecordsTable.leadId, id),
+      ));
+      await tx.delete(leadsTable).where(ownedLeadFilter(id, business.id));
+    });
+    res.status(204).end();
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Lead data could not be deleted");
+    res.status(502).json({ error: "Lead data could not be deleted" });
   }
 });
 

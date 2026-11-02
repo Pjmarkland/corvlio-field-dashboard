@@ -43,6 +43,9 @@ describe('native business setup', () => {
     expect(screen.getByTestId('input-ownerEmail')).toBeTruthy();
     expect(screen.getByTestId('select-business-type')).toBeTruthy();
     expect(screen.getByTestId('input-servicesOffered')).toBeTruthy();
+    expect(screen.getByTestId('input-servicesNotOffered')).toBeTruthy();
+    expect(screen.getByTestId('select-emergency-availability')).toBeTruthy();
+    expect(screen.getByTestId('select-promise-policy')).toBeTruthy();
     expect(screen.getByTestId('input-serviceArea')).toBeTruthy();
     expect(screen.getByTestId('input-majorIssueExamples')).toBeTruthy();
     expect(screen.getByTestId('input-onboarding-businessHours')).toBeTruthy();
@@ -64,6 +67,9 @@ describe('native business setup', () => {
     fireEvent.change(screen.getByTestId('select-business-type'), { target: { value: 'HVAC' } });
     fireEvent.change(screen.getByTestId('input-serviceArea'), { target: { value: 'North Bay' } });
     fireEvent.change(screen.getByTestId('input-servicesOffered'), { target: { value: 'Heating repair and installation.' } });
+    fireEvent.change(screen.getByTestId('input-servicesNotOffered'), { target: { value: 'None' } });
+    fireEvent.change(screen.getByTestId('select-emergency-availability'), { target: { value: 'no' } });
+    fireEvent.change(screen.getByTestId('select-promise-policy'), { target: { value: 'callback_only' } });
     fireEvent.change(screen.getByTestId('input-majorIssueExamples'), { target: { value: 'No heat in winter or a gas smell.' } });
     fireEvent.change(screen.getByTestId('input-onboarding-businessHours'), { target: { value: 'Mon-Fri 08:00-17:00' } });
     fireEvent.change(screen.getByTestId('input-onboarding-timeZone'), { target: { value: 'America/Los_Angeles' } });
@@ -79,6 +85,10 @@ describe('native business setup', () => {
       ownerEmail: 'owner@northline.example',
       businessType: 'HVAC',
       servicesOffered: 'Heating repair and installation.',
+      servicesNotOffered: 'None',
+      emergencyAvailable: false,
+      emergencyEscalationPhone: null,
+      aiPromisePolicy: 'callback_only',
       serviceArea: 'North Bay',
       majorIssueExamples: 'No heat in winter or a gas smell.',
       businessHours: 'Mon-Fri 08:00-17:00',

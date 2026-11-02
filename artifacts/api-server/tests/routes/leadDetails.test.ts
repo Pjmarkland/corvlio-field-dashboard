@@ -3,7 +3,8 @@ import { createServer, type Server } from "node:http";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 const fixture = vi.hoisted(() => ({
-  rows: [] as any[], records: [] as any[], fail: false,
+  rows: [] as any[], records: [] as any[], flags: [] as any[], notifications: [] as any[],
+  fail: false, removeCall: vi.fn(),
 }));
 vi.mock("@clerk/express", () => ({
   getAuth: (req: express.Request) => ({ userId: req.get("x-test-user") ?? null }),
@@ -15,6 +16,8 @@ vi.mock("../../src/lib/businessDirectory", () => ({
 vi.mock("@workspace/db", async () => {
   const { leadsTable } = await import("../../../../lib/db/src/schema/leads");
   const { retellCallRecordsTable } = await import("../../../../lib/db/src/schema/retellCallRecords");
+  const { leadInfoFlagsTable } = await import("../../../../lib/db/src/schema/leadInfoFlags");
+  const { notificationEventsTable } = await import("../../../../lib/db/src/schema/notifications");
   const dialect = new PgDialect();
   function selected(condition: any) {
     const query = dialect.sqlToQuery(condition);
@@ -23,7 +26,7 @@ vi.mock("@workspace/db", async () => {
     return fixture.rows.filter(row => row.id === query.params[0]
       && (!query.sql.includes('"business_id"') || row.businessId === query.params[1]));
   }
-  return { leadsTable, retellCallRecordsTable, db: {
+  const db: any = {
     select: () => ({ from: (table: any) => ({ where: (condition: any) => ({
       limit: async () => {
         if (fixture.fail) throw new Error("Database error");
@@ -43,8 +46,31 @@ vi.mock("@workspace/db", async () => {
         return rows;
       },
     }) }) }),
-  } };
+    insert: () => ({ values: (value: any) => ({ onConflictDoNothing: async () => { fixture.flags.push(value); } }) }),
+    delete: (table: any) => ({ where: async (condition: any) => {
+      if (fixture.fail) throw new Error("Database error");
+      if (table === leadsTable) {
+        const removed = selected(condition);
+        fixture.rows = fixture.rows.filter(row => !removed.includes(row));
+        return removed;
+      }
+      const query = dialect.sqlToQuery(condition);
+      if (table === notificationEventsTable) {
+        const [businessId, leadId] = query.params;
+        fixture.notifications = fixture.notifications.filter(row =>
+          row.businessId !== businessId || row.leadId !== leadId);
+      } else if (table === retellCallRecordsTable) {
+        const [businessId, leadId, callId] = query.params;
+        fixture.records = fixture.records.filter(row =>
+          row.businessId !== businessId || (row.leadId !== leadId && row.retellCallId !== callId));
+      }
+      return [];
+    } }),
+  };
+  db.transaction = (callback: (tx: any) => Promise<unknown>) => callback(db);
+  return { leadsTable, retellCallRecordsTable, leadInfoFlagsTable, notificationEventsTable, db };
 });
+vi.mock("../../src/lib/retellCallDeletion", () => ({ deleteRetellCall: fixture.removeCall }));
 import detailsRouter from "../../src/routes/leadDetails";
 import leadsRouter from "../../src/routes/leads";
 
@@ -53,7 +79,7 @@ let base: string;
 beforeAll(async () => {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => { (req as any).log = { error: vi.fn() }; next(); });
+  app.use((req, _res, next) => { (req as any).log = { error: vi.fn(), warn: vi.fn() }; next(); });
   app.use(leadsRouter, detailsRouter);
   server = createServer(app);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -61,7 +87,11 @@ beforeAll(async () => {
 });
 afterAll(() => new Promise<void>(resolve => server.close(() => resolve())));
 beforeEach(() => {
+  vi.clearAllMocks();
+  fixture.removeCall.mockResolvedValue(undefined);
   fixture.fail = false;
+  fixture.flags = [];
+  fixture.notifications = [];
   fixture.rows = [1, 2].map(businessId => ({
     id: businessId * 100 + 1, businessId, callerName: null, retellCallId: `call-${businessId}`,
     phoneNumber: null, callbackNumber: null, callerId: null, issueReason: null,
@@ -79,7 +109,7 @@ async function request(path: string, user?: string, method = "GET", data?: any) 
     method, headers: { ...(user ? { "x-test-user": user } : {}), "content-type": "application/json" },
     ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
   });
-  return { status: response.status, headers: response.headers, body: await response.json() };
+  return { status: response.status, headers: response.headers, body: response.status === 204 ? null : await response.json() };
 }
 
 it("returns the owner's almost-empty lead plus existing linked call metadata", async () => {
@@ -115,6 +145,29 @@ it("persists and clears plain-text private notes without changing intake or stat
     .toMatchObject({ status: 200, body: { privateNotes: value, status: "pending" } });
   expect((await request("/leads/101", "owner-a")).body.privateNotes).toBe(value);
   expect((await request("/leads/101/notes", "owner-a", "PATCH", { privateNotes: "" })).body.privateNotes).toBeNull();
+});
+it("flags only an owned lead and stores no caller data in the flag", async () => {
+  expect(await request("/leads/101/flag", "owner-a", "POST", { reason: "Incorrect service area" }))
+    .toMatchObject({ status: 200, body: { flagged: true } });
+  expect(fixture.flags).toEqual([{ businessId: 1, leadId: 101, reason: "Incorrect service area" }]);
+  expect((await request("/leads/201/flag", "owner-a", "POST", {})).status).toBe(404);
+  expect(fixture.flags).toHaveLength(1);
+});
+it("deletes an owned lead, linked Retell metadata, and notifications after provider deletion", async () => {
+  fixture.notifications = [
+    { businessId: "1", leadId: "101" },
+    { businessId: "2", leadId: "201" },
+  ];
+  expect(await request("/leads/101", "owner-a", "DELETE")).toMatchObject({ status: 204, body: null });
+  expect(fixture.removeCall).toHaveBeenCalledWith("call-1");
+  expect(fixture.rows.map(row => row.id)).toEqual([201]);
+  expect(fixture.records).toEqual([]);
+  expect(fixture.notifications).toEqual([{ businessId: "2", leadId: "201" }]);
+});
+it("keeps the lead available when Retell deletion fails", async () => {
+  fixture.removeCall.mockRejectedValue(new Error("provider error"));
+  expect(await request("/leads/101", "owner-a", "DELETE")).toMatchObject({ status: 502 });
+  expect(fixture.rows.map(row => row.id)).toEqual([101, 201]);
 });
 it("requires authentication for detail and notes", async () => {
   expect((await request("/leads/101")).status).toBe(401);

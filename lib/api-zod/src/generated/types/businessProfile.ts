@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BusinessProfileAiPromisePolicy } from './businessProfileAiPromisePolicy';
 
 export interface BusinessProfile {
   isInternal?: boolean;
@@ -52,6 +53,15 @@ export interface BusinessProfile {
   ownerAvailability: string | null;
   /** @nullable */
   emergencyContactInfo: string | null;
+  /** @nullable */
+  emergencyAvailable: boolean | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone: string | null;
+  /** @nullable */
+  aiPromisePolicy: BusinessProfileAiPromisePolicy;
   /** @nullable */
   retellPhoneNumber: string | null;
 }

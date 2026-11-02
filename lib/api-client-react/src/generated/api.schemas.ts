@@ -81,6 +81,14 @@ export interface NativeBusinessSetupStatus {
   provisioningState: string | null;
 }
 
+export type NativeBusinessSetupInputAiPromisePolicy = typeof NativeBusinessSetupInputAiPromisePolicy[keyof typeof NativeBusinessSetupInputAiPromisePolicy];
+
+
+export const NativeBusinessSetupInputAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
+
 export interface NativeBusinessSetupInput {
   /**
      * @minLength 1
@@ -99,9 +107,21 @@ export interface NativeBusinessSetupInput {
   businessType: string;
   /**
      * @minLength 1
-     * @maxLength 4000
+     * @maxLength 500
      */
   servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesNotOffered: string;
+  emergencyAvailable: boolean;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone: string | null;
+  aiPromisePolicy: NativeBusinessSetupInputAiPromisePolicy;
   /**
      * @minLength 1
      * @maxLength 4000
@@ -473,7 +493,7 @@ export type LeadDetail = Lead & ({
 });
 
 export interface LeadNotesInput {
-  /** @maxLength 10000 */
+  /** @maxLength 500 */
   privateNotes: string;
 }
 
@@ -587,6 +607,17 @@ export interface AppReviewDemoLinkInput {
   allowUnverifiedEmail?: boolean;
 }
 
+/**
+ * @nullable
+ */
+export type BusinessProfileAiPromisePolicy = typeof BusinessProfileAiPromisePolicy[keyof typeof BusinessProfileAiPromisePolicy] | null;
+
+
+export const BusinessProfileAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
+
 export interface BusinessProfile {
   isInternal?: boolean;
   /** @nullable */
@@ -634,8 +665,28 @@ export interface BusinessProfile {
   /** @nullable */
   emergencyContactInfo: string | null;
   /** @nullable */
+  emergencyAvailable: boolean | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone: string | null;
+  /** @nullable */
+  aiPromisePolicy: BusinessProfileAiPromisePolicy;
+  /** @nullable */
   retellPhoneNumber: string | null;
 }
+
+/**
+ * @nullable
+ */
+export type BusinessProfileUpdateAiPromisePolicy = typeof BusinessProfileUpdateAiPromisePolicy[keyof typeof BusinessProfileUpdateAiPromisePolicy] | null;
+
+
+export const BusinessProfileUpdateAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
 
 export interface BusinessProfileUpdate {
   /**
@@ -740,6 +791,15 @@ export interface BusinessProfileUpdate {
      * @nullable
      */
   emergencyContactInfo?: string | null;
+  /** @nullable */
+  emergencyAvailable?: boolean | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone?: string | null;
+  /** @nullable */
+  aiPromisePolicy?: BusinessProfileUpdateAiPromisePolicy;
 }
 
 export interface WebsitePreviewInput {
@@ -1013,6 +1073,7 @@ export const AdminBusinessSummaryProvisioningStatus = {
 } as const;
 
 export interface AdminBusinessSummary {
+  managedReportsEnabled?: boolean;
   isInternal?: boolean;
   isSample?: boolean;
   provisioningState?: string;
@@ -1055,6 +1116,17 @@ export interface AdminOverview {
   businesses: AdminBusinessSummary[];
 }
 
+/**
+ * @nullable
+ */
+export type AdminOnboardingAnswersAiPromisePolicy = typeof AdminOnboardingAnswersAiPromisePolicy[keyof typeof AdminOnboardingAnswersAiPromisePolicy] | null;
+
+
+export const AdminOnboardingAnswersAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
+
 export type AdminOnboardingAnswersWebsiteEnrichmentSources = {[key: string]: string};
 
 export interface AdminOnboardingAnswers {
@@ -1091,6 +1163,12 @@ export interface AdminOnboardingAnswers {
   ownerAvailability: string | null;
   /** @nullable */
   emergencyContactInfo: string | null;
+  /** @nullable */
+  emergencyAvailable?: boolean | null;
+  /** @nullable */
+  emergencyEscalationPhone?: string | null;
+  /** @nullable */
+  aiPromisePolicy?: AdminOnboardingAnswersAiPromisePolicy;
   /** @nullable */
   businessWebsiteUrl: string | null;
   /** @nullable */
@@ -1233,6 +1311,71 @@ export interface AdminActivity {
   uncontactedOver24HoursCount: number;
   recentLeads: AdminLeadActivity[];
   operationalFailures: AdminOperationalFailure[];
+}
+
+export interface BusinessCallUsage {
+  /** @minimum 0 */
+  count: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  includedCalls: number | null;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export type BusinessMonthlyResultsReportBusiestDaysItem = {
+  day: string;
+  /** @minimum 0 */
+  callCount: number;
+};
+
+export interface BusinessMonthlyResultsReport {
+  enabled: boolean;
+  month: string;
+  /** @minimum 0 */
+  calls: number;
+  /** @minimum 0 */
+  leadsCaptured: number;
+  /** @minimum 0 */
+  urgentLeads: number;
+  /** @minimum 0 */
+  contactedLeads: number;
+  /** @minimum 0 */
+  pendingLeads: number;
+  busiestDays: BusinessMonthlyResultsReportBusiestDaysItem[];
+}
+
+export interface LeadInformationFlagInput {
+  /** @maxLength 500 */
+  reason?: string;
+}
+
+export interface LeadInformationFlagResult {
+  flagged: boolean;
+}
+
+export interface ManagedReportsInput {
+  enabled: boolean;
+}
+
+export interface AdminFlaggedLead {
+  flagId: number;
+  businessId: number;
+  businessName: string;
+  leadId: number;
+  /** @nullable */
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface AdminFlaggedLeadsResponse {
+  items: AdminFlaggedLead[];
+}
+
+export interface AdminResolveLeadFlagResult {
+  resolved: boolean;
 }
 
 export type CreateOwnerDemoCall200 = {

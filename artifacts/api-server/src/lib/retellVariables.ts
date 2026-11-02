@@ -37,5 +37,11 @@ export function dynamicVariables(business: Business | null) {
     credentials: detail(business?.credentialsCertifications, PASS_TO_OWNER),
     owner_availability: detail(business?.ownerAvailability, NOTIFY_OWNER),
     emergency_contact_info: detail(business?.emergencyContactInfo, NOTIFY_OWNER),
+    emergency_services_available: business?.emergencyAvailable === true ? "yes"
+      : business?.emergencyAvailable === false ? "no" : "unknown",
+    emergency_escalation_phone: business?.emergencyAvailable === true
+      ? business.emergencyEscalationPhone?.trim() ?? "" : "",
+    allowed_promise_policy: business?.aiPromisePolicy === "appointment_windows"
+      ? "appointment_windows" : "callback_only",
   };
 }

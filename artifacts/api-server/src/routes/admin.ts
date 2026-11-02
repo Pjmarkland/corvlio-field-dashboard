@@ -11,7 +11,8 @@ import {
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { getAdminCallQuality } from "../lib/callQuality";
 import { z } from "zod";
-import { pool } from "@workspace/db";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { businessesTable, db, leadInfoFlagsTable, leadsTable, pool } from "@workspace/db";
 import { createInternalBusiness, internalBusinessDirectory, internalBusinessRecord, InternalBusinessError } from "../lib/internalBusinesses";
 import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
 
@@ -127,6 +128,67 @@ router.post("/admin/app-review-demo/link", async (req, res): Promise<void> => {
     res.status(503).json({ error: "The App Review account could not be linked." });
   } finally {
     if (allowUnverifiedEmail) logOverride(overrideResult);
+  }
+});
+
+router.patch("/admin/businesses/:businessId/managed-reports", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const id = z.coerce.number().int().positive().safeParse(req.params.businessId);
+  const body = z.object({ enabled: z.boolean() }).strict().safeParse(req.body);
+  if (!id.success || !body.success) { res.status(400).json({ error: "Enter a valid business and enabled state." }); return; }
+  try {
+    const [updated] = await db.update(businessesTable)
+      .set({ managedReportsEnabled: body.data.enabled, updatedAt: new Date() })
+      .where(eq(businessesTable.id, id.data))
+      .returning({ enabled: businessesTable.managedReportsEnabled });
+    if (!updated) { res.status(404).json({ error: "Business not found" }); return; }
+    res.json(updated);
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Managed report setting could not be updated");
+    res.status(503).json({ error: "Managed report setting could not be updated." });
+  }
+});
+
+router.get("/admin/flagged-leads", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    const items = await db.select({
+      flagId: leadInfoFlagsTable.id,
+      businessId: businessesTable.id,
+      businessName: businessesTable.businessName,
+      leadId: leadsTable.id,
+      reason: leadInfoFlagsTable.reason,
+      createdAt: leadInfoFlagsTable.createdAt,
+    }).from(leadInfoFlagsTable)
+      .innerJoin(leadsTable, eq(leadsTable.id, leadInfoFlagsTable.leadId))
+      .innerJoin(businessesTable, eq(businessesTable.id, leadInfoFlagsTable.businessId))
+      .where(isNull(leadInfoFlagsTable.resolvedAt))
+      .orderBy(desc(leadInfoFlagsTable.createdAt))
+      .limit(200);
+    res.json({ items });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Flagged leads could not be loaded");
+    res.status(503).json({ error: "Flagged leads could not be loaded." });
+  }
+});
+
+router.patch("/admin/lead-information-flags/:flagId/resolve", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const id = z.coerce.number().int().positive().safeParse(req.params.flagId);
+  if (!id.success) { res.status(400).json({ error: "Invalid flag ID." }); return; }
+  try {
+    const [updated] = await db.update(leadInfoFlagsTable)
+      .set({
+        resolvedAt: new Date(),
+        resolvedBy: typeof res.locals.adminEmail === "string" ? res.locals.adminEmail : "admin",
+      })
+      .where(and(eq(leadInfoFlagsTable.id, id.data), isNull(leadInfoFlagsTable.resolvedAt)))
+      .returning({ id: leadInfoFlagsTable.id });
+    if (!updated) { res.status(404).json({ error: "Unresolved flag not found." }); return; }
+    res.json({ resolved: true });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Lead information flag could not be resolved");
+    res.status(503).json({ error: "Lead information flag could not be resolved." });
   }
 });
 

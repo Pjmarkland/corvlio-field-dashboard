@@ -62,6 +62,11 @@ const validBody = {
   chosenPlan: "starter",
   businessName: "Example Heating",
   ownerEmail: "business-owner@example.test",
+  servicesOffered: "Residential heating repair and replacement.",
+  servicesNotOffered: "None",
+  emergencyAvailable: false,
+  emergencyEscalationPhone: null,
+  aiPromisePolicy: "callback_only",
 };
 
 beforeAll(async () => {
@@ -100,6 +105,7 @@ beforeEach(() => {
     ownerEmail: "owner@example.com",
     serviceArea: "Northside",
     personalityToneDescription: null,
+    servicesOffered: "Residential heating repair and replacement.",
     servicesNotOffered: null,
     majorIssueExamples: null,
     pricingPolicy: null,
@@ -111,6 +117,9 @@ beforeEach(() => {
     credentialsCertifications: null,
     ownerAvailability: null,
     emergencyContactInfo: null,
+    emergencyAvailable: null,
+    emergencyEscalationPhone: null,
+    aiPromisePolicy: null,
     retellPhoneNumber: null,
     websiteEnrichmentAttemptedAt: null,
     websiteEnrichmentSources: {},
@@ -166,6 +175,10 @@ const validNativeBody = {
   ownerEmail: "owner@example.test",
   businessType: "HVAC",
   servicesOffered: "Residential heating repair and replacement.",
+  servicesNotOffered: "None",
+  emergencyAvailable: false,
+  emergencyEscalationPhone: null,
+  aiPromisePolicy: "callback_only",
   serviceArea: "Northside",
   majorIssueExamples: "No heat in winter or a gas smell.",
   businessHours: "Mon-Fri 08:00-17:00",
@@ -228,6 +241,10 @@ describe("owner business profile API", () => {
       ownerEmail: "owner@example.test",
       businessType: "HVAC",
       servicesOffered: "Residential heating repair and replacement.",
+      servicesNotOffered: "None",
+      emergencyAvailable: false,
+      emergencyEscalationPhone: null,
+      aiPromisePolicy: "callback_only",
       serviceArea: "Northside",
       majorIssueExamples: "No heat in winter or a gas smell.",
       businessHours: "Mon-Fri 08:00-17:00",
@@ -539,18 +556,18 @@ describe("business onboarding website enrichment", () => {
       servicesOffered: body.servicesOffered, businessHours: "", timeZone: "",
     });
   });
-  it("requires services or explicit deferral after preview, including an empty failed preview", async () => {
+  it("rejects incomplete required services even when a website preview was attempted", async () => {
     const body = { ...validBody, websitePreviewAttempted: true, servicesOffered: "" };
     expect((await onboard(body)).status).toBe(400);
     expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
-    expect((await onboard({ ...body, servicesOfferedDeferred: true })).status).toBe(200);
+    expect((await onboard({ ...body, servicesOfferedDeferred: true })).status).toBe(400);
   });
   it("saves reviewed otherPolicies separately from refused work", async () => {
     const otherPolicies = "We do not process payment through the insurance provider.";
-    expect((await onboard({ ...validBody, otherPolicies, servicesNotOffered: "",
+    expect((await onboard({ ...validBody, otherPolicies, servicesNotOffered: "None",
       servicesOffered: "Roof repair", websitePreviewAttempted: true,
       websiteScrapePreviewed: true, websiteSuggestionsReviewed: true })).status).toBe(200);
-    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({ otherPolicies, servicesNotOffered: "" });
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({ otherPolicies, servicesNotOffered: "None" });
     expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import app from "./app";
 import { startInvoiceWorker, stopInvoiceWorker } from "./invoicing/worker";
 import { databaseErrorFields } from "@workspace/db/errors";
 import { startAccountDeletionWorker, stopAccountDeletionWorker } from "./lib/accountDeletionWorker";
+import { startCallMediaRetentionWorker, stopCallMediaRetentionWorker } from "./lib/callMediaRetentionWorker";
 import { startBillingWorker, stopBillingWorker } from "./billing/worker";
 import { closeApnsSession } from "./lib/apnsAdapter";
 import { refreshBusinessPhoneCache } from "./lib/businessDirectory";
@@ -43,6 +44,7 @@ const server = app.listen(port, (err) => {
     startLeadNotificationPoller();
     startBillingWorker();
     startAccountDeletionWorker();
+    startCallMediaRetentionWorker();
     startInvoiceWorker();
   } else {
     logger.info("Development background delivery/provisioning paused; explicit test flows use mocked providers");
@@ -56,6 +58,7 @@ async function shutdown(signal: string) {
   await stopLeadNotificationPoller();
   await stopBillingWorker();
   await stopAccountDeletionWorker();
+  await stopCallMediaRetentionWorker();
   await stopInvoiceWorker();
   closeApnsSession();
   server.close((error) => {

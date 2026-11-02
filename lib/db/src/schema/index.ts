@@ -22,6 +22,7 @@ export * from "./demo-calls";
 export * from "./notifications";
 export * from "./businesses";
 export * from "./leads";
+export * from "./leadInfoFlags";
 export * from "./retellCallRecords";
 export * from "./provisioningAttempts";
 export * from "./operationalFailures";

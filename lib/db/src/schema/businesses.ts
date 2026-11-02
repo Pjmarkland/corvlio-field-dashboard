@@ -43,6 +43,10 @@ export const businessesTable = pgTable("businesses", {
   credentialsCertifications: text("credentials_certifications"),
   ownerAvailability: text("owner_availability"),
   emergencyContactInfo: text("emergency_contact_info"),
+  emergencyAvailable: boolean("emergency_available"),
+  emergencyEscalationPhone: text("emergency_escalation_phone"),
+  aiPromisePolicy: text("ai_promise_policy"),
+  managedReportsEnabled: boolean("managed_reports_enabled").notNull().default(false),
   businessWebsiteUrl: text("business_website_url"),
   websiteEnrichmentAttemptedAt: timestamp("website_enrichment_attempted_at", { withTimezone: true }),
   websiteEnrichmentSources: jsonb("website_enrichment_sources")

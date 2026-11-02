@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ArrowUpRight, CircleAlert, Clock3, Phone, Radio, Users, Wrench } from 'lucide-react';
 import { Link } from 'wouter';
-import { getGetAdminActivityQueryKey, useGetAdminActivity, type AdminLeadActivity } from '@workspace/api-client-react';
+import { getGetAdminActivityQueryKey, getGetAdminFlaggedLeadsQueryKey, useGetAdminActivity, useGetAdminFlaggedLeads, useResolveAdminLeadInformationFlag, type AdminLeadActivity } from '@workspace/api-client-react';
 
 import { AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, SectionHeading, formatAdminDate } from './AdminShared';
 import EmailHealthSection from './EmailHealthSection';
@@ -24,6 +24,12 @@ function LeadActivityRow({ lead }: { lead: AdminLeadActivity }) {
 }
 
 export default function AdminActivityPage() {
+  const flaggedQuery = useGetAdminFlaggedLeads({ query: { queryKey: getGetAdminFlaggedLeadsQueryKey(), retry: false } });
+  const resolveFlag = useResolveAdminLeadInformationFlag();
+  const { data: flags } = flaggedQuery;
+  const resolve = (flagId: number) => resolveFlag.mutate({ flagId }, {
+    onSuccess: () => void flaggedQuery.refetch(),
+  });
   const { data, isLoading, isError, error, refetch } = useGetAdminActivity({ query: { queryKey: getGetAdminActivityQueryKey(), retry: false } });
   const leads = useMemo(() => [...(data?.recentLeads ?? [])].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [data?.recentLeads]);
   const blankCalls = useMemo(() => (data?.operationalFailures ?? []).filter((failure) => failure.summary === 'Blank or failed call'), [data?.operationalFailures]);
@@ -41,6 +47,21 @@ export default function AdminActivityPage() {
       <AdminMetric label="Over 24 hours" value={data.uncontactedOver24HoursCount} detail="Oldest open follow-ups" tone={data.uncontactedOver24HoursCount ? 'coral' : 'neutral'} icon={Clock3} />
     </section>
     <EmailHealthSection />
+    <section className="mb-10" data-testid="section-flagged-leads">
+      <SectionHeading eyebrow="Owner reports" title="Flagged lead information" detail="Review inaccurate lead details reported by client businesses." />
+      {flaggedQuery.isLoading ? <AdminLoading label="Loading flagged leads" />
+        : flaggedQuery.isError ? <div role="alert" className="admin-panel rounded-2xl p-5 text-sm text-[#a3432d]">Flagged leads could not load. <button type="button" onClick={() => void flaggedQuery.refetch()} className="font-semibold underline">Try again</button></div>
+        : flags?.items.length ? <div className="admin-panel overflow-hidden rounded-2xl">
+          {flags.items.map((flag) => <article key={flag.flagId} className="flex flex-col gap-4 border-b border-[#e1e6df] px-4 py-5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:px-6" data-testid={`row-flagged-lead-${flag.flagId}`}>
+            <div className="min-w-0">
+              <p className="text-sm font-800 text-[#25362e]">{flag.businessName} · Lead #{flag.leadId}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-[#68766c]">{flag.reason ?? 'No reason provided.'}</p>
+              <time className="mt-2 block font-mono text-[10px] text-[#8a948d]" dateTime={flag.createdAt}>{formatAdminDate(flag.createdAt)}</time>
+            </div>
+            <button type="button" disabled={resolveFlag.isPending} onClick={() => resolve(flag.flagId)} data-testid={`button-resolve-flag-${flag.flagId}`} className="min-h-10 shrink-0 rounded-xl border border-[#c7dccb] px-4 text-xs font-bold text-[#2c6b56] disabled:opacity-55">Resolve</button>
+          </article>)}
+        </div> : <AdminEmpty title="No unresolved reports" description="Client-reported lead corrections will appear here." icon={CircleAlert} />}
+    </section>
     <section>
       <SectionHeading eyebrow="Global feed" title="Recent leads" detail="The latest incoming lead activity across the Corvlio portfolio." />
       {leads.length === 0 ? <AdminEmpty title="No lead activity yet" description="When a receptionist captures a lead, it will appear here in newest-first order." icon={Radio} /> : <div className="admin-panel overflow-hidden rounded-2xl">{leads.map((lead) => <LeadActivityRow key={lead.id} lead={lead} />)}</div>}

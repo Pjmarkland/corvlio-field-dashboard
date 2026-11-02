@@ -189,6 +189,42 @@ paths:
           description: No business is configured for this account
         "502":
           description: Business profile could not be updated
+  /businesses/me/call-usage:
+    get:
+      operationId: getBusinessCallUsage
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Get the signed-in business's current-month call usage
+      responses:
+        "200":
+          description: Current month call count and known allowance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessCallUsage"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
+  /businesses/me/monthly-report:
+    get:
+      operationId: getBusinessMonthlyResultsReport
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Get the current-month results report when enabled by an administrator
+      responses:
+        "200":
+          description: Managed monthly report status and results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessMonthlyResultsReport"
+        "401":
+          description: Authentication required
+        "404":
+          description: No business is configured for this account
   /businesses/onboarding/website-preview:
     post:
       operationId: previewBusinessWebsite
@@ -416,6 +452,61 @@ paths:
           description: Lead not found
         "502":
           description: Lead could not be loaded
+    delete:
+      operationId: deleteOwnedLead
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Permanently delete one lead belonging to the signed-in business
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "204":
+          description: Lead and its personal details deleted
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Lead data could not be deleted
+  /leads/{leadId}/flag:
+    post:
+      operationId: flagLeadInformation
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Flag inaccurate information on an owned lead
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInformationFlagInput"
+      responses:
+        "200":
+          description: Flag submitted or already open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadInformationFlagResult"
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Flag could not be saved
   /leads/{leadId}/notes:
     patch:
       operationId: updateLeadNotes
@@ -844,6 +935,80 @@ paths:
           description: Invalid business ID
         "404":
           description: Not found, business missing, or administrator access unavailable
+  /admin/businesses/{businessId}/managed-reports:
+    patch:
+      operationId: updateAdminManagedReports
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Enable or disable managed monthly reports for one business
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedReportsInput"
+      responses:
+        "200":
+          description: Managed report setting updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedReportsInput"
+        "400":
+          description: Invalid business ID or input
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/flagged-leads:
+    get:
+      operationId: getAdminFlaggedLeads
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: List unresolved inaccurate-information flags
+      responses:
+        "200":
+          description: Unresolved flags with business and lead IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFlaggedLeadsResponse"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/lead-information-flags/{flagId}/resolve:
+    patch:
+      operationId: resolveAdminLeadInformationFlag
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Resolve one inaccurate-information flag
+      parameters:
+        - name: flagId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "200":
+          description: Flag resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminResolveLeadFlagResult"
+        "400":
+          description: Invalid flag ID
+        "404":
+          description: Flag not found or administrator access is unavailable
   /admin/activity:
     get:
       operationId: getAdminActivity
@@ -1147,7 +1312,11 @@ components:
         businessName: { type: string, minLength: 1, maxLength: 160 }
         ownerEmail: { type: string, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", maxLength: 320 }
         businessType: { type: string, minLength: 1, maxLength: 200 }
-        servicesOffered: { type: string, minLength: 1, maxLength: 4000 }
+        servicesOffered: { type: string, minLength: 1, maxLength: 500 }
+        servicesNotOffered: { type: string, minLength: 1, maxLength: 500 }
+        emergencyAvailable: { type: boolean }
+        emergencyEscalationPhone: { type: [string, "null"], maxLength: 16 }
+        aiPromisePolicy: { type: string, enum: [callback_only, appointment_windows] }
         serviceArea: { type: string, minLength: 1, maxLength: 4000 }
         majorIssueExamples: { type: string, minLength: 1, maxLength: 4000 }
         businessHours: { type: string, minLength: 1, maxLength: 500 }
@@ -1160,7 +1329,7 @@ components:
         privacyAccepted: { type: boolean, enum: [true] }
         termsAccepted: { type: boolean, enum: [true] }
         serviceAgreementAccepted: { type: boolean, enum: [true] }
-      required: [businessName, ownerEmail, businessType, servicesOffered, serviceArea, majorIssueExamples, businessHours, timeZone, privacyAccepted, termsAccepted, serviceAgreementAccepted]
+      required: [businessName, ownerEmail, businessType, servicesOffered, servicesNotOffered, emergencyAvailable, emergencyEscalationPhone, aiPromisePolicy, serviceArea, majorIssueExamples, businessHours, timeZone, privacyAccepted, termsAccepted, serviceAgreementAccepted]
     NativeBusinessSetupResult:
       type: object
       additionalProperties: false
@@ -1440,7 +1609,7 @@ components:
       properties:
         privateNotes:
           type: string
-          maxLength: 10000
+          maxLength: 500
       required: [privateNotes]
     WelcomeEntry:
       type: object
@@ -1636,6 +1805,14 @@ components:
           type: [string, "null"]
         emergencyContactInfo:
           type: [string, "null"]
+        emergencyAvailable:
+          type: [boolean, "null"]
+        emergencyEscalationPhone:
+          type: [string, "null"]
+          maxLength: 16
+        aiPromisePolicy:
+          type: [string, "null"]
+          enum: [callback_only, appointment_windows, null]
         retellPhoneNumber:
           type: [string, "null"]
       required:
@@ -1658,6 +1835,9 @@ components:
         - credentials
         - ownerAvailability
         - emergencyContactInfo
+        - emergencyAvailable
+        - emergencyEscalationPhone
+        - aiPromisePolicy
         - retellPhoneNumber
     BusinessProfileUpdate:
       type: object
@@ -1732,6 +1912,14 @@ components:
         emergencyContactInfo:
           type: [string, "null"]
           maxLength: 4000
+        emergencyAvailable:
+          type: [boolean, "null"]
+        emergencyEscalationPhone:
+          type: [string, "null"]
+          maxLength: 16
+        aiPromisePolicy:
+          type: [string, "null"]
+          enum: [callback_only, appointment_windows, null]
     WebsitePreviewInput:
       type: object
       additionalProperties: false
@@ -2091,6 +2279,8 @@ components:
     AdminBusinessSummary:
       type: object
       properties:
+        managedReportsEnabled:
+          type: boolean
         isInternal:
           type: boolean
         isSample:
@@ -2223,6 +2413,13 @@ components:
           type: [string, "null"]
         emergencyContactInfo:
           type: [string, "null"]
+        emergencyAvailable:
+          type: [boolean, "null"]
+        emergencyEscalationPhone:
+          type: [string, "null"]
+        aiPromisePolicy:
+          type: [string, "null"]
+          enum: [callback_only, appointment_windows, null]
         businessWebsiteUrl:
           type: [string, "null"]
         websiteEnrichmentAttemptedAt:
@@ -2434,6 +2631,79 @@ components:
         - uncontactedOver24HoursCount
         - recentLeads
         - operationalFailures
+    BusinessCallUsage:
+      type: object
+      additionalProperties: false
+      properties:
+        count: { type: number, multipleOf: 1, minimum: 0 }
+        includedCalls: { type: [number, "null"], multipleOf: 1, minimum: 0 }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+      required: [count, includedCalls, periodStart, periodEnd]
+    BusinessMonthlyResultsReport:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        month: { type: string, format: date }
+        calls: { type: number, multipleOf: 1, minimum: 0 }
+        leadsCaptured: { type: number, multipleOf: 1, minimum: 0 }
+        urgentLeads: { type: number, multipleOf: 1, minimum: 0 }
+        contactedLeads: { type: number, multipleOf: 1, minimum: 0 }
+        pendingLeads: { type: number, multipleOf: 1, minimum: 0 }
+        busiestDays:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              day: { type: string, format: date }
+              callCount: { type: number, multipleOf: 1, minimum: 0 }
+            required: [day, callCount]
+      required: [enabled, month, calls, leadsCaptured, urgentLeads, contactedLeads, pendingLeads, busiestDays]
+    LeadInformationFlagInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string, maxLength: 500 }
+    LeadInformationFlagResult:
+      type: object
+      additionalProperties: false
+      properties:
+        flagged: { type: boolean }
+      required: [flagged]
+    ManagedReportsInput:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+      required: [enabled]
+    AdminFlaggedLead:
+      type: object
+      additionalProperties: false
+      properties:
+        flagId: { type: number, multipleOf: 1 }
+        businessId: { type: number, multipleOf: 1 }
+        businessName: { type: string }
+        leadId: { type: number, multipleOf: 1 }
+        reason: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [flagId, businessId, businessName, leadId, reason, createdAt]
+    AdminFlaggedLeadsResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFlaggedLead"
+      required: [items]
+    AdminResolveLeadFlagResult:
+      type: object
+      additionalProperties: false
+      properties:
+        resolved: { type: boolean }
+      required: [resolved]
     AdminOperationalFailure:
       type: object
       properties:

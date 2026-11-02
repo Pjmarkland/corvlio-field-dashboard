@@ -19,6 +19,7 @@ export const retellCallRecordsTable = pgTable(
     issueCaptured: boolean("issue_captured"),
     addressCaptured: boolean("address_captured"),
     analysisComplete: boolean("analysis_complete").notNull().default(false),
+    mediaRetentionCompletedAt: timestamp("media_retention_completed_at", { withTimezone: true }),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -7,6 +7,6 @@
  */
 
 export interface LeadNotesInput {
-  /** @maxLength 10000 */
+  /** @maxLength 500 */
   privateNotes: string;
 }

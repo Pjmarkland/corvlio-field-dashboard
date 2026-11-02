@@ -51,6 +51,7 @@ let server: Server;
 let baseUrl: string;
 
 const OTHER_DYNAMIC_VARIABLE_KEYS = [
+  "allowed_promise_policy",
   "receptionist_tone_style", "receptionist_tone_guidance", "intake_trade", "trade_question_1", "trade_question_2",
   "business_hours", "time_zone", "current_local_time", "business_is_open", "next_opening", "transfer_available",
   "business_name",
@@ -69,6 +70,8 @@ const OTHER_DYNAMIC_VARIABLE_KEYS = [
   "credentials",
   "owner_availability",
   "emergency_contact_info",
+  "emergency_escalation_phone",
+  "emergency_services_available",
 ] as const;
 
 function makeBusiness(overrides: Record<string, unknown> = {}) {

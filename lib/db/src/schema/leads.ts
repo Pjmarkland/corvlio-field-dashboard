@@ -14,6 +14,7 @@ export const leadsTable = pgTable("leads", {
   transcript: text("transcript"),
   summary: text("summary"),
   recordingUrl: text("recording_url"),
+  mediaRetentionCompletedAt: timestamp("media_retention_completed_at", { withTimezone: true }),
   privateNotes: text("private_notes"),
   issueReason: text("issue_reason"),
   address: text("address"),

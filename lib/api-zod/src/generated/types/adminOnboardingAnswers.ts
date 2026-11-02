@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminOnboardingAnswersAiPromisePolicy } from './adminOnboardingAnswersAiPromisePolicy';
 import type { AdminOnboardingAnswersWebsiteEnrichmentSources } from './adminOnboardingAnswersWebsiteEnrichmentSources';
 
 export interface AdminOnboardingAnswers {
@@ -41,6 +42,12 @@ export interface AdminOnboardingAnswers {
   ownerAvailability: string | null;
   /** @nullable */
   emergencyContactInfo: string | null;
+  /** @nullable */
+  emergencyAvailable?: boolean | null;
+  /** @nullable */
+  emergencyEscalationPhone?: string | null;
+  /** @nullable */
+  aiPromisePolicy?: AdminOnboardingAnswersAiPromisePolicy;
   /** @nullable */
   businessWebsiteUrl: string | null;
   /** @nullable */

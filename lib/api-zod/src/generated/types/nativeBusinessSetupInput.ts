@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NativeBusinessSetupInputAiPromisePolicy } from './nativeBusinessSetupInputAiPromisePolicy';
 
 export interface NativeBusinessSetupInput {
   /**
@@ -24,9 +25,21 @@ export interface NativeBusinessSetupInput {
   businessType: string;
   /**
      * @minLength 1
-     * @maxLength 4000
+     * @maxLength 500
      */
   servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesNotOffered: string;
+  emergencyAvailable: boolean;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone: string | null;
+  aiPromisePolicy: NativeBusinessSetupInputAiPromisePolicy;
   /**
      * @minLength 1
      * @maxLength 4000

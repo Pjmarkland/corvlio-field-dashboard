@@ -4,13 +4,18 @@ import { LeadDetailView, copyText, formatCallTime, safeRecordingUrl } from './Le
 
 const state: { data?: unknown; isError?: boolean; error?: unknown } = {};
 const mutate = vi.fn();
+const flagMutate = vi.fn();
+const deleteMutate = vi.fn();
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isLoaded: true, user: { id: 'u1', fullName: 'Sam Roe' } }) }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ setQueryData: vi.fn() }) }));
-vi.mock('wouter', () => ({ Link: ({ href, children, ...p }: { href: string; children: React.ReactNode }) => <a href={href} {...p}>{children}</a> }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ setQueryData: vi.fn(), invalidateQueries: vi.fn() }) }));
+vi.mock('wouter', () => ({ Link: ({ href, children, ...p }: { href: string; children: React.ReactNode }) => <a href={href} {...p}>{children}</a>, useLocation: () => ['/leads/L1', vi.fn()] }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetLeadDetailQueryKey: (id: string) => [`/api/leads/${id}`],
+  getGetLeadsQueryKey: () => ['/api/leads'],
   useGetLeadDetail: () => ({ data: state.data, isLoading: false, isError: !!state.isError, error: state.error, refetch: vi.fn() }),
   useUpdateLeadNotes: () => ({ mutate }),
+  useFlagLeadInformation: () => ({ mutate: flagMutate, isPending: false }),
+  useDeleteOwnedLead: () => ({ mutate: deleteMutate, isPending: false }),
 }));
 
 const base = { id: 'L1', name: '', phone: '', issue: '', address: '', urgency: 'normal', status: 'pending', createdAt: 'bad', contactedAt: null,
@@ -19,7 +24,7 @@ const view = () => render(<LeadDetailView leadId="L1" onStatus={vi.fn()} savingL
 const type = (v: string) => fireEvent.change(screen.getByTestId('input-notes'), { target: { value: v } });
 
 describe('LeadDetailView', () => {
-  beforeEach(() => { state.data = base; state.isError = false; mutate.mockReset(); });
+  beforeEach(() => { state.data = base; state.isError = false; mutate.mockReset(); flagMutate.mockReset(); deleteMutate.mockReset(); });
   it('renders a blank lead safely', () => {
     view();
     expect(screen.getByTestId('text-detail-name').textContent).toBe('Unknown caller');
@@ -44,6 +49,30 @@ describe('LeadDetailView', () => {
     fireEvent.change(screen.getByTestId('input-notes'), { target: { value: 'gate code' } });
     fireEvent.click(screen.getByTestId('button-save-notes'));
     expect(mutate).toHaveBeenCalledWith({ leadId: 'L1', data: { privateNotes: 'gate code' } }, expect.anything());
+  });
+  it('saves notes on blur and enforces the 500-character limit', () => {
+    view();
+    const input = screen.getByTestId('input-notes') as HTMLTextAreaElement;
+    expect(input.maxLength).toBe(500);
+    fireEvent.change(input, { target: { value: 'owner-only note' } });
+    fireEvent.blur(input);
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ leadId: 'L1', data: { privateNotes: 'owner-only note' } }, expect.anything());
+  });
+  it('submits an optional inaccurate-information reason', () => {
+    view();
+    fireEvent.click(screen.getByTestId('button-flag-lead'));
+    fireEvent.change(screen.getByTestId('input-flag-reason'), { target: { value: 'Caller gave a different address' } });
+    fireEvent.click(screen.getByTestId('button-submit-flag'));
+    expect(flagMutate).toHaveBeenCalledWith({ leadId: 'L1', data: { reason: 'Caller gave a different address' } }, expect.anything());
+  });
+  it('requires owner confirmation before deleting a lead', () => {
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    view();
+    fireEvent.click(screen.getByTestId('button-delete-lead'));
+    expect(confirmation).toHaveBeenCalled();
+    expect(deleteMutate).toHaveBeenCalledWith({ leadId: 'L1' }, expect.anything());
+    confirmation.mockRestore();
   });
   it('shows not found without data', () => {
     state.data = undefined; state.isError = true; state.error = { status: 404 };

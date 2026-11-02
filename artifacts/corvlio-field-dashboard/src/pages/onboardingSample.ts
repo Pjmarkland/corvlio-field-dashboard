@@ -11,6 +11,9 @@ export type OnboardingForm = {
   receptionistTone: string;
   servicesOffered: string;
   servicesNotOffered: string;
+  emergencyAvailable: boolean | null;
+  emergencyEscalationPhone: string;
+  aiPromisePolicy: 'callback_only' | 'appointment_windows' | '';
   otherPolicies: string;
   majorIssueExamples: string;
   pricingPolicy: string;
@@ -40,6 +43,9 @@ export const initialForm: OnboardingForm = {
   receptionistTone: 'Friendly and professional',
   servicesOffered: '',
   servicesNotOffered: '',
+  emergencyAvailable: null,
+  emergencyEscalationPhone: '',
+  aiPromisePolicy: '',
   otherPolicies: '',
   majorIssueExamples: '',
   pricingPolicy: '',
@@ -117,6 +123,9 @@ export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
     receptionistTone: toneOptions[0].value,
     servicesOffered: 'Fictional sample only: residential sink leaks, faucet repairs, and drain clearing in Example City.',
     servicesNotOffered: 'Sample only: no commercial plumbing, excavation, or work outside Example City.',
+    emergencyAvailable: false,
+    emergencyEscalationPhone: '',
+    aiPromisePolicy: 'callback_only',
     majorIssueExamples: 'Fictional sample only: an active leak that cannot be contained, a sewage backup, or a complete loss of water.',
     pricingPolicy: 'Sample only: do not guess at prices; explain that the business will confirm costs.',
     financingPolicy: '',

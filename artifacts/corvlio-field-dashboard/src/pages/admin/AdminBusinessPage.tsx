@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, ExternalLink, FileText, Globe2, Phone, Radio, UserRound } from 'lucide-react';
 import { useParams } from 'wouter';
-import { getGetAdminBusinessQueryKey, useGetAdminBusiness, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers } from '@workspace/api-client-react';
+import { getGetAdminBusinessQueryKey, useGetAdminBusiness, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers } from '@workspace/api-client-react';
 
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, BackLink, SectionHeading, formatAdminDate, formatAdminDuration, formatAdminResponse } from './AdminShared';
 
@@ -68,6 +69,8 @@ function CallsPanel({ detail }: { detail: AdminBusinessDetail }) {
 
 export default function AdminBusinessPage() {
   const params = useParams<{ businessId: string }>();
+  const queryClient = useQueryClient();
+  const managedReportsMutation = useUpdateAdminManagedReports();
   const businessId = Number(params.businessId);
   const validId = Number.isInteger(businessId) && businessId > 0;
   const { data, isLoading, isError, error, refetch } = useGetAdminBusiness(businessId, { query: { enabled: validId, queryKey: getGetAdminBusinessQueryKey(businessId), retry: false } });
@@ -79,13 +82,23 @@ export default function AdminBusinessPage() {
   if (isError || !data) return <AdminShell title="Business detail" eyebrow="Founder operations"><AdminError onRetry={() => void refetch()} notFound={notFound} /></AdminShell>;
 
   const { business, onboarding } = data;
-  return <AdminShell title={business.businessName} eyebrow="Business detail" action={<span className="hidden items-center gap-2 text-xs text-[#76837a] sm:flex"><span className="h-2 w-2 rounded-full bg-[#4e8d70]" />Read-only record</span>}>
+  return <AdminShell title={business.businessName} eyebrow="Business detail">
     <BackLink href="/admin">Back to overview</BackLink>
     <SummaryHero detail={data} />
     <section className="admin-panel mb-7 rounded-2xl p-4 text-sm text-[#34443b]" aria-label="Number setup state">
       <p className="font-semibold">{data.business.isSample ? 'Sample / demo — no live number purchased' : `Provisioning state: ${data.business.provisioningState ?? data.business.provisioningStatus}`}</p>
       {data.business.unusedNumber7Days ? <p className="mt-2 font-semibold text-[#a3432d]">No recorded calls in 7+ days. Review this number in the Retell dashboard; this console does not release or delete numbers.</p> : null}
       {data.business.lastCallAt ? <p className="mt-2">Last recorded call: {formatAdminDate(data.business.lastCallAt)}</p> : null}
+    </section>
+    <section className="admin-panel mb-7 flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" data-testid="section-managed-reports">
+      <div><p className="admin-label">Managed monthly reports</p><p className="mt-1 text-sm text-[#68766c]">When enabled, this business can view its monthly results report. New accounts default to off.</p><p className="mt-2 text-xs font-semibold text-[#4f6f5c]">{business.managedReportsEnabled ? 'Enabled' : 'Disabled'}</p></div>
+      <button type="button" disabled={managedReportsMutation.isPending} data-testid="button-toggle-managed-reports" onClick={() => managedReportsMutation.mutate(
+        { businessId, data: { enabled: !business.managedReportsEnabled } },
+        { onSuccess: () => void queryClient.invalidateQueries({ queryKey: getGetAdminBusinessQueryKey(businessId) }) },
+      )} className={`min-h-11 rounded-xl px-4 text-sm font-bold disabled:opacity-55 ${business.managedReportsEnabled ? 'border border-[#d7e2d8] text-[#53675a]' : 'bg-[#244d3f] text-white'}`}>
+        {managedReportsMutation.isPending ? 'Saving…' : business.managedReportsEnabled ? 'Disable reports' : 'Enable reports'}
+      </button>
+      {managedReportsMutation.isError ? <p role="alert" className="text-xs text-[#a3432d]">The report setting could not be saved.</p> : null}
     </section>
     <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <AdminMetric label="Onboarding" value={`${business.onboardingCompletenessPercent}%`} detail={`${business.completedOnboardingFieldCount} of ${business.onboardingFieldCount} fields`} tone={business.onboardingCompletenessPercent === 100 ? 'moss' : 'neutral'} icon={FileText} />

@@ -60,6 +60,8 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetOwnerInvoicesQueryKey: () => ['/api/owner/invoices'],
   useGetOwnerInvoices: (...args: unknown[]) => mockGetOwnerInvoices(...args),
   useGetBusinessProfile: () => mockGetBusinessProfile(),
+  useGetBusinessCallUsage: () => ({ data: { count: 18, includedCalls: 100 } }),
+  useGetBusinessMonthlyResultsReport: () => ({ isLoading: false, isError: false, data: { enabled: false, month: '2026-11-01', calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [] } }),
   useUpdateBusinessProfile: () => ({ isPending: false, mutate: mockUpdateBusinessProfile }),
   getGetBusinessProfileQueryKey: () => ['/api/businesses/me'],
 }));
@@ -96,6 +98,7 @@ const sampleProfile = {
   serviceArea: 'North Bay',
   personalityToneDescription: null,
   servicesNotOffered: null,
+  servicesOffered: 'Residential electrical repairs',
   majorIssueExamples: null,
   pricingPolicy: null,
   financingPolicy: null,
@@ -106,6 +109,9 @@ const sampleProfile = {
   credentials: null,
   ownerAvailability: 'Weekdays, 8–5',
   emergencyContactInfo: null,
+  emergencyAvailable: null,
+  emergencyEscalationPhone: null,
+  aiPromisePolicy: null,
   retellPhoneNumber: '+14155550123',
 };
 

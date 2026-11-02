@@ -471,6 +471,11 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
     setRequiredValidationAttempted(true);
     if (getMissingRequiredAgentFields(form).length > 0) return;
     if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting || websiteMutation.isPending) return;
+    if (!form.servicesNotOffered.trim() || form.emergencyAvailable === null || !form.aiPromisePolicy
+      || (form.emergencyAvailable && !/^\+[1-9]\d{7,14}$/.test(form.emergencyEscalationPhone.trim()))) {
+      setSubmission({ kind: 'error', message: 'Complete services not offered, emergency availability, the escalation number when applicable, and the promise policy.' });
+      return;
+    }
     if (needsWebsiteReview && !websiteReviewed) {
       setSubmission({ kind: 'error', message: 'Review the website suggestions and missing fields, then check the website review box before saving.' });
       return;
@@ -505,6 +510,10 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           ownerEmail: form.ownerEmail.trim(),
           businessType: form.businessType.trim(),
           servicesOffered: form.servicesOffered.trim(),
+          servicesNotOffered: form.servicesNotOffered.trim(),
+          emergencyAvailable: form.emergencyAvailable,
+          emergencyEscalationPhone: form.emergencyAvailable ? form.emergencyEscalationPhone.trim() : null,
+          aiPromisePolicy: form.aiPromisePolicy,
           serviceArea: form.serviceArea.trim(),
           majorIssueExamples: form.majorIssueExamples.trim(),
           businessHours: form.businessHours.trim(),
@@ -544,6 +553,10 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           agentName: form.agentName.trim() || undefined,
           businessType: form.businessType,
           servicesOffered: form.servicesOffered,
+          servicesNotOffered: form.servicesNotOffered,
+          emergencyAvailable: form.emergencyAvailable,
+          emergencyEscalationPhone: form.emergencyAvailable ? form.emergencyEscalationPhone.trim() : null,
+          aiPromisePolicy: form.aiPromisePolicy,
           businessWebsiteUrl: normalizeWebsiteInput(form.businessWebsiteUrl),
           websiteScrapePreviewed: needsWebsiteReview,
           websitePreviewAttempted: previewAttempted,
@@ -552,7 +565,6 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           ownerEmail: form.ownerEmail,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
-          servicesNotOffered: form.servicesNotOffered,
           majorIssueExamples: form.majorIssueExamples,
           pricingPolicy: form.pricingPolicy,
           financingPolicy: form.financingPolicy,
@@ -753,9 +765,11 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                 <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." required error={requiredError('servicesOffered')} showError={Boolean(requiredError('servicesOffered'))} />
                 {previewAttempted && !form.servicesOffered.trim() ? <ServicesOfferedPrompt /> : null}
                 <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." required error={requiredError('majorIssueExamples')} showError={Boolean(requiredError('majorIssueExamples'))} />
-                {!nativeMode ? <>
-                  <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
+                <>
+                  <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="Commercial refrigeration, solar panels, or enter None." multiline rows={3} hint="Keep this short. Enter None if you have no exclusions." required maxLength={500} />
                   {form.servicesNotOffered.trim() ? <ServicesNotOfferedWarning /> : null}
+                </>
+                {!nativeMode ? <>
                   <Field id="otherPolicies" label="Other policies (notes)" value={form.otherPolicies} onChange={(value) => updateField('otherPolicies', value)} placeholder="Optional notes about policies not covered above." multiline rows={3} hint="Notes only. These are not treated as services you refuse." />
                   <div className="grid gap-5 sm:grid-cols-2">
                     <Field id="pricingPolicy" label="Pricing policy" value={form.pricingPolicy} onChange={(value) => updateField('pricingPolicy', value)} placeholder="Diagnostic visits start at $129; quote after inspection." multiline rows={4} />
@@ -766,6 +780,31 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
               </div>
             </section>
 
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-receptionist-boundaries">
+              <SectionHeading icon={ShieldCheck} eyebrow="03 · Availability and promises" title="Set clear limits for the receptionist." description="These choices prevent unsupported emergency-service and appointment promises." tone="green" />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <label className="block text-xs font-semibold">Do you take 24/7 emergency calls? <span className="text-primary">*</span>
+                  <select required value={form.emergencyAvailable === null ? '' : form.emergencyAvailable ? 'yes' : 'no'} onChange={(event) => {
+                    const available = event.target.value === '' ? null : event.target.value === 'yes';
+                    updateField('emergencyAvailable', available);
+                    if (!available) updateField('emergencyEscalationPhone', '');
+                  }} data-testid="select-emergency-availability" className="mt-1.5 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="">Choose yes or no</option><option value="yes">Yes, we take emergency calls</option><option value="no">No, we do not</option>
+                  </select>
+                </label>
+                {form.emergencyAvailable ? <label className="block text-xs font-semibold">Emergency escalation phone <span className="text-primary">*</span>
+                  <input type="tel" required maxLength={16} value={form.emergencyEscalationPhone} onChange={(event) => updateField('emergencyEscalationPhone', event.target.value)} placeholder="+14155550123" data-testid="input-emergency-escalation-phone" className="mt-1.5 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground" />
+                  <span className="mt-1 block font-normal text-muted-foreground">Use the full number with country code.</span>
+                </label> : null}
+                <label className="block text-xs font-semibold">What may the receptionist promise? <span className="text-primary">*</span>
+                  <select required value={form.aiPromisePolicy} onChange={(event) => updateField('aiPromisePolicy', event.target.value as OnboardingForm['aiPromisePolicy'])} data-testid="select-promise-policy" className="mt-1.5 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="">Choose a policy</option><option value="callback_only">Callback only</option><option value="appointment_windows">Appointment windows</option>
+                  </select>
+                  <span className="mt-1 block font-normal text-muted-foreground">Appointment windows are never treated as booked without confirmation.</span>
+                </label>
+                {!nativeMode ? <Field id="emergencyContact" label="Additional emergency / after-hours notes" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="Optional details for the owner’s follow-up." multiline rows={3} /> : null}
+              </div>
+            </section>
             {nativeMode ? <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-native-hours">
               <SectionHeading icon={Clock3} eyebrow="03 · Business hours" title="Set your hours and time zone." description="These details help the receptionist avoid saying you’re open when you’re not." tone="green" />
               <div className="grid gap-5 sm:grid-cols-2">
