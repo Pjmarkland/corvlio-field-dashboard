@@ -40,6 +40,66 @@ export const websiteFieldLabels: Record<WebsiteFieldKey, string> = {
   credentials: 'Credentials', otherPolicies: 'Other policies (notes)',
 };
 
+export const requiredAgentFields = [
+  {
+    key: 'businessType',
+    label: 'Business type',
+    message: 'Choose your business type so your receptionist can use the right intake questions.',
+    websiteKey: null,
+  },
+  {
+    key: 'servicesOffered',
+    label: 'Services offered',
+    message: 'Tell us what services you offer so your receptionist can answer accurately.',
+    websiteKey: 'servicesOffered',
+  },
+  {
+    key: 'serviceArea',
+    label: 'Service area',
+    message: 'Add your service area so your receptionist can tell callers whether you serve them.',
+    websiteKey: 'serviceArea',
+  },
+  {
+    key: 'majorIssueExamples',
+    label: 'Urgent-call examples',
+    message: 'Describe urgent issues so your receptionist can route urgent calls appropriately.',
+    websiteKey: null,
+  },
+] as const;
+
+export type RequiredAgentFieldKey = typeof requiredAgentFields[number]['key'];
+
+export function getMissingRequiredAgentFields(form: OnboardingForm): RequiredAgentFieldKey[] {
+  return requiredAgentFields
+    .filter(({ key }) => !form[key].trim())
+    .map(({ key }) => key);
+}
+
+export function getPendingRequiredWebsiteSuggestionKeys(
+  baseline: OnboardingForm | null,
+  preview: WebsitePreview | null,
+): RequiredAgentFieldKey[] {
+  if (!baseline || !preview) return [];
+  return requiredAgentFields.flatMap((field) => {
+    if (!field.websiteKey || baseline[field.key].trim()) return [];
+    return preview.fields[field.websiteKey]?.value?.trim() ? [field.key] : [];
+  });
+}
+
+export function getRequiredAgentFieldStatuses(
+  form: OnboardingForm,
+  pendingSuggestionKeys: ReadonlySet<RequiredAgentFieldKey>,
+  websiteReviewed: boolean,
+) {
+  const gaps = new Map(getReadinessGaps(form).map(({ key, state }) => [key, state]));
+  return requiredAgentFields.map((field) => {
+    const isBlank = !form[field.key].trim();
+    const needsReview = !isBlank && !websiteReviewed && pendingSuggestionKeys.has(field.key);
+    const state = isBlank ? 'missing' : needsReview ? 'review' : gaps.get(field.key) === 'thin' ? 'brief' : 'ready';
+    return { ...field, state };
+  });
+}
+
 export function applyWebsiteSuggestions(current: OnboardingForm, preview: WebsitePreview): OnboardingForm {
   const next = { ...current };
   for (const key of Object.keys(websiteFormFields) as WebsiteFieldKey[]) {
@@ -65,8 +125,10 @@ export function removeUneditedWebsiteSuggestions(
 }
 
 const readinessFields = [
+  ['businessType', 'Business type', 1],
   ['servicesOffered', 'Services offered', 4], ['servicesNotOffered', 'Services not offered', 3],
-  ['serviceArea', 'Service area', 2], ['businessHours', 'Business hours', 1],
+  ['serviceArea', 'Service area', 2], ['majorIssueExamples', 'Urgent-call examples', 4],
+  ['businessHours', 'Business hours', 1],
   ['timeZone', 'Time zone', 1], ['pricingPolicy', 'Pricing / estimates', 4],
   ['financingPolicy', 'Financing', 4], ['brandsWorkedWith', 'Brands', 1],
   ['warrantyInfo', 'Warranty', 4], ['emergencyContact', 'Emergency / after-hours policy', 4],

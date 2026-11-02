@@ -4,7 +4,7 @@ import { getGetLeadsQueryKey, useGetLeads } from '@workspace/api-client-react';
 import { Redirect } from 'wouter';
 
 /** Read-only gate: setup pages must never mount for an already configured owner. */
-export function BusinessSetupGuard({ children }: { children: ReactNode }) {
+export function BusinessSetupGuard({ children, allowConfigured = false }: { children: ReactNode; allowConfigured?: boolean }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const { data, isPending, isFetching, isError, refetch } = useGetLeads({
     query: {
@@ -37,6 +37,6 @@ export function BusinessSetupGuard({ children }: { children: ReactNode }) {
     </main>;
   }
 
-  if (data.configured) return <Redirect to="/dashboard" />;
+  if (data.configured && !allowConfigured) return <Redirect to="/dashboard" />;
   return children;
 }

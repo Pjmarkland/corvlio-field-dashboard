@@ -74,12 +74,107 @@ export async function ownerInvoiceOverview(businessId: number, now = new Date())
   const status = !b.chosen_plan || b.is_sample ? "legacy" : b.manual_payment_state === "requested"
     ? "requested" : invoices.some(i => i.status === "overdue") ? "overdue"
     : invoices.some(i => i.status === "invoiced") || !b.first_invoice_paid_at ? "invoiced" : "paid";
+  const setupStatus = !b.chosen_plan && b.provisioning_state === "awaiting_activation"
+    ? "awaiting_activation" : status;
   return {
     businessId:b.id,businessName:b.business_name,plan:b.chosen_plan,businessAgeMonths:b.startup_age_months,
-    status,serviceActive:!b.chosen_plan || b.is_sample || Boolean(b.first_invoice_paid_at && b.retell_phone_number),
+    status:setupStatus,
+    serviceActive:(b.provisioning_state !== "awaiting_activation" && !b.chosen_plan) || b.is_sample
+      || Boolean(b.first_invoice_paid_at && b.retell_phone_number),
     provisioningState:b.provisioning_state,invoices,settings,
   };
 }
+export async function assignBusinessPlan(
+  businessId: number,
+  plan: string,
+  startupAgeMonths?: number,
+) {
+  if (!isPlan(plan)) throw new InvoiceError("Choose a valid plan.", 400);
+  if (plan === "startup" && (startupAgeMonths === undefined
+    || !Number.isInteger(startupAgeMonths) || startupAgeMonths < 0 || startupAgeMonths >= 18)) {
+    throw new InvoiceError("Startup is available only to businesses under 18 months old.", 400);
+  }
+
+  await withInvoiceTransaction(async c => {
+    const b = (await c.query<InvoiceBusiness>(
+      "SELECT * FROM businesses WHERE id=$1 FOR UPDATE", [businessId],
+    )).rows[0];
+    if (!b || b.is_internal || b.is_sample) throw new InvoiceError("Business not found.", 404);
+    if (b.provisioning_state !== "awaiting_activation") {
+      throw new InvoiceError("Only a pending native setup can have its plan assigned here.");
+    }
+    if (b.first_invoice_paid_at || b.retell_phone_number) {
+      throw new InvoiceError("A paid or activated business cannot have its plan changed.");
+    }
+    const age = plan === "startup" ? startupAgeMonths! : null;
+    if (b.chosen_plan === plan && b.startup_age_months === age) return;
+    const paymentState = plan === "startup" ? "requested" : "invoiced";
+    const invoiceHistory = await c.query<InvoiceRow>(
+      "SELECT * FROM manual_invoices WHERE business_id=$1 FOR UPDATE", [businessId],
+    );
+    if (invoiceHistory.rows.length) {
+      if (plan === "startup") {
+        throw new InvoiceError("Startup cannot replace an invoice that has already been issued.");
+      }
+      if (invoiceHistory.rows.some(invoice => invoice.paid_at || invoice.period_key !== "initial")) {
+        throw new InvoiceError("A plan cannot be changed after payment or recurring invoices exist.");
+      }
+      for (const invoice of invoiceHistory.rows) {
+        const email = await c.query<{status:string}>(
+          "SELECT status FROM invoice_emails WHERE invoice_id=$1 AND kind='invoice' FOR UPDATE",
+          [invoice.id],
+        );
+        if (email.rows.some(({status}) => !["pending", "unconfigured"].includes(status))) {
+          throw new InvoiceError("This invoice has already been sent or is being processed. Contact support before changing the plan.");
+        }
+        const pricing = PLANS[plan];
+        await c.query(
+          "UPDATE manual_invoices SET plan=$2,monthly_cents=$3,setup_cents=$4 WHERE id=$1",
+          [invoice.id, plan, pricing.monthlyCents, pricing.setupCents],
+        );
+      }
+    }
+    await c.query(
+      `UPDATE businesses SET chosen_plan=$2,startup_age_months=$3,
+        manual_payment_state=$4,updated_at=now() WHERE id=$1`,
+      [businessId, plan, age, paymentState],
+    );
+    if (plan !== "startup" && !invoiceHistory.rows.length) {
+      await insertInvoice(c, {
+        ...b,
+        chosen_plan: plan,
+        startup_age_months: age,
+        manual_payment_state: paymentState,
+      }, "initial", new Date());
+    }
+  });
+  return ownerInvoiceOverview(businessId);
+}
+
+export async function activateBusiness(businessId: number) {
+  await withInvoiceTransaction(async c => {
+    const b = (await c.query<InvoiceBusiness>(
+      "SELECT * FROM businesses WHERE id=$1 FOR UPDATE", [businessId],
+    )).rows[0];
+    if (!b || b.is_internal || b.is_sample) throw new InvoiceError("Business not found.", 404);
+    const hasPaidSetup = Boolean(b.chosen_plan && b.first_invoice_paid_at
+      && b.manual_payment_state === "paid");
+    if (!hasPaidSetup) {
+      throw new InvoiceError("Assign a plan and confirm the first invoice payment before activation.");
+    }
+    if (b.provisioning_state === "awaiting_activation") {
+      await c.query(
+        "UPDATE businesses SET provisioning_state=$2,updated_at=now() WHERE id=$1",
+        [businessId, b.retell_phone_number ? "ready" : "awaiting_payment"],
+      );
+    } else if (b.provisioning_state !== "awaiting_payment"
+      && !(b.provisioning_state === "ready" && b.retell_phone_number)) {
+      throw new InvoiceError("This business is not waiting for activation.");
+    }
+  });
+  return ownerInvoiceOverview(businessId);
+}
+
 export async function approveStartup(businessId: number) {
   await withInvoiceTransaction(async c => {
     const b = (await c.query<InvoiceBusiness>("SELECT * FROM businesses WHERE id=$1 FOR UPDATE",[businessId])).rows[0];

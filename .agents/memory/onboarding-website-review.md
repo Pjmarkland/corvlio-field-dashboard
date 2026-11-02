@@ -9,6 +9,12 @@ Website scraping is optional and preview-only. Never persist scraped suggestions
 
 **How to apply:** Preserve these constraints when extending website intake or enrichment. Keep offered services separate from urgent-issue examples. Unknown hours and time zones must not become invented opening-hours claims.
 
+Agent call quality is what the whole business is about. Require business type, offered services, service area, and urgent-call examples during new web onboarding. Website suggestions for required fields count only after the owner reviews them; owners can edit every suggestion.
+
+**Why:** The user explicitly identified receptionist call quality as the product's central value.
+
+**How to apply:** Keep these four intake facts required in new web onboarding while leaving other business guidance optional. Preserve owner review and editing for any website-prefilled values.
+
 Hours found only in JSON-LD or other hidden metadata are unconfirmed suggestions, never automatically accepted business hours. Only customer-visible schedules may prefill; hidden hours need an explicit owner acceptance or manual entry. Rejecting a suggestion must clear untouched accepted hours without erasing owner edits.
 
 **Why:** The user found hidden metadata schedules that contradicted customer-facing availability. These hours control the receptionist's open/closed statements to real callers; a wrong value is worse than a blank.

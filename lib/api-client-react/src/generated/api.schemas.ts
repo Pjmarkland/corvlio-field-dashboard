@@ -52,6 +52,7 @@ export type InvoiceOverviewStatus = typeof InvoiceOverviewStatus[keyof typeof In
 
 export const InvoiceOverviewStatus = {
   legacy: 'legacy',
+  awaiting_activation: 'awaiting_activation',
   requested: 'requested',
   invoiced: 'invoiced',
   paid: 'paid',
@@ -70,6 +71,105 @@ export interface InvoiceOverview {
   provisioningState: string;
   invoices: ManualInvoice[];
   settings: PaymentInstructions;
+}
+
+export interface NativeBusinessSetupStatus {
+  submitted: boolean;
+  /** @nullable */
+  businessName: string | null;
+  /** @nullable */
+  provisioningState: string | null;
+}
+
+export interface NativeBusinessSetupInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  businessName: string;
+  /**
+     * @maxLength 320
+     * @pattern ^[^\s@]+@[^\s@]+\.[^\s@]+$
+     */
+  ownerEmail: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  businessType: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  serviceArea: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  majorIssueExamples: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  businessHours: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  timeZone: string;
+  /** @maxLength 40 */
+  agentName?: string;
+  /** @maxLength 2048 */
+  businessWebsiteUrl?: string;
+  websiteScrapePreviewed?: boolean;
+  websiteSuggestionsReviewed?: boolean;
+  websitePreviewAttempted?: boolean;
+  privacyAccepted: true;
+  termsAccepted: true;
+  serviceAgreementAccepted: true;
+}
+
+export type NativeBusinessSetupResultStatus = typeof NativeBusinessSetupResultStatus[keyof typeof NativeBusinessSetupResultStatus];
+
+
+export const NativeBusinessSetupResultStatus = {
+  received: 'received',
+} as const;
+
+export type NativeBusinessSetupResultProvisioningState = typeof NativeBusinessSetupResultProvisioningState[keyof typeof NativeBusinessSetupResultProvisioningState];
+
+
+export const NativeBusinessSetupResultProvisioningState = {
+  awaiting_activation: 'awaiting_activation',
+} as const;
+
+export interface NativeBusinessSetupResult {
+  status: NativeBusinessSetupResultStatus;
+  provisioningState: NativeBusinessSetupResultProvisioningState;
+}
+
+export type AdminBusinessPlanInputPlan = typeof AdminBusinessPlanInputPlan[keyof typeof AdminBusinessPlanInputPlan];
+
+
+export const AdminBusinessPlanInputPlan = {
+  startup: 'startup',
+  starter: 'starter',
+  professional: 'professional',
+  managed: 'managed',
+} as const;
+
+export interface AdminBusinessPlanInput {
+  plan: AdminBusinessPlanInputPlan;
+  /**
+     * @minimum 0
+     * @maximum 17
+     */
+  startupAgeMonths?: number;
 }
 
 export type AccountDeletionInputConfirmation = typeof AccountDeletionInputConfirmation[keyof typeof AccountDeletionInputConfirmation];

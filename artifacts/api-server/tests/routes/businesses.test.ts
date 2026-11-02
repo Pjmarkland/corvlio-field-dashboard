@@ -161,6 +161,33 @@ async function onboard(body: Record<string, unknown>) {
   });
 }
 
+const validNativeBody = {
+  businessName: "  Example Heating  ",
+  ownerEmail: "owner@example.test",
+  businessType: "HVAC",
+  servicesOffered: "Residential heating repair and replacement.",
+  serviceArea: "Northside",
+  majorIssueExamples: "No heat in winter or a gas smell.",
+  businessHours: "Mon-Fri 08:00-17:00",
+  timeZone: "America/Los_Angeles",
+  agentName: "  Aria  ",
+  privacyAccepted: true,
+  termsAccepted: true,
+  serviceAgreementAccepted: true,
+};
+
+async function submitNativeSetup(body: Record<string, unknown>) {
+  return fetch(`${baseUrl}/businesses/native-onboard`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function nativeSetupStatus() {
+  return fetch(`${baseUrl}/businesses/native-onboard/status`);
+}
+
 async function getMyBusiness() {
   return fetch(`${baseUrl}/businesses/me`);
 }
@@ -174,6 +201,75 @@ async function updateMyBusiness(body: Record<string, unknown>) {
 }
 
 describe("owner business profile API", () => {
+  it("reports native setup status without exposing billing or payment details", async () => {
+    business = { ...business, provisioningState: "awaiting_activation" };
+    const response = await nativeSetupStatus();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toEqual({
+      submitted: true,
+      businessName: "Example Heating",
+      provisioningState: "awaiting_activation",
+    });
+  });
+
+  it("saves a native setup in the admin-activation hold without assigning or charging a plan", async () => {
+    business = undefined;
+    const response = await submitNativeSetup(validNativeBody);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      status: "received",
+      provisioningState: "awaiting_activation",
+    });
+    expect(mocks.saveBusinessWithOptionalPhone).toHaveBeenCalledOnce();
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({
+      clerkUserId: "clerk-user-44",
+      businessName: "Example Heating",
+      ownerEmail: "owner@example.test",
+      businessType: "HVAC",
+      servicesOffered: "Residential heating repair and replacement.",
+      serviceArea: "Northside",
+      majorIssueExamples: "No heat in winter or a gas smell.",
+      businessHours: "Mon-Fri 08:00-17:00",
+      timeZone: "America/Los_Angeles",
+      agentName: "Aria",
+      chosenPlan: null,
+      manualPaymentState: null,
+      provisioningState: "awaiting_activation",
+      isSample: false,
+    });
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("plan");
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("checkoutUrl");
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("paymentLink");
+    expect(mocks.updateBusiness).not.toHaveBeenCalled();
+    expect(mocks.claimWebsiteEnrichment).not.toHaveBeenCalled();
+    expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...validNativeBody, termsAccepted: false },
+    { ...validNativeBody, websiteScrapePreviewed: true, websiteSuggestionsReviewed: false },
+    { ...validNativeBody, businessHours: "not business hours" },
+  ])("rejects invalid native setup before saving: %j", async body => {
+    business = undefined;
+    const response = await submitNativeSetup(body);
+    expect(response.status).toBe(400);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+  });
+
+  it("will not let native setup overwrite an already linked business", async () => {
+    const response = await submitNativeSetup(validNativeBody);
+    expect(response.status).toBe(409);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication for native setup and its status", async () => {
+    mocks.getAuth.mockReturnValue({ userId: null });
+    expect((await submitNativeSetup(validNativeBody)).status).toBe(401);
+    expect((await nativeSetupStatus()).status).toBe(401);
+    expect(mocks.findBusinessByClerkUserId).not.toHaveBeenCalled();
+  });
+
   it.each(["Fuck Plumbing", "F u c k Plumbing", "N1gg3r Services"])("rejects unsafe names through direct create/edit APIs: %s", async businessName => {
     const before = structuredClone(business);
     const created = await onboard({ ...validBody, businessName });

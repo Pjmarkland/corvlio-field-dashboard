@@ -7,6 +7,9 @@ import {
   UpdateBusinessProfileResponse,
   PreviewBusinessWebsiteBody,
   PreviewBusinessWebsiteResponse,
+  GetNativeBusinessSetupStatusResponse,
+  SubmitNativeBusinessSetupBody,
+  SubmitNativeBusinessSetupResponse,
 } from "@workspace/api-zod";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
 import {
@@ -299,6 +302,130 @@ router.post("/businesses/onboarding/website-preview", async (req, res): Promise<
     }
   } finally {
     activeWebsitePreviews.delete(userId);
+  }
+});
+
+router.get("/businesses/native-onboard/status", async (req, res): Promise<void> => {
+  setPrivateOwnerResponseHeaders(res);
+  const { userId } = getAuth(req);
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    res.json(GetNativeBusinessSetupStatusResponse.parse({
+      submitted: Boolean(business),
+      businessName: business?.businessName ?? null,
+      provisioningState: business?.provisioningState ?? null,
+    }));
+  } catch (error) {
+    req.log.error(
+      { error: error instanceof Error ? error.message : "Unknown native setup status error" },
+      "Could not check native business setup status",
+    );
+    res.status(503).json({ error: "Business setup status is temporarily unavailable." });
+  }
+});
+
+router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const body = SubmitNativeBusinessSetupBody.strict().safeParse(req.body);
+  if (!body.success) {
+    req.log.warn({ error: body.error.flatten() }, "Invalid native business setup payload");
+    res.status(400).json({ error: "Complete the required business details and accept all three agreements." });
+    return;
+  }
+
+  const nameError = businessNameValidationError(body.data.businessName);
+  if (nameError) {
+    res.status(400).json({ error: nameError });
+    return;
+  }
+  const answers = [
+    body.data.businessType,
+    body.data.servicesOffered,
+    body.data.serviceArea,
+    body.data.majorIssueExamples,
+  ];
+  if (answers.some((value) => !value.trim())) {
+    res.status(400).json({ error: "Business type, services, service area, and urgent-issue examples are required." });
+    return;
+  }
+  if (!body.data.businessHours.trim() || !parseBusinessHours(body.data.businessHours)
+    || !validTimeZone(body.data.timeZone)) {
+    res.status(400).json({ error: "Enter valid business hours and a time zone." });
+    return;
+  }
+  if (body.data.websiteScrapePreviewed && body.data.websiteSuggestionsReviewed !== true) {
+    res.status(400).json({ error: "Review the website suggestions before submitting." });
+    return;
+  }
+
+  const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() ?? "";
+  if (rawWebsiteUrl && !isHttpUrl(rawWebsiteUrl)) {
+    res.status(400).json({ error: "Website must be a valid HTTP or HTTPS URL." });
+    return;
+  }
+
+  try {
+    const existingBusiness = await findBusinessByClerkUserId(userId);
+    const retryingNativeSetup = existingBusiness?.provisioningState === "awaiting_activation"
+      && !existingBusiness.chosenPlan
+      && !existingBusiness.retellPhoneNumber;
+    if (existingBusiness && !retryingNativeSetup) {
+      res.status(409).json({ error: "A business setup is already linked to this account." });
+      return;
+    }
+
+    await saveBusinessWithOptionalPhone({
+      clerkUserId: userId,
+      businessName: body.data.businessName.trim(),
+      ownerEmail: body.data.ownerEmail.trim(),
+      businessType: body.data.businessType.trim(),
+      servicesOffered: body.data.servicesOffered.trim(),
+      serviceArea: body.data.serviceArea.trim(),
+      majorIssueExamples: body.data.majorIssueExamples.trim(),
+      businessHours: body.data.businessHours.trim(),
+      timeZone: body.data.timeZone.trim(),
+      agentName: body.data.agentName?.trim() || null,
+      personalityToneDescription: "",
+      servicesNotOffered: "",
+      otherPolicies: "",
+      pricingPolicy: "",
+      financingPolicy: "",
+      brandsWorkedWith: "",
+      typicalResponseTimeCommitment: "",
+      warrantyInfo: "",
+      maintenancePlanOfferings: "",
+      credentialsCertifications: "",
+      ownerAvailability: "",
+      emergencyContactInfo: "",
+      businessWebsiteUrl: rawWebsiteUrl || null,
+      isSample: false,
+      chosenPlan: null,
+      startupAgeMonths: null,
+      manualPaymentState: null,
+      provisioningState: "awaiting_activation",
+      agreementsAcceptedAt: new Date(),
+      websiteEnrichmentAttemptedAt: null,
+    });
+
+    res.status(existingBusiness ? 200 : 201).json(SubmitNativeBusinessSetupResponse.parse({
+      status: "received",
+      provisioningState: "awaiting_activation",
+    }));
+  } catch (error) {
+    req.log.error(
+      { error: error instanceof Error ? error.message : "Unknown native business setup error" },
+      "Native business setup failed while saving",
+    );
+    res.status(502).json({ error: "We could not save your setup. Please try again." });
   }
 });
 

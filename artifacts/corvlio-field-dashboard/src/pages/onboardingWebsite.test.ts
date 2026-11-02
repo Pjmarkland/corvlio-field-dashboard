@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { WebsitePreview, WebsitePreviewFields } from '@workspace/api-client-react';
 import { initialForm } from './onboardingSample';
-import { applyWebsiteSuggestions, getReadinessGaps, removeUneditedWebsiteSuggestions, websiteFormFields } from './onboardingWebsite';
+import {
+  applyWebsiteSuggestions,
+  getMissingRequiredAgentFields,
+  getPendingRequiredWebsiteSuggestionKeys,
+  getReadinessGaps,
+  getRequiredAgentFieldStatuses,
+  removeUneditedWebsiteSuggestions,
+  websiteFormFields,
+} from './onboardingWebsite';
 
 function preview(): WebsitePreview {
   const fields = Object.fromEntries(Object.keys(websiteFormFields).map((key) =>
@@ -43,5 +51,44 @@ describe('website suggestions and readiness', () => {
     expect(gaps).toContainEqual({ key: 'pricingPolicy', label: 'Pricing / estimates', state: 'thin' });
     expect(gaps.some(gap => gap.key === 'brandsWorkedWith')).toBe(false);
     expect(getReadinessGaps({ ...initialForm, servicesOffered: 'Residential heating repairs and installations' }).some(gap => gap.key === 'servicesOffered')).toBe(false);
+  });
+
+  it('requires the four call-quality answers while leaving other details optional', () => {
+    expect(getMissingRequiredAgentFields(initialForm)).toEqual([
+      'businessType',
+      'servicesOffered',
+      'serviceArea',
+      'majorIssueExamples',
+    ]);
+    expect(getMissingRequiredAgentFields({
+      ...initialForm,
+      businessType: 'HVAC',
+      servicesOffered: 'Repairs and installation',
+      serviceArea: 'Oakland',
+      majorIssueExamples: 'No heat or active gas leaks',
+      financingPolicy: '',
+    })).toEqual([]);
+  });
+
+  it('keeps website-filled required answers pending until the owner reviews them', () => {
+    const source = preview();
+    const suggested = applyWebsiteSuggestions(initialForm, source);
+    const pending = getPendingRequiredWebsiteSuggestionKeys(initialForm, source);
+    const pendingSet = new Set(pending);
+
+    expect(pending).toEqual(['servicesOffered', 'serviceArea']);
+    expect(getMissingRequiredAgentFields(suggested)).toEqual(['businessType', 'majorIssueExamples']);
+    const ownerEditedSuggestion = {
+      ...suggested,
+      servicesOffered: 'Residential furnace repair and heat-pump installation for homes.',
+    };
+    expect(getRequiredAgentFieldStatuses(ownerEditedSuggestion, pendingSet, false)
+      .find((field) => field.key === 'servicesOffered')?.state).toBe('review');
+    expect(getRequiredAgentFieldStatuses(suggested, pendingSet, false)
+      .filter((field) => pendingSet.has(field.key))
+      .map((field) => field.state)).toEqual(['review', 'review']);
+    expect(getRequiredAgentFieldStatuses(suggested, pendingSet, true)
+      .filter((field) => pendingSet.has(field.key))
+      .map((field) => field.state)).toEqual(['ready', 'ready']);
   });
 });

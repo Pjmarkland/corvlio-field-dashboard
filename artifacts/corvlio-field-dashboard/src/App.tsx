@@ -50,6 +50,7 @@ import { BusinessCoverageFields } from '@/components/BusinessCoverageFields';
 import { validateBusinessHours, validateTimeZone } from '@/lib/businessCoverage';
 import WelcomePage from '@/pages/welcome';
 import { BusinessSetupGuard } from '@/components/BusinessSetupGuard';
+import NativeBusinessSetupGate from '@/components/NativeBusinessSetupGate';
 import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
@@ -287,7 +288,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
     { href: '/completed', label: 'Completed', icon: CheckCircle2 },
     { href: '/stats', label: 'Stats', icon: Signal },
     { href: '/settings', label: 'Settings', icon: SettingsIcon },
-    ...(adminAccess ? [{ href: '/admin', label: 'Founder Console', icon: ShieldCheck }] : []),
+    ...(adminAccess && !native ? [{ href: '/admin', label: 'Founder Console', icon: ShieldCheck }] : []),
   ];
 
   return (
@@ -338,7 +339,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
         <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{!native && location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
-      <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess ? 'grid-cols-5' : 'grid-cols-4'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
+      <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess && !native ? 'grid-cols-5' : 'grid-cols-4'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
         {nav.map(({ href, label, icon: Icon, count }) => {
           const active = location === href || (href === '/dashboard' && location.startsWith('/leads/'));
           return <Link key={href} href={href} data-testid={`link-mobile-${label.toLowerCase()}`} className={`relative flex min-h-14 flex-col items-center gap-1 text-[10px] font-semibold ${active ? 'text-primary' : 'text-muted-foreground'}`}><span className={`grid h-7 w-10 place-items-center rounded-xl ${active ? 'bg-primary/15' : ''}`}><Icon size={19} strokeWidth={active ? 2.5 : 1.8} /></span><span>{label}</span>{count ? <span className="absolute left-1/2 top-0 ml-1 grid h-4 min-w-4 -translate-y-0.5 place-items-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">{count}</span> : null}</Link>;
@@ -824,20 +825,15 @@ function LeadDataRouter() {
 }
 
 function WelcomeRoute() {
-  return <BusinessSetupGuard>{Capacitor.isNativePlatform() ? <NativeSetupUnavailable /> : <WelcomePage />}</BusinessSetupGuard>;
+  return Capacitor.isNativePlatform()
+    ? <BusinessSetupGuard allowConfigured><NativeBusinessSetupGate /></BusinessSetupGuard>
+    : <BusinessSetupGuard><WelcomePage /></BusinessSetupGuard>;
 }
 
 function OnboardingRoute() {
-  return <BusinessSetupGuard>{Capacitor.isNativePlatform() ? <NativeSetupUnavailable /> : <OnboardingPage />}</BusinessSetupGuard>;
-}
-
-function NativeSetupUnavailable() {
-  return <main className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center" data-testid="native-setup-unavailable">
-    <div className="max-w-sm">
-      <h1 className="text-2xl font-800 tracking-tight">Business setup is unavailable in this app</h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Please contact Corvlio support for help completing your business setup.</p>
-    </div>
-  </main>;
+  return Capacitor.isNativePlatform()
+    ? <BusinessSetupGuard allowConfigured><NativeBusinessSetupGate /></BusinessSetupGuard>
+    : <BusinessSetupGuard><OnboardingPage /></BusinessSetupGuard>;
 }
 
 function AuthenticatedRouter() {

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  getGetAdminInvoicesQueryKey, useApproveStartupInvoice, useGetAdminInvoices,
+  getGetAdminInvoicesQueryKey, useApproveStartupInvoice, useAssignAdminBusinessPlan,
+  useActivateAdminBusiness, useGetAdminInvoices,
   useMarkManualInvoicePaid, useUpdateInvoiceSettings, type InvoiceOverview,
 } from '@workspace/api-client-react';
 import { FileText } from 'lucide-react';
@@ -23,14 +24,52 @@ function PaidForm({ invoiceId, onDone }: { invoiceId: number; onDone: () => void
 
 function BusinessCard({ b, onChanged }: { b: InvoiceOverview; onChanged: () => void }) {
   const approve = useApproveStartupInvoice();
+  const assignPlan = useAssignAdminBusinessPlan();
+  const activate = useActivateAdminBusiness();
+  const [plan, setPlan] = useState(b.plan ?? '');
+  const [startupAge, setStartupAge] = useState(b.businessAgeMonths?.toString() ?? '');
+  const [planError, setPlanError] = useState('');
   const needsApproval = b.plan === 'startup' && b.status === 'requested' && b.invoices.length === 0;
+  const canAssignPlan = b.provisioningState === 'awaiting_activation' && !b.serviceActive && b.status !== 'paid';
+  const needsActivation = b.provisioningState === 'awaiting_activation' && b.status === 'paid' && Boolean(b.plan);
+  const validStartupAge = /^\d+$/.test(startupAge) && Number(startupAge) < 18;
   return <article className="admin-panel rounded-2xl border border-[#dfe4dc] bg-[#fbfbf7] p-4 sm:p-5" data-testid={`card-admin-invoice-business-${b.businessId}`}>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div><h3 className="font-800 text-[#17231f]">{b.businessName}</h3><p className="text-xs text-[#718078]">Plan: {planName(b.plan)}{b.businessAgeMonths != null ? ` · ${b.businessAgeMonths} months old` : ''}</p></div>
       <div className="flex gap-2 text-xs font-semibold"><span className="rounded-full bg-[#e9eee8] px-2.5 py-1" data-testid={`status-payment-${b.businessId}`}>Payment: {b.status}</span><span className="rounded-full bg-[#e9eee8] px-2.5 py-1">{b.serviceActive ? 'Service active' : `Setup: ${b.provisioningState}`}</span></div>
     </div>
+    {canAssignPlan ? <form className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-[#dfe4dc] p-3" onSubmit={(e) => {
+      e.preventDefault();
+      if (!plan || (plan === 'startup' && !validStartupAge)) {
+        setPlanError('Choose a plan and enter a whole-month age under 18 for Startup.');
+        return;
+      }
+      setPlanError('');
+      assignPlan.mutate({
+        businessId: b.businessId,
+        data: { plan: plan as 'startup' | 'starter' | 'professional' | 'managed', ...(plan === 'startup' ? { startupAgeMonths: Number(startupAge) } : {}) },
+      }, { onSuccess: onChanged, onError: () => setPlanError('Plan could not be saved. Try again.') });
+    }}>
+      <label className="min-w-[180px] flex-1 text-xs font-semibold text-[#5d6b63]">Assign plan
+        <select value={plan} onChange={(e) => { setPlan(e.target.value); setPlanError(''); }} className={`${field} mt-1`} data-testid={`select-admin-plan-${b.businessId}`}>
+          <option value="">Choose a plan</option>
+          <option value="startup">Startup</option><option value="starter">Starter</option>
+          <option value="professional">Professional</option><option value="managed">Managed</option>
+        </select>
+      </label>
+      {plan === 'startup' ? <label className="w-full max-w-[180px] text-xs font-semibold text-[#5d6b63]">Business age in months
+        <input type="number" min={0} max={17} step={1} value={startupAge} onChange={(e) => { setStartupAge(e.target.value); setPlanError(''); }} className={`${field} mt-1`} data-testid={`input-startup-age-${b.businessId}`} />
+      </label> : null}
+      <button type="submit" disabled={assignPlan.isPending} data-testid={`button-assign-plan-${b.businessId}`} className="min-h-11 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-[#f4f7f1] disabled:opacity-60">{assignPlan.isPending ? 'Saving…' : b.plan ? 'Change plan' : 'Assign plan'}</button>
+      {planError ? <p role="alert" className="w-full text-xs text-[#a6533c]">{planError}</p> : null}
+    </form> : null}
     {needsApproval ? <button type="button" disabled={approve.isPending} onClick={() => approve.mutate({ businessId: b.businessId }, { onSuccess: onChanged })} data-testid={`button-approve-startup-${b.businessId}`} className="mt-3 min-h-11 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-[#f4f7f1] disabled:opacity-60">{approve.isPending ? 'Approving…' : 'Approve Startup and issue invoice'}</button> : null}
     {approve.isError ? <p role="alert" className="mt-2 text-xs text-[#a6533c]">Approval failed. Try again.</p> : null}
+    {needsActivation ? <div className="mt-3 rounded-xl border border-[#dfe4dc] p-3">
+      <p className="text-sm font-semibold text-[#17231f]">First invoice is paid. Activate this business to begin phone setup.</p>
+      <button type="button" disabled={activate.isPending} onClick={() => activate.mutate({ businessId: b.businessId }, { onSuccess: onChanged })} data-testid={`button-activate-business-${b.businessId}`} className="mt-3 min-h-11 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-[#f4f7f1] disabled:opacity-60">{activate.isPending ? 'Activating…' : 'Activate business'}</button>
+      {activate.isError ? <p role="alert" className="mt-2 text-xs text-[#a6533c]">Activation could not be completed. Try again.</p> : null}
+    </div> : null}
     {b.invoices.length === 0 ? <p className="mt-3 text-sm text-[#718078]">No invoices yet.</p> : <ul className="mt-3 space-y-3">{b.invoices.map((i) => <li key={i.id} className="rounded-xl border border-[#dfe4dc] p-3 text-sm" data-testid={`row-admin-invoice-${i.id}`}>
       <div className="flex flex-wrap justify-between gap-2"><strong>{i.number}</strong><span>{money(i.totalCents)} · {i.status}</span></div>
       <p className="text-xs text-[#718078]">Setup {money(i.setupCents)} + monthly {money(i.monthlyCents)} · Issued {fmtDate(i.issuedAt)} · Due {fmtDate(i.dueAt)}</p>

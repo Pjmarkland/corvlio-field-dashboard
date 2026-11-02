@@ -56,10 +56,11 @@ export async function deliverInvoiceEmails() {
     }
   }
 }
-export async function provisionPaidBusinesses() {
+export async function provisionPaidBusinesses(onlyBusinessIds: number[] | null = null) {
   const candidates = await pool.query<{id:number}>(`SELECT id FROM businesses
     WHERE is_internal=false AND chosen_plan IS NOT NULL AND first_invoice_paid_at IS NOT NULL AND is_sample=false
-      AND retell_phone_number IS NULL AND provisioning_state IN ('awaiting_payment','recovery')`);
+      AND retell_phone_number IS NULL AND provisioning_state IN ('awaiting_payment','recovery')
+      AND ($1::int[] IS NULL OR id=ANY($1))`, [onlyBusinessIds]);
   for (const {id} of candidates.rows) {
     const b = await findBusinessById(id);
     if (!b) continue;

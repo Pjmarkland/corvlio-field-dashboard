@@ -368,6 +368,68 @@ export const PreviewBusinessWebsiteResponse = zod.object({
 
 
 /**
+ * @summary Check whether native business setup has already been received
+ */
+export const GetNativeBusinessSetupStatusResponse = zod.object({
+  "submitted": zod.boolean(),
+  "businessName": zod.string().nullable(),
+  "provisioningState": zod.string().nullable()
+})
+
+
+/**
+ * @summary Submit a plan-free native business setup for admin activation
+ */
+export const submitNativeBusinessSetupBodyBusinessNameMax = 160;
+
+export const submitNativeBusinessSetupBodyOwnerEmailMax = 320;
+
+
+export const submitNativeBusinessSetupBodyOwnerEmailRegExp = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
+export const submitNativeBusinessSetupBodyBusinessTypeMax = 200;
+
+export const submitNativeBusinessSetupBodyServicesOfferedMax = 4000;
+
+export const submitNativeBusinessSetupBodyServiceAreaMax = 4000;
+
+export const submitNativeBusinessSetupBodyMajorIssueExamplesMax = 4000;
+
+export const submitNativeBusinessSetupBodyBusinessHoursMax = 500;
+
+export const submitNativeBusinessSetupBodyTimeZoneMax = 100;
+
+export const submitNativeBusinessSetupBodyAgentNameMax = 40;
+
+export const submitNativeBusinessSetupBodyBusinessWebsiteUrlMax = 2048;
+
+
+
+export const SubmitNativeBusinessSetupBody = zod.object({
+  "businessName": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessNameMax),
+  "ownerEmail": zod.string().max(submitNativeBusinessSetupBodyOwnerEmailMax).regex(submitNativeBusinessSetupBodyOwnerEmailRegExp),
+  "businessType": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessTypeMax),
+  "servicesOffered": zod.string().min(1).max(submitNativeBusinessSetupBodyServicesOfferedMax),
+  "serviceArea": zod.string().min(1).max(submitNativeBusinessSetupBodyServiceAreaMax),
+  "majorIssueExamples": zod.string().min(1).max(submitNativeBusinessSetupBodyMajorIssueExamplesMax),
+  "businessHours": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessHoursMax),
+  "timeZone": zod.string().min(1).max(submitNativeBusinessSetupBodyTimeZoneMax),
+  "agentName": zod.string().max(submitNativeBusinessSetupBodyAgentNameMax).optional(),
+  "businessWebsiteUrl": zod.string().max(submitNativeBusinessSetupBodyBusinessWebsiteUrlMax).optional(),
+  "websiteScrapePreviewed": zod.boolean().optional(),
+  "websiteSuggestionsReviewed": zod.boolean().optional(),
+  "websitePreviewAttempted": zod.boolean().optional(),
+  "privacyAccepted": zod.literal(true),
+  "termsAccepted": zod.literal(true),
+  "serviceAgreementAccepted": zod.literal(true)
+})
+
+export const SubmitNativeBusinessSetupResponse = zod.object({
+  "status": zod.enum(['received']),
+  "provisioningState": zod.enum(['awaiting_activation'])
+})
+
+
+/**
  * @summary Read-only scorecard for the latest 100 recorded inbound calls
  */
 export const GetAdminCallQualityResponse = zod.object({
@@ -1436,7 +1498,7 @@ export const GetOwnerInvoicesResponse = zod.object({
   "businessName": zod.string(),
   "plan": zod.string().nullable(),
   "businessAgeMonths": zod.number().nullable(),
-  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
   "serviceActive": zod.boolean(),
   "provisioningState": zod.string(),
   "invoices": zod.array(zod.object({
@@ -1480,7 +1542,7 @@ export const GetAdminInvoicesResponse = zod.object({
   "businessName": zod.string(),
   "plan": zod.string().nullable(),
   "businessAgeMonths": zod.number().nullable(),
-  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
   "serviceActive": zod.boolean(),
   "provisioningState": zod.string(),
   "invoices": zod.array(zod.object({
@@ -1551,7 +1613,7 @@ export const ApproveStartupInvoiceResponse = zod.object({
   "businessName": zod.string(),
   "plan": zod.string().nullable(),
   "businessAgeMonths": zod.number().nullable(),
-  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
   "serviceActive": zod.boolean(),
   "provisioningState": zod.string(),
   "invoices": zod.array(zod.object({
@@ -1579,6 +1641,103 @@ export const ApproveStartupInvoiceResponse = zod.object({
 })
 
 
+export const AssignAdminBusinessPlanParams = zod.object({
+  "businessId": zod.coerce.number()
+})
+
+export const assignAdminBusinessPlanBodyStartupAgeMonthsMin = 0;
+export const assignAdminBusinessPlanBodyStartupAgeMonthsMax = 17;
+export const assignAdminBusinessPlanBodyStartupAgeMonthsMultipleOf = 1;
+
+
+
+export const AssignAdminBusinessPlanBody = zod.object({
+  "plan": zod.enum(['startup', 'starter', 'professional', 'managed']),
+  "startupAgeMonths": zod.number().min(assignAdminBusinessPlanBodyStartupAgeMonthsMin).max(assignAdminBusinessPlanBodyStartupAgeMonthsMax).multipleOf(assignAdminBusinessPlanBodyStartupAgeMonthsMultipleOf).optional()
+})
+
+export const assignAdminBusinessPlanResponseSettingsInstructionsMax = 6000;
+
+export const assignAdminBusinessPlanResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const AssignAdminBusinessPlanResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(assignAdminBusinessPlanResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(assignAdminBusinessPlanResponseSettingsPaymentLinkMax)
+})
+})
+
+
+export const ActivateAdminBusinessParams = zod.object({
+  "businessId": zod.coerce.number()
+})
+
+export const activateAdminBusinessResponseSettingsInstructionsMax = 6000;
+
+export const activateAdminBusinessResponseSettingsPaymentLinkMax = 2048;
+
+
+
+export const ActivateAdminBusinessResponse = zod.object({
+  "businessId": zod.number(),
+  "businessName": zod.string(),
+  "plan": zod.string().nullable(),
+  "businessAgeMonths": zod.number().nullable(),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
+  "serviceActive": zod.boolean(),
+  "provisioningState": zod.string(),
+  "invoices": zod.array(zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "businessName": zod.string(),
+  "plan": zod.string(),
+  "payee": zod.string(),
+  "monthlyCents": zod.number(),
+  "setupCents": zod.number(),
+  "totalCents": zod.number(),
+  "issuedAt": zod.string(),
+  "dueAt": zod.string(),
+  "periodKey": zod.string(),
+  "status": zod.enum(['invoiced', 'paid', 'overdue']),
+  "paidAt": zod.string().nullable(),
+  "paymentReference": zod.string().nullable(),
+  "deliveryStatus": zod.string(),
+  "reminderStatus": zod.string()
+})),
+  "settings": zod.object({
+  "instructions": zod.string().max(activateAdminBusinessResponseSettingsInstructionsMax),
+  "paymentLink": zod.string().max(activateAdminBusinessResponseSettingsPaymentLinkMax)
+})
+})
+
+
 export const MarkManualInvoicePaidParams = zod.object({
   "invoiceId": zod.coerce.number()
 })
@@ -1602,7 +1761,7 @@ export const MarkManualInvoicePaidResponse = zod.object({
   "businessName": zod.string(),
   "plan": zod.string().nullable(),
   "businessAgeMonths": zod.number().nullable(),
-  "status": zod.enum(['legacy', 'requested', 'invoiced', 'paid', 'overdue']),
+  "status": zod.enum(['legacy', 'awaiting_activation', 'requested', 'invoiced', 'paid', 'overdue']),
   "serviceActive": zod.boolean(),
   "provisioningState": zod.string(),
   "invoices": zod.array(zod.object({

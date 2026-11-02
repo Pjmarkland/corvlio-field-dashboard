@@ -2,12 +2,13 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { pool } from "@workspace/db";
+import { AssignAdminBusinessPlanBody } from "@workspace/api-zod";
 import { databaseErrorFields } from "@workspace/db/errors";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
-import { approveStartup, InvoiceError, markInvoicePaid, ownerInvoiceOverview, paymentInstructions } from "../invoicing/service";
+import { activateBusiness, approveStartup, assignBusinessPlan, InvoiceError, markInvoicePaid, ownerInvoiceOverview, paymentInstructions } from "../invoicing/service";
 import { validPaymentLink } from "../invoicing/policy";
-import { runInvoiceCycle } from "../invoicing/worker";
+import { provisionPaidBusinesses, runInvoiceCycle } from "../invoicing/worker";
 const router = Router();
 const idSchema=z.coerce.number().int().positive();
 router.get("/invoicing/me",async(req,res,next) => {
@@ -47,6 +48,26 @@ router.post("/admin/invoicing/:businessId/approve-startup",async(req,res,next) =
   const id=idSchema.safeParse(req.params.businessId);
   if(!id.success){res.status(400).json({error:"Invalid business."});return;}
   try {res.json(await approveStartup(id.data));void runInvoiceCycle();}catch(e){next(e);}
+});
+router.patch("/admin/invoicing/:businessId/plan",async(req,res,next) => {
+  const id=idSchema.safeParse(req.params.businessId);
+  const body=AssignAdminBusinessPlanBody.strict().safeParse(req.body);
+  if(!id.success||!body.success
+    || (body.data.plan === "startup" && body.data.startupAgeMonths === undefined)) {
+    res.status(400).json({error:"Choose a valid plan and provide the Startup business age when required."});return;
+  }
+  try {
+    res.json(await assignBusinessPlan(id.data,body.data.plan,body.data.startupAgeMonths));
+  }catch(e){next(e);}
+});
+router.post("/admin/invoicing/:businessId/activate",async(req,res,next) => {
+  const id=idSchema.safeParse(req.params.businessId);
+  if(!id.success){res.status(400).json({error:"Invalid business."});return;}
+  try {
+    await activateBusiness(id.data);
+    await provisionPaidBusinesses([id.data]);
+    res.json(await ownerInvoiceOverview(id.data));
+  }catch(e){next(e);}
 });
 router.post("/admin/invoicing/invoices/:invoiceId/paid",async(req,res,next) => {
   const id=idSchema.safeParse(req.params.invoiceId);

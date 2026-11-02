@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { BusinessTypeField, PresetChoiceField, SampleBusinessHelper } from './onboarding';
+import { BusinessTypeField, Field, PresetChoiceField, SampleBusinessHelper } from './onboarding';
 import { ServicesNotOfferedWarning, ServicesOfferedPrompt } from '@/components/WebsiteOnboardingPreview';
 import { applySampleBusiness, initialForm } from './onboardingSample';
+import { requiredAgentFields } from './onboardingWebsite';
 
 const toneChoices = [
   { value: 'Friendly and professional', label: 'Friendly & professional (default)' },
@@ -142,6 +143,22 @@ describe('BusinessTypeField', () => {
     expect(update).toHaveBeenCalledWith('Plumbing');
   });
 
+  it('shows required semantics and an inline explanation when the business type is missing', () => {
+    render(
+      <BusinessTypeField
+        value=""
+        onChange={vi.fn()}
+        required
+        error={requiredAgentFields[0].message}
+        showError
+      />,
+    );
+
+    expect((screen.getByTestId('select-business-type') as HTMLSelectElement).required).toBe(true);
+    expect(screen.getByTestId('select-business-type').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('alert').textContent).toBe(requiredAgentFields[0].message);
+  });
+
   it('opens a custom field when Other is chosen from a known option', () => {
     const update = vi.fn();
     render(<BusinessTypeField value="HVAC" onChange={update} />);
@@ -173,11 +190,28 @@ describe('services prompts', () => {
     render(<ServicesNotOfferedWarning />);
     expect(screen.getByText('Your receptionist will politely decline these requests. Remove anything that is not a service you refuse.')).toBeTruthy();
   });
-  it('shows the services prompt and explicit deferral', () => {
-    const change = vi.fn();
-    render(<ServicesOfferedPrompt deferred={false} onDeferredChange={change} />);
-    expect(screen.getByText('Tell us what you do in one or two sentences. Your receptionist uses this to answer callers.')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('I’ll add this later'));
-    expect(change).toHaveBeenCalledWith(true);
+  it('explains that services need to be entered and does not offer a deferral', () => {
+    render(<ServicesOfferedPrompt />);
+    expect(screen.getByText('Add at least one sentence about your services so your receptionist can answer callers accurately.')).toBeTruthy();
+    expect(screen.queryByLabelText('I’ll add this later')).toBeNull();
+  });
+
+  it('shows an inline required error for a blank services answer', () => {
+    render(
+      <Field
+        id="servicesOffered"
+        label="Services offered"
+        value=""
+        onChange={vi.fn()}
+        placeholder="Describe your services"
+        required
+        error={requiredAgentFields[1].message}
+        showError
+      />,
+    );
+
+    expect((screen.getByTestId('input-servicesOffered') as HTMLTextAreaElement).required).toBe(true);
+    expect(screen.getByTestId('input-servicesOffered').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('alert').textContent).toBe(requiredAgentFields[1].message);
   });
 });

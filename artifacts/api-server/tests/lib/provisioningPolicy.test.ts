@@ -57,6 +57,21 @@ function fixture() {
 }
 
 describe("phone provisioning safeguards", () => {
+  it("does not reserve or purchase a number for native setup awaiting admin activation", async () => {
+    const { store, buy } = fixture();
+    const result = await guardedProvisioning({
+      ...input(),
+      chosenPlan: null,
+      manualPaymentState: null,
+      provisioningState: "awaiting_activation",
+    }, store, buy);
+
+    expect(result.business.provisioningState).toBe("awaiting_activation");
+    expect(result.phoneProvisioningPending).toBe(true);
+    expect(store.reserve).not.toHaveBeenCalled();
+    expect(buy).not.toHaveBeenCalled();
+  });
+
   it("saves unpaid onboarding without reserving or purchasing a number", async () => {
     const {store,buy}=fixture();
     const r=await guardedProvisioning({...input(),chosenPlan:"starter",manualPaymentState:"invoiced"},store,buy);

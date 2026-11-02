@@ -11,6 +11,7 @@ export type InvoiceOverviewStatus = typeof InvoiceOverviewStatus[keyof typeof In
 
 export const InvoiceOverviewStatus = {
   legacy: 'legacy',
+  awaiting_activation: 'awaiting_activation',
   requested: 'requested',
   invoiced: 'invoiced',
   paid: 'paid',

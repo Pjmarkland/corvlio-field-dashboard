@@ -213,6 +213,58 @@ paths:
           description: Invalid or non-public website URL
         "401":
           description: Authentication required
+  /businesses/native-onboard/status:
+    get:
+      operationId: getNativeBusinessSetupStatus
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Check whether native business setup has already been received
+      responses:
+        "200":
+          description: Minimal persisted setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NativeBusinessSetupStatus"
+        "401":
+          description: Authentication required
+        "503":
+          description: Setup status could not be checked
+  /businesses/native-onboard:
+    post:
+      operationId: submitNativeBusinessSetup
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Submit a plan-free native business setup for admin activation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NativeBusinessSetupInput"
+      responses:
+        "201":
+          description: New setup received; no plan or phone number assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NativeBusinessSetupResult"
+        "200":
+          description: Pending setup retry received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NativeBusinessSetupResult"
+        "400":
+          description: Invalid setup or missing legal acceptance
+        "401":
+          description: Authentication required
+        "409":
+          description: This account already has a business setup
+        "502":
+          description: Setup could not be saved
   /admin/call-quality:
     get:
       operationId: getAdminCallQuality
@@ -965,6 +1017,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InvoiceOverview'
+  /admin/invoicing/{businessId}/plan:
+    patch:
+      operationId: assignAdminBusinessPlan
+      tags: [Invoicing]
+      parameters:
+        - { name: businessId, in: path, required: true, schema: { type: number } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminBusinessPlanInput'
+      responses:
+        '200':
+          description: Plan assigned and invoice initialized where applicable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+        '400': { description: Invalid plan or Startup eligibility }
+        '404': { description: Business not found }
+        '409': { description: Plan cannot be changed after activation or invoice history }
+  /admin/invoicing/{businessId}/activate:
+    post:
+      operationId: activateAdminBusiness
+      tags: [Invoicing]
+      parameters:
+        - { name: businessId, in: path, required: true, schema: { type: number } }
+      responses:
+        '200':
+          description: Paid business queued for phone provisioning
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOverview'
+        '404': { description: Business not found }
+        '409': { description: Plan assignment and first payment are required }
   /admin/invoicing/invoices/{invoiceId}/paid:
     post:
       operationId: markManualInvoicePaid
@@ -1034,7 +1123,7 @@ components:
         businessName: { type: string }
         plan: { type: [string, 'null'] }
         businessAgeMonths: { type: [number, 'null'] }
-        status: { type: string, enum: [legacy, requested, invoiced, paid, overdue] }
+        status: { type: string, enum: [legacy, awaiting_activation, requested, invoiced, paid, overdue] }
         serviceActive: { type: boolean }
         provisioningState: { type: string }
         invoices:
@@ -1043,6 +1132,49 @@ components:
             $ref: '#/components/schemas/ManualInvoice'
         settings:
           $ref: '#/components/schemas/PaymentInstructions'
+    NativeBusinessSetupStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        submitted: { type: boolean }
+        businessName: { type: [string, "null"] }
+        provisioningState: { type: [string, "null"] }
+      required: [submitted, businessName, provisioningState]
+    NativeBusinessSetupInput:
+      type: object
+      additionalProperties: false
+      properties:
+        businessName: { type: string, minLength: 1, maxLength: 160 }
+        ownerEmail: { type: string, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", maxLength: 320 }
+        businessType: { type: string, minLength: 1, maxLength: 200 }
+        servicesOffered: { type: string, minLength: 1, maxLength: 4000 }
+        serviceArea: { type: string, minLength: 1, maxLength: 4000 }
+        majorIssueExamples: { type: string, minLength: 1, maxLength: 4000 }
+        businessHours: { type: string, minLength: 1, maxLength: 500 }
+        timeZone: { type: string, minLength: 1, maxLength: 100 }
+        agentName: { type: string, maxLength: 40 }
+        businessWebsiteUrl: { type: string, maxLength: 2048 }
+        websiteScrapePreviewed: { type: boolean }
+        websiteSuggestionsReviewed: { type: boolean }
+        websitePreviewAttempted: { type: boolean }
+        privacyAccepted: { type: boolean, enum: [true] }
+        termsAccepted: { type: boolean, enum: [true] }
+        serviceAgreementAccepted: { type: boolean, enum: [true] }
+      required: [businessName, ownerEmail, businessType, servicesOffered, serviceArea, majorIssueExamples, businessHours, timeZone, privacyAccepted, termsAccepted, serviceAgreementAccepted]
+    NativeBusinessSetupResult:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [received] }
+        provisioningState: { type: string, enum: [awaiting_activation] }
+      required: [status, provisioningState]
+    AdminBusinessPlanInput:
+      type: object
+      additionalProperties: false
+      properties:
+        plan: { type: string, enum: [startup, starter, professional, managed] }
+        startupAgeMonths: { type: number, multipleOf: 1, minimum: 0, maximum: 17 }
+      required: [plan]
     AccountDeletionInput:
       type: object
       required: [confirmation]

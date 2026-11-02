@@ -8,7 +8,7 @@ vi.mock("../../src/lib/retellProvisioning",()=>({saveBusinessWithOptionalPhone:m
 vi.mock("../../src/lib/businessDirectory",()=>({findBusinessById:mocks.find}));
 vi.mock("../../src/lib/logger",()=>({logger:{error:vi.fn()}}));
 import { addDays,anniversary,invoiceNumber,invoiceStatus,PLANS,validPaymentLink } from "../../src/invoicing/policy";
-import { approveStartup,initializeInvoices,insertInvoice,markInvoicePaid,scheduleInvoiceWork,ownerInvoiceOverview } from "../../src/invoicing/service";
+import { activateBusiness,approveStartup,assignBusinessPlan,initializeInvoices,insertInvoice,markInvoicePaid,scheduleInvoiceWork,ownerInvoiceOverview } from "../../src/invoicing/service";
 import { deliverInvoiceEmails,invoiceEmailBody,provisionPaidBusinesses } from "../../src/invoicing/worker";
 
 const b={id:71,business_name:"Test Invoice Business",owner_email:"test@example.test",chosen_plan:"starter",
@@ -49,6 +49,99 @@ describe("manual invoicing policy",()=>{
   });
 });
 describe("invoice persistence and approval",()=>{
+  it("assigns a plan and initializes an invoice while keeping native setup pending activation",async()=>{
+    let business={...b,chosen_plan:null,manual_payment_state:null,provisioning_state:"awaiting_activation"};
+    const invoices:any[]=[];
+    mocks.query.mockImplementation(async(sql:string,params:any[] = [])=>{
+      if(sql.startsWith("SELECT * FROM businesses")) return {rows:[business]};
+      if(sql.startsWith("SELECT * FROM manual_invoices WHERE business_id")) return {rows:invoices};
+      if(sql.startsWith("UPDATE businesses SET chosen_plan")) {
+        business={...business,chosen_plan:params[1],startup_age_months:params[2],manual_payment_state:params[3]};
+        return {rows:[]};
+      }
+      if(sql.startsWith("INSERT INTO manual_invoices")) {
+        const [business_id,business_name,plan,period_key,monthly_cents,setup_cents,issued_at,due_at]=params;
+        const invoice={id:91,business_id,business_name,plan,period_key,monthly_cents,setup_cents,issued_at,due_at,paid_at:null,payment_reference:null};
+        invoices.push(invoice);
+        return {rows:[invoice]};
+      }
+      if(sql.includes("SELECT i.*")) return {rows:invoices.map(invoice=>({...invoice,delivery_status:"pending",reminder_status:"not_scheduled"}))};
+      if(sql.startsWith("SELECT instructions")) return {rows:[]};
+      return {rows:[]};
+    });
+    const overview=await assignBusinessPlan(71,"starter");
+    expect(overview).toMatchObject({
+      plan:"starter",status:"invoiced",serviceActive:false,provisioningState:"awaiting_activation",
+      invoices:[{plan:"starter",status:"invoiced",monthlyCents:75000,setupCents:30000}],
+    });
+    expect(business).toMatchObject({
+      chosen_plan:"starter",manual_payment_state:"invoiced",provisioning_state:"awaiting_activation",
+    });
+  });
+
+  it("rejects Startup assignments for businesses aged 18 months or more",async()=>{
+    mocks.query.mockImplementation(async(sql:string)=>({
+      rows:sql.startsWith("SELECT * FROM businesses")
+        ? [{...b,chosen_plan:null,manual_payment_state:null,provisioning_state:"awaiting_activation"}] : [],
+    }));
+    await expect(assignBusinessPlan(71,"startup",18)).rejects.toThrow("under 18 months");
+    expect(mocks.query.mock.calls.some(([sql])=>String(sql).startsWith("UPDATE businesses"))).toBe(false);
+  });
+
+  it("changes an unpaid, unsent initial invoice without creating a second invoice",async()=>{
+    let business={...b,chosen_plan:"starter",provisioning_state:"awaiting_activation"};
+    const invoice={...i};
+    mocks.query.mockImplementation(async(sql:string,params:any[] = [])=>{
+      if(sql.startsWith("SELECT * FROM businesses")) return {rows:[business]};
+      if(sql.startsWith("SELECT * FROM manual_invoices WHERE business_id")) return {rows:[invoice]};
+      if(sql.startsWith("SELECT status FROM invoice_emails")) return {rows:[{status:"pending"}]};
+      if(sql.startsWith("UPDATE manual_invoices SET plan")) {
+        Object.assign(invoice,{plan:params[1],monthly_cents:params[2],setup_cents:params[3]});
+        return {rows:[]};
+      }
+      if(sql.startsWith("UPDATE businesses SET chosen_plan")) {
+        business={...business,chosen_plan:params[1],startup_age_months:params[2],manual_payment_state:params[3]};
+        return {rows:[]};
+      }
+      if(sql.includes("SELECT i.*")) return {rows:[{...invoice,delivery_status:"pending",reminder_status:"not_scheduled"}]};
+      if(sql.startsWith("SELECT instructions")) return {rows:[]};
+      return {rows:[]};
+    });
+    const overview=await assignBusinessPlan(71,"professional");
+    expect(overview.plan).toBe("professional");
+    expect(overview.invoices).toHaveLength(1);
+    expect(invoice).toMatchObject({plan:"professional",monthly_cents:100000,setup_cents:30000});
+    expect(mocks.query.mock.calls.filter(([sql])=>String(sql).startsWith("INSERT INTO manual_invoices"))).toHaveLength(0);
+  });
+
+  it("requires payment before native setup activation",async()=>{
+    mocks.query.mockImplementation(async(sql:string)=>({
+      rows:sql.startsWith("SELECT * FROM businesses")
+        ? [{...b,chosen_plan:null,manual_payment_state:null,provisioning_state:"awaiting_activation"}] : [],
+    }));
+    await expect(activateBusiness(71)).rejects.toThrow("confirm the first invoice payment");
+    expect(mocks.query.mock.calls.some(([sql])=>String(sql).startsWith("UPDATE businesses"))).toBe(false);
+  });
+
+  it("moves a paid setup into the guarded phone-provisioning state on activation",async()=>{
+    let business={...b,chosen_plan:"starter",manual_payment_state:"paid",first_invoice_paid_at:new Date(),provisioning_state:"awaiting_activation"};
+    const paidInvoice={...i,paid_at:new Date()};
+    mocks.query.mockImplementation(async(sql:string,params:any[] = [])=>{
+      if(sql.startsWith("SELECT * FROM businesses")) return {rows:[business]};
+      if(sql.startsWith("UPDATE businesses SET provisioning_state")) {
+        business={...business,provisioning_state:params[1]};
+        return {rows:[]};
+      }
+      if(sql.includes("SELECT i.*")) return {rows:[{...paidInvoice,delivery_status:"sent",reminder_status:"not_scheduled"}]};
+      if(sql.startsWith("SELECT instructions")) return {rows:[]};
+      return {rows:[]};
+    });
+    const overview=await activateBusiness(71);
+    expect(overview.provisioningState).toBe("awaiting_payment");
+    expect(overview.serviceActive).toBe(false);
+    expect(business.provisioning_state).toBe("awaiting_payment");
+  });
+
   it("uses business-period uniqueness and does not enqueue a duplicate email",async()=>{
     await insertInvoice({query:mocks.query} as any,b as any,"initial",i.issued_at);
     expect(mocks.query).toHaveBeenCalledOnce();

@@ -54,6 +54,9 @@ vi.mock('@workspace/api-client-react', () => ({
   useGetNotificationStatus: vi.fn(),
   useUpdateLeadStatus: vi.fn(),
   getGetLeadsQueryKey: () => ['/api/leads'],
+  getGetNativeBusinessSetupStatusQueryKey: () => ['/api/businesses/native-onboard/status'],
+  useGetNativeBusinessSetupStatus: vi.fn(),
+  submitNativeBusinessSetup: vi.fn(),
   getGetOwnerInvoicesQueryKey: () => ['/api/owner/invoices'],
   useGetOwnerInvoices: (...args: unknown[]) => mockGetOwnerInvoices(...args),
   useGetBusinessProfile: () => mockGetBusinessProfile(),
@@ -73,7 +76,7 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock('@/hooks/usePushDeepLink', () => ({ usePushDeepLink: vi.fn() }));
-vi.mock('@/pages/onboarding', () => ({ default: () => null }));
+vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm: () => null }));
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 

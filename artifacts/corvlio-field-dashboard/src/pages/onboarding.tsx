@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetLeadsQueryKey, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
+import { getGetLeadsQueryKey, getGetNativeBusinessSetupStatusQueryKey, submitNativeBusinessSetup, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { PlanPicker } from '@/components/PlanPicker';
 import { validStartupAge, type PlanId } from '@/lib/invoicePlans';
@@ -15,7 +15,9 @@ import { saveOnboardingConfirmation } from '@/lib/onboardingConfirmation';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSignOut } from '@/hooks/useSignOut';
 import { applySampleBusiness, initialForm, responseTimeOptions, sampleCallPreview, toneOptions, type OnboardingForm } from './onboardingSample';
-import { acceptHoursSuggestion, applyWebsiteSuggestions, clearUneditedAcceptedHours, getReadinessGaps, initialHoursDecision, normalizeWebsiteInput, rejectHoursSuggestion, removeUneditedWebsiteSuggestions, type HoursDecision } from './onboardingWebsite';
+import { acceptHoursSuggestion, applyWebsiteSuggestions, clearUneditedAcceptedHours, getMissingRequiredAgentFields, getPendingRequiredWebsiteSuggestionKeys, getReadinessGaps, getRequiredAgentFieldStatuses, initialHoursDecision, normalizeWebsiteInput, rejectHoursSuggestion, removeUneditedWebsiteSuggestions, requiredAgentFields, type HoursDecision, type WebsiteFieldKey } from './onboardingWebsite';
+
+const nativeWebsiteFieldKeys: WebsiteFieldKey[] = ['servicesOffered', 'serviceArea', 'businessHours'];
 
 export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -122,7 +124,7 @@ export function SampleBusinessHelper({ onApply }: { onApply: () => void }) {
   );
 }
 
-function Field({
+export function Field({
   id,
   label,
   value,
@@ -134,6 +136,8 @@ function Field({
   rows = 4,
   hint,
   maxLength,
+  error,
+  showError = false,
 }: {
   id: keyof OnboardingForm;
   label: string;
@@ -146,7 +150,15 @@ function Field({
   rows?: number;
   hint?: string;
   maxLength?: number;
+  error?: string;
+  showError?: boolean;
 }) {
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy = [
+    hint ? hintId : null,
+    showError && error ? errorId : null,
+  ].filter(Boolean).join(' ') || undefined;
   const commonClassName = 'w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm leading-relaxed text-foreground outline-none ring-primary transition placeholder:text-muted-foreground focus:ring-2';
   return (
     <label className="block" htmlFor={id}>
@@ -154,7 +166,7 @@ function Field({
         {label}
         {required ? <span className="ml-1 text-primary" aria-hidden="true">*</span> : null}
       </span>
-      {hint ? <span className="mb-2 block text-xs leading-relaxed text-muted-foreground">{hint}</span> : null}
+      {hint ? <span id={hintId} className="mb-2 block text-xs leading-relaxed text-muted-foreground">{hint}</span> : null}
       {multiline ? (
         <textarea
           id={id}
@@ -164,6 +176,9 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
+          aria-required={required}
+          aria-invalid={showError && error ? true : undefined}
+          aria-describedby={describedBy}
           maxLength={maxLength}
           data-testid={`input-${id}`}
           className={`${commonClassName} resize-y`}
@@ -177,18 +192,29 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           required={required}
+          aria-required={required}
+          aria-invalid={showError && error ? true : undefined}
+          aria-describedby={describedBy}
           maxLength={maxLength}
           data-testid={`input-${id}`}
           className={`${commonClassName} min-h-12 font-semibold`}
         />
       )}
+      {showError && error ? <span id={errorId} role="alert" className="mt-2 block text-xs font-medium text-destructive">{error}</span> : null}
     </label>
   );
 }
 
 const businessTypeOptions = ['HVAC', 'Electrical', 'Plumbing', 'Roofing', 'Landscaping', 'General contracting', 'Garage doors', 'Pest control', 'Cleaning', 'Appliance repair'];
 
-export function BusinessTypeField({ value, onChange, resetKey = 0 }: { value: string; onChange: (value: string) => void; resetKey?: number }) {
+export function BusinessTypeField({ value, onChange, resetKey = 0, required = false, error, showError = false }: {
+  value: string;
+  onChange: (value: string) => void;
+  resetKey?: number;
+  required?: boolean;
+  error?: string;
+  showError?: boolean;
+}) {
   const isKnownType = businessTypeOptions.includes(value);
   const [otherSelected, setOtherSelected] = useState(value !== '' && !isKnownType);
   const lastResetKey = useRef(resetKey);
@@ -200,14 +226,15 @@ export function BusinessTypeField({ value, onChange, resetKey = 0 }: { value: st
   }, [resetKey]);
   const customValue = otherSelected;
   return <div className="block">
-    <label htmlFor="businessType" className="mb-2 block text-sm font-semibold">Business type</label>
-    <select id="businessType" value={customValue || (!isKnownType && value !== '') ? 'Other' : value} onChange={(event) => { const choice = event.target.value; if (choice === 'Other') { if (!customValue && isKnownType) onChange(''); setOtherSelected(true); } else if (choice !== '') { setOtherSelected(false); onChange(choice); } }} data-testid="select-business-type" className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+    <label htmlFor="businessType" className="mb-2 block text-sm font-semibold">Business type{required ? <span className="ml-1 text-primary" aria-hidden="true">*</span> : null}</label>
+    <select id="businessType" required={required} aria-required={required} aria-invalid={showError && error ? true : undefined} aria-describedby={showError && error ? 'businessType-error' : undefined} value={customValue || (!isKnownType && value !== '') ? 'Other' : value} onChange={(event) => { const choice = event.target.value; if (choice === 'Other') { if (!customValue && isKnownType) onChange(''); setOtherSelected(true); } else if (choice !== '') { setOtherSelected(false); onChange(choice); } }} data-testid="select-business-type" className="min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary">
       <option value="" disabled>Select your industry</option>
       {businessTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
       <option value="Other">Other</option>
     </select>
-    {customValue || (!isKnownType && value !== '') ? <input type="text" value={value} onChange={(event) => { setOtherSelected(true); onChange(event.target.value); }} placeholder="Enter your business type" maxLength={200} data-testid="input-business-type-other" aria-label="Other business type" className="mt-2 min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary" /> : null}
+    {customValue || (!isKnownType && value !== '') ? <input id="businessType-other" type="text" required={required} aria-required={required} aria-invalid={showError && error ? true : undefined} aria-describedby={showError && error ? 'businessType-error' : undefined} value={value} onChange={(event) => { setOtherSelected(true); onChange(event.target.value); }} placeholder="Enter your business type" maxLength={200} data-testid="input-business-type-other" aria-label="Other business type" className="mt-2 min-h-12 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none focus:ring-2 focus:ring-primary" /> : null}
     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Choose the closest fit, or enter your own. Your answer is saved as written.</p>
+    {showError && error ? <p id="businessType-error" role="alert" className="mt-2 text-xs font-medium text-destructive">{error}</p> : null}
   </div>;
 }
 
@@ -339,7 +366,15 @@ function SectionHeading({
   );
 }
 
-function OnboardingPage() {
+export default function OnboardingPage() {
+  return <OnboardingForm nativeMode={false} />;
+}
+
+export function NativeOnboardingForm() {
+  return <OnboardingForm nativeMode />;
+}
+
+function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -350,18 +385,34 @@ function OnboardingPage() {
   const [startupAge, setStartupAge] = useState('');
   const [sampleResetKey, setSampleResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requiredValidationAttempted, setRequiredValidationAttempted] = useState(false);
   const websiteMutation = usePreviewBusinessWebsite();
   const [websitePreview, setWebsitePreview] = useState<WebsitePreview | null>(null);
   const [websiteReviewed, setWebsiteReviewed] = useState(false);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [hoursDecision, setHoursDecision] = useState<HoursDecision>(initialHoursDecision);
-  const [servicesDeferred, setServicesDeferred] = useState(false);
   const [previewAttempted, setPreviewAttempted] = useState(false);
   const websiteRequest = useRef(0);
   const beforeWebsiteSuggestions = useRef<OnboardingForm | null>(null);
   const readinessGaps = getReadinessGaps(form);
+  const requiredFieldStatuses = getRequiredAgentFieldStatuses(
+    form,
+    new Set(getPendingRequiredWebsiteSuggestionKeys(beforeWebsiteSuggestions.current, websitePreview)),
+    websiteReviewed,
+  );
+  const missingRequiredFields = new Set(getMissingRequiredAgentFields(form));
+  const requiredError = (key: keyof OnboardingForm) => {
+    if (!requiredValidationAttempted || !missingRequiredFields.has(key as typeof requiredAgentFields[number]['key'])) return undefined;
+    return requiredAgentFields.find((field) => field.key === key)?.message;
+  };
+  const optionalReadinessGaps = readinessGaps.filter(
+    (gap) => !requiredAgentFields.some((field) => field.key === gap.key),
+  );
   const needsWebsiteReview = websitePreview !== null && websitePreview.status !== 'unavailable'
-    && Object.values(websitePreview.fields).some((field) => field?.value);
+    && (nativeMode
+      ? nativeWebsiteFieldKeys.some((key) => websitePreview.fields[key]?.value)
+        || Boolean(websitePreview.fields.businessHoursSuggestion?.value)
+      : Object.values(websitePreview.fields).some((field) => field?.value));
   const [submission, setSubmission] = useState<
     { kind: 'success' | 'error'; message: string } | null
   >(null);
@@ -378,7 +429,6 @@ function OnboardingPage() {
       setWebsitePreview(null);
       setWebsiteReviewed(false);
       setWebsiteError(null);
-      setServicesDeferred(false);
       setPreviewAttempted(false);
     } else {
       setForm((current) => ({ ...current, [key]: value }));
@@ -390,7 +440,6 @@ function OnboardingPage() {
     setWebsitePreview(null);
     setWebsiteReviewed(false);
     setWebsiteError(null);
-    setServicesDeferred(false);
     setPreviewAttempted(false);
   };
   const handleWebsitePreview = async () => {
@@ -399,7 +448,6 @@ function OnboardingPage() {
     const websiteUrl = normalizeWebsiteInput(form.businessWebsiteUrl);
     setWebsiteError(null);
     setWebsiteReviewed(false);
-    setServicesDeferred(false);
     try {
       const preview = await websiteMutation.mutateAsync({ data: { websiteUrl } });
       if (requestId !== websiteRequest.current) return;
@@ -420,16 +468,14 @@ function OnboardingPage() {
   };
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setRequiredValidationAttempted(true);
+    if (getMissingRequiredAgentFields(form).length > 0) return;
     if (!form.privacyAccepted || !form.termsAccepted || !form.serviceAgreementAccepted || isSubmitting || websiteMutation.isPending) return;
     if (needsWebsiteReview && !websiteReviewed) {
       setSubmission({ kind: 'error', message: 'Review the website suggestions and missing fields, then check the website review box before saving.' });
       return;
     }
-    if (previewAttempted && !form.servicesOffered.trim() && !servicesDeferred) {
-      setSubmission({ kind: 'error', message: 'Describe what you do, or check I’ll add this later, before finishing.' });
-      return;
-    }
-    if (!form.receptionistTone.trim()) {
+    if (!nativeMode && !form.receptionistTone.trim()) {
       setSubmission({ kind: 'error', message: 'Choose or enter a personality and tone for your AI receptionist.' });
       return;
     }
@@ -440,12 +486,12 @@ function OnboardingPage() {
       return;
     }
 
-    if (!chosenPlan) {
+    if (!nativeMode && !chosenPlan) {
       setSubmission({ kind: 'error', message: 'Choose a plan before finishing.' });
       return;
     }
-    const startupAgeMonths = chosenPlan === 'startup' ? validStartupAge(startupAge) : null;
-    if (chosenPlan === 'startup' && startupAgeMonths === null) {
+    const startupAgeMonths = !nativeMode && chosenPlan === 'startup' ? validStartupAge(startupAge) : null;
+    if (!nativeMode && chosenPlan === 'startup' && startupAgeMonths === null) {
       setSubmission({ kind: 'error', message: 'Startup is for businesses under 18 months. Enter a whole number from 0 to 17.' });
       return;
     }
@@ -453,6 +499,39 @@ function OnboardingPage() {
     setSubmission(null);
 
     try {
+      if (nativeMode) {
+        await submitNativeBusinessSetup({
+          businessName: form.businessName.trim(),
+          ownerEmail: form.ownerEmail.trim(),
+          businessType: form.businessType.trim(),
+          servicesOffered: form.servicesOffered.trim(),
+          serviceArea: form.serviceArea.trim(),
+          majorIssueExamples: form.majorIssueExamples.trim(),
+          businessHours: form.businessHours.trim(),
+          timeZone: form.timeZone.trim(),
+          agentName: form.agentName.trim() || undefined,
+          businessWebsiteUrl: normalizeWebsiteInput(form.businessWebsiteUrl) || undefined,
+          websiteScrapePreviewed: needsWebsiteReview,
+          websiteSuggestionsReviewed: websiteReviewed,
+          websitePreviewAttempted: previewAttempted,
+          privacyAccepted: true,
+          termsAccepted: true,
+          serviceAgreementAccepted: true,
+        });
+        setSubmission({ kind: 'success', message: 'Setup received. Corvlio will review your business details.' });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: getGetNativeBusinessSetupStatusQueryKey(),
+            refetchType: 'all',
+          }),
+          queryClient.invalidateQueries({
+            queryKey: getGetLeadsQueryKey(),
+            refetchType: 'all',
+          }),
+        ]);
+        return;
+      }
+
       const response = await fetch('/api/businesses/onboard', {
         method: 'POST',
         credentials: 'include',
@@ -468,7 +547,6 @@ function OnboardingPage() {
           businessWebsiteUrl: normalizeWebsiteInput(form.businessWebsiteUrl),
           websiteScrapePreviewed: needsWebsiteReview,
           websitePreviewAttempted: previewAttempted,
-          servicesOfferedDeferred: previewAttempted && !form.servicesOffered.trim() && servicesDeferred,
           otherPolicies: form.otherPolicies,
           websiteSuggestionsReviewed: websiteReviewed,
           ownerEmail: form.ownerEmail,
@@ -579,25 +657,43 @@ function OnboardingPage() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" />
             Business setup
           </div>
-          <h1 className="max-w-3xl text-[38px] font-800 leading-[.95] tracking-[-0.06em] sm:text-6xl">Give your receptionist the right starting point.</h1>
+          <h1 className="max-w-3xl text-[38px] font-800 leading-[.95] tracking-[-0.06em] sm:text-6xl">{nativeMode ? 'Tell us how your business works.' : 'Give your receptionist the right starting point.'}</h1>
           <p className="mt-5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Corvlio’s virtual receptionist answers your customer calls, asks what the caller needs, captures their contact details, and records each lead here for you to follow up. A few details help it represent your business clearly.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.13em] text-muted-foreground">
             <span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-[#398660] dark:text-emerald-300" /> Private setup</span>
             <span className="inline-flex items-center gap-2"><Clock3 size={14} className="text-primary" /> About 5 minutes</span>
-            <span className="inline-flex items-center gap-2"><Sparkles size={14} className="text-[#8c6418] dark:text-amber-300" /> No commitment today</span>
+            <span className="inline-flex items-center gap-2"><Sparkles size={14} className="text-[#8c6418] dark:text-amber-300" /> {nativeMode ? 'Reviewed by Corvlio' : 'No commitment today'}</span>
           </div>
         </div>
 
-        <form className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]" onSubmit={handleSubmit} data-testid="form-onboarding">
+        <form
+          className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]"
+          onSubmit={handleSubmit}
+          onInvalidCapture={(event) => {
+            const target = event.target;
+            if (target instanceof HTMLElement && ['businessType', 'businessType-other', 'servicesOffered', 'serviceArea', 'majorIssueExamples'].includes(target.id)) {
+              event.preventDefault();
+              setRequiredValidationAttempted(true);
+            }
+          }}
+          data-testid="form-onboarding"
+        >
           <div className="space-y-4">
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
                 <Field id="agentName" label="Receptionist name" value={form.agentName} onChange={(value) => updateField('agentName', value)} placeholder="Aria" maxLength={40} hint="What should your AI receptionist call itself? Leave blank and we'll use Aria." />
-                <BusinessTypeField value={form.businessType} onChange={(value) => updateField('businessType', value)} resetKey={sampleResetKey} />
+                <BusinessTypeField
+                  value={form.businessType}
+                  onChange={(value) => updateField('businessType', value)}
+                  resetKey={sampleResetKey}
+                  required
+                  error={requiredAgentFields.find((field) => field.key === 'businessType')?.message}
+                  showError={Boolean(requiredError('businessType'))}
+                />
                 <Field
                   id="businessWebsiteUrl"
                   label="Business website URL"
@@ -607,7 +703,7 @@ function OnboardingPage() {
                    hint="Optional. Read the site now to suggest answers for your review. Nothing is saved automatically."
                 />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
-                <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" />
+                <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required error={requiredError('serviceArea')} showError={Boolean(requiredError('serviceArea'))} />
               </div>
               {!form.isSample ? <div className="mt-4">
                 <button type="button" onClick={() => void handleWebsitePreview()} disabled={!form.businessWebsiteUrl.trim() || websiteMutation.isPending || isSubmitting} data-testid="button-scrape-website" className="min-h-11 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-50">
@@ -615,18 +711,18 @@ function OnboardingPage() {
                 </button>
                 <p className="mt-2 text-xs text-muted-foreground">Reads only this site and up to three linked about, services, or contact pages. Review every suggestion before saving.</p>
                 {websiteError ? <p role="status" className="mt-2 text-xs text-destructive" data-testid="website-preview-error">{websiteError}</p> : null}
-                {websitePreview ? <WebsiteOnboardingPreview preview={websitePreview} hoursDecision={hoursDecision}
+                {websitePreview ? <WebsiteOnboardingPreview preview={websitePreview} hoursDecision={hoursDecision} visibleFieldKeys={nativeMode ? nativeWebsiteFieldKeys : undefined}
                   onUseHours={(value) => { const r = acceptHoursSuggestion(form, value); setForm(r.form); setHoursDecision(r.decision); }}
                   onRejectHours={(value) => {
                     setForm((current) => clearUneditedAcceptedHours(current, hoursDecision));
                     setHoursDecision(rejectHoursSuggestion(value));
                   }} /> : null}
               </div> : null}
-              <SampleBusinessHelper onApply={() => {
+              {!nativeMode ? <SampleBusinessHelper onApply={() => {
                 resetWebsitePreview();
                 setForm((current) => applySampleBusiness(current));
                 setSampleResetKey((current) => current + 1);
-              }} />
+              }} /> : null}
               {form.isSample ? <div role="status" className="mt-3 rounded-xl border border-border bg-muted p-4 text-sm">
                 <p className="font-semibold">Sample business — no real phone number or website scraping.</p>
                 <p className="mt-1 text-muted-foreground">Submitting saves a demo profile only. Edit these details freely; it stays a sample.</p>
@@ -636,7 +732,7 @@ function OnboardingPage() {
                   setSampleResetKey((current) => current + 1);
                 }}>Start with my real business instead</button>
               </div> : null}
-              <div className="mt-5">
+              {!nativeMode ? <div className="mt-5">
                 <PresetChoiceField
                   id="receptionistTone"
                   label="AI receptionist personality and tone"
@@ -648,47 +744,56 @@ function OnboardingPage() {
                   hint="Describe how you want callers to feel, and any words or phrases your team naturally uses."
                   resetKey={sampleResetKey}
                 />
-              </div>
+              </div> : null}
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={Wrench} eyebrow="02 · The work" title="Set the boundaries before calls begin." description="Clear limits help the receptionist qualify the right jobs without making promises your team cannot keep." tone="warm" />
               <div className="space-y-5">
-                <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." />
-                {previewAttempted && !form.servicesOffered.trim() ? <ServicesOfferedPrompt deferred={servicesDeferred} onDeferredChange={setServicesDeferred} /> : null}
-                <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." />
-                <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
-                {form.servicesNotOffered.trim() ? <ServicesNotOfferedWarning /> : null}
-                <Field id="otherPolicies" label="Other policies (notes)" value={form.otherPolicies} onChange={(value) => updateField('otherPolicies', value)} placeholder="Optional notes about policies not covered above." multiline rows={3} hint="Notes only. These are not treated as services you refuse." />
+                <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." required error={requiredError('servicesOffered')} showError={Boolean(requiredError('servicesOffered'))} />
+                {previewAttempted && !form.servicesOffered.trim() ? <ServicesOfferedPrompt /> : null}
+                <Field id="majorIssueExamples" label="What counts as urgent for your business" value={form.majorIssueExamples} onChange={(value) => updateField('majorIssueExamples', value)} placeholder="For HVAC, no heat in winter, a gas smell, or an active water leak from the system are urgent." multiline rows={3} hint="Describe trade-specific situations the receptionist should treat as emergencies." required error={requiredError('majorIssueExamples')} showError={Boolean(requiredError('majorIssueExamples'))} />
+                {!nativeMode ? <>
+                  <Field id="servicesNotOffered" label="Services not offered" value={form.servicesNotOffered} onChange={(value) => updateField('servicesNotOffered', value)} placeholder="We do not service commercial refrigeration or install solar panels." multiline rows={3} />
+                  {form.servicesNotOffered.trim() ? <ServicesNotOfferedWarning /> : null}
+                  <Field id="otherPolicies" label="Other policies (notes)" value={form.otherPolicies} onChange={(value) => updateField('otherPolicies', value)} placeholder="Optional notes about policies not covered above." multiline rows={3} hint="Notes only. These are not treated as services you refuse." />
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field id="pricingPolicy" label="Pricing policy" value={form.pricingPolicy} onChange={(value) => updateField('pricingPolicy', value)} placeholder="Diagnostic visits start at $129; quote after inspection." multiline rows={4} />
+                    <Field id="financingPolicy" label="Financing policy" value={form.financingPolicy} onChange={(value) => updateField('financingPolicy', value)} placeholder="Financing is available for jobs over $1,000 through our office." multiline rows={4} />
+                  </div>
+                  <Field id="brandsWorkedWith" label="Brands worked with" value={form.brandsWorkedWith} onChange={(value) => updateField('brandsWorkedWith', value)} placeholder="Carrier, Trane, Mitsubishi, Rheem, and most major residential brands." multiline rows={3} />
+                </> : null}
+              </div>
+            </section>
+
+            {nativeMode ? <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-native-hours">
+              <SectionHeading icon={Clock3} eyebrow="03 · Business hours" title="Set your hours and time zone." description="These details help the receptionist avoid saying you’re open when you’re not." tone="green" />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank={false} />
+              </div>
+            </section> : <>
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+                <SectionHeading icon={FileCheck2} eyebrow="03 · Your promise" title="Make the follow-through unmistakable." description="These details turn a captured lead into a conversation that already feels informed." tone="green" />
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <Field id="pricingPolicy" label="Pricing policy" value={form.pricingPolicy} onChange={(value) => updateField('pricingPolicy', value)} placeholder="Diagnostic visits start at $129; quote after inspection." multiline rows={4} />
-                  <Field id="financingPolicy" label="Financing policy" value={form.financingPolicy} onChange={(value) => updateField('financingPolicy', value)} placeholder="Financing is available for jobs over $1,000 through our office." multiline rows={4} />
+                    <PresetChoiceField id="responseTime" label="Typical response time commitment" value={form.responseTime} onChange={(value) => updateField('responseTime', value)} options={responseTimeOptions} multiline hint="Choose the commitment you can meet consistently, or enter a custom one." resetKey={sampleResetKey} />
+                  <Field id="warrantyInfo" label="Warranty information" value={form.warrantyInfo} onChange={(value) => updateField('warrantyInfo', value)} placeholder="One-year labor warranty; manufacturer warranties apply." multiline rows={3} />
+                  <Field id="maintenancePlans" label="Maintenance plan offerings" value={form.maintenancePlans} onChange={(value) => updateField('maintenancePlans', value)} placeholder="Seasonal tune-up plan with priority scheduling." multiline rows={3} />
+                  <Field id="credentials" label="Credentials and certifications" value={form.credentials} onChange={(value) => updateField('credentials', value)} placeholder="Licensed C-20 contractor, EPA certified, NATE certified." multiline rows={3} />
                 </div>
-                <Field id="brandsWorkedWith" label="Brands worked with" value={form.brandsWorkedWith} onChange={(value) => updateField('brandsWorkedWith', value)} placeholder="Carrier, Trane, Mitsubishi, Rheem, and most major residential brands." multiline rows={3} />
-              </div>
-            </section>
+              </section>
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
-              <SectionHeading icon={FileCheck2} eyebrow="03 · Your promise" title="Make the follow-through unmistakable." description="These details turn a captured lead into a conversation that already feels informed." tone="green" />
-              <div className="grid gap-5 sm:grid-cols-2">
-                  <PresetChoiceField id="responseTime" label="Typical response time commitment" value={form.responseTime} onChange={(value) => updateField('responseTime', value)} options={responseTimeOptions} multiline hint="Choose the commitment you can meet consistently, or enter a custom one." resetKey={sampleResetKey} />
-                <Field id="warrantyInfo" label="Warranty information" value={form.warrantyInfo} onChange={(value) => updateField('warrantyInfo', value)} placeholder="One-year labor warranty; manufacturer warranties apply." multiline rows={3} />
-                <Field id="maintenancePlans" label="Maintenance plan offerings" value={form.maintenancePlans} onChange={(value) => updateField('maintenancePlans', value)} placeholder="Seasonal tune-up plan with priority scheduling." multiline rows={3} />
-                <Field id="credentials" label="Credentials and certifications" value={form.credentials} onChange={(value) => updateField('credentials', value)} placeholder="Licensed C-20 contractor, EPA certified, NATE certified." multiline rows={3} />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
-              <SectionHeading icon={Headphones} eyebrow="04 · When to reach you" title="Keep the handoff human." description="Tell us when an owner can step in, and where urgent callers should go after hours." tone="muted" />
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field id="ownerAvailability" label="Owner availability" value={form.ownerAvailability} onChange={(value) => updateField('ownerAvailability', value)} placeholder="Mon–Fri, 7am–5pm. I review new leads between jobs." multiline rows={4} />
-                <Field id="emergencyContact" label="Emergency / after-hours policy" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours availability, dispatch instructions, or urgent-call guidance." multiline rows={4} />
-                <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank />
-              </div>
-            </section>
-            <section className="rounded-2xl border border-border bg-card p-5 sm:p-7" data-testid="section-plan">
-              <PlanPicker value={chosenPlan} onChange={setChosenPlan} age={startupAge} onAge={setStartupAge} />
-            </section>
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+                <SectionHeading icon={Headphones} eyebrow="04 · When to reach you" title="Keep the handoff human." description="Tell us when an owner can step in, and where urgent callers should go after hours." tone="muted" />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field id="ownerAvailability" label="Owner availability" value={form.ownerAvailability} onChange={(value) => updateField('ownerAvailability', value)} placeholder="Mon–Fri, 7am–5pm. I review new leads between jobs." multiline rows={4} />
+                  <Field id="emergencyContact" label="Emergency / after-hours policy" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="After-hours availability, dispatch instructions, or urgent-call guidance." multiline rows={4} />
+                  <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank />
+                </div>
+              </section>
+              <section className="rounded-2xl border border-border bg-card p-5 sm:p-7" data-testid="section-plan">
+                <PlanPicker value={chosenPlan} onChange={setChosenPlan} age={startupAge} onAge={setStartupAge} />
+              </section>
+            </>}
           </div>
 
           <aside className="lg:sticky lg:top-6 lg:self-start">
@@ -704,14 +809,26 @@ function OnboardingPage() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-border bg-card p-5 sm:p-6">
-              <div className="mb-5 border-b border-border pb-5" data-testid="agent-readiness-checklist">
+              {!nativeMode ? <div className="mb-5 border-b border-border pb-5" data-testid="agent-readiness-checklist">
                 <h3 className="text-sm font-bold">Agent readiness</h3>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{readinessGaps.length ? 'These answers are still blank or brief. Add confirmed detail where possible so the receptionist can answer specifically. This does not block manual setup.' : 'The key answers have useful detail. Review accuracy before saving.'}</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">These four answers are required before setup. Add confirmed detail where possible; all other business details are optional.</p>
+                <ul className="mt-3 flex flex-wrap gap-2" aria-label="Required agent setup fields">
+                  {requiredFieldStatuses.map((field) => {
+                    const stateLabel = field.state === 'missing' ? 'needed'
+                      : field.state === 'review' ? 'review suggestion'
+                      : field.state === 'brief' ? 'add detail if possible'
+                      : 'answered';
+                    return <li key={field.key} className={`rounded-md border px-2 py-1 text-xs ${field.state === 'missing' ? 'border-destructive/40 bg-destructive/5 text-destructive' : 'border-border bg-muted'}`} data-testid={`required-agent-field-${field.key}`}>
+                      {field.label} · Required · {stateLabel}
+                    </li>;
+                  })}
+                </ul>
+                <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{optionalReadinessGaps.length ? 'Optional answers below are blank or brief. Add only confirmed details that apply to your business.' : 'Other business details are optional. Review accuracy before saving.'}</p>
                 <ul className="mt-3 flex flex-wrap gap-2">
-                  {readinessGaps.map((gap) => <li key={gap.key} className="rounded-md border border-border bg-muted px-2 py-1 text-xs">{gap.label} · {gap.state}</li>)}
+                  {optionalReadinessGaps.map((gap) => <li key={gap.key} className="rounded-md border border-border bg-muted px-2 py-1 text-xs">{gap.label} · {gap.state} · optional</li>)}
                 </ul>
                 {readinessGaps.some((gap) => gap.key === 'businessHours' || gap.key === 'timeZone') ? <p className="mt-2 text-xs text-muted-foreground">Without confirmed hours and a time zone, the agent will not claim the business is currently open.</p> : null}
-              </div>
+              </div> : null}
               <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.17em] text-muted-foreground">Review & continue</p>
               <div className="space-y-4">
                 {needsWebsiteReview ? <label className="flex items-start gap-3 text-sm leading-relaxed">
@@ -758,5 +875,3 @@ function OnboardingPage() {
     </main>
   );
 }
-
-export default OnboardingPage;

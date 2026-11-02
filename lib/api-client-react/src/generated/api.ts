@@ -25,6 +25,7 @@ import type {
   AccountDeletionResult,
   AdminActivity,
   AdminBusinessDetail,
+  AdminBusinessPlanInput,
   AdminCallQuality,
   AdminEmailHealth,
   AdminOverview,
@@ -59,6 +60,9 @@ import type {
   ManualPaymentConfirmation,
   ManualReleaseInput,
   NativeBillingSummary,
+  NativeBusinessSetupInput,
+  NativeBusinessSetupResult,
+  NativeBusinessSetupStatus,
   NotificationDevice,
   NotificationDeviceRegistration,
   NotificationOutboxEvent,
@@ -827,6 +831,154 @@ export const usePreviewBusinessWebsite = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPreviewBusinessWebsiteMutationOptions(options));
+    }
+
+export const getGetNativeBusinessSetupStatusUrl = () => {
+
+
+
+
+  return `/api/businesses/native-onboard/status`
+}
+
+/**
+ * @summary Check whether native business setup has already been received
+ */
+export const getNativeBusinessSetupStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<NativeBusinessSetupStatus> => {
+
+  return customFetch<NativeBusinessSetupStatus>(getGetNativeBusinessSetupStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNativeBusinessSetupStatusQueryKey = () => {
+    return [
+    `/api/businesses/native-onboard/status`
+    ] as const;
+    }
+
+
+export const getGetNativeBusinessSetupStatusQueryOptions = <TData = Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNativeBusinessSetupStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>> = ({ signal }) => getNativeBusinessSetupStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNativeBusinessSetupStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>>
+export type GetNativeBusinessSetupStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check whether native business setup has already been received
+ */
+
+export function useGetNativeBusinessSetupStatus<TData = Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNativeBusinessSetupStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNativeBusinessSetupStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSubmitNativeBusinessSetupUrl = () => {
+
+
+
+
+  return `/api/businesses/native-onboard`
+}
+
+/**
+ * @summary Submit a plan-free native business setup for admin activation
+ */
+export const submitNativeBusinessSetup = async (nativeBusinessSetupInput: NativeBusinessSetupInput, options?: Parameters<typeof customFetch>[1]): Promise<NativeBusinessSetupResult> => {
+
+  return customFetch<NativeBusinessSetupResult>(getSubmitNativeBusinessSetupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(nativeBusinessSetupInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitNativeBusinessSetupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitNativeBusinessSetup>>, TError,{data: BodyType<NativeBusinessSetupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitNativeBusinessSetup>>, TError,{data: BodyType<NativeBusinessSetupInput>}, TContext> => {
+
+const mutationKey = ['submitNativeBusinessSetup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitNativeBusinessSetup>>, {data: BodyType<NativeBusinessSetupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitNativeBusinessSetup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitNativeBusinessSetupMutationResult = NonNullable<Awaited<ReturnType<typeof submitNativeBusinessSetup>>>
+    export type SubmitNativeBusinessSetupMutationBody = BodyType<NativeBusinessSetupInput>
+    export type SubmitNativeBusinessSetupMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a plan-free native business setup for admin activation
+ */
+export const useSubmitNativeBusinessSetup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitNativeBusinessSetup>>, TError,{data: BodyType<NativeBusinessSetupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitNativeBusinessSetup>>,
+        TError,
+        {data: BodyType<NativeBusinessSetupInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitNativeBusinessSetupMutationOptions(options));
     }
 
 export const getGetAdminCallQualityUrl = () => {
@@ -3821,6 +3973,137 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getApproveStartupInvoiceMutationOptions(options));
+    }
+
+export const getAssignAdminBusinessPlanUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/invoicing/${businessId}/plan`
+}
+
+export const assignAdminBusinessPlan = async (businessId: number,
+    adminBusinessPlanInput: AdminBusinessPlanInput, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceOverview> => {
+
+  return customFetch<InvoiceOverview>(getAssignAdminBusinessPlanUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminBusinessPlanInput)
+  }
+);}
+
+
+
+
+
+export const getAssignAdminBusinessPlanMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignAdminBusinessPlan>>, TError,{businessId: number;data: BodyType<AdminBusinessPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignAdminBusinessPlan>>, TError,{businessId: number;data: BodyType<AdminBusinessPlanInput>}, TContext> => {
+
+const mutationKey = ['assignAdminBusinessPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignAdminBusinessPlan>>, {businessId: number;data: BodyType<AdminBusinessPlanInput>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  assignAdminBusinessPlan(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignAdminBusinessPlanMutationResult = NonNullable<Awaited<ReturnType<typeof assignAdminBusinessPlan>>>
+    export type AssignAdminBusinessPlanMutationBody = BodyType<AdminBusinessPlanInput>
+    export type AssignAdminBusinessPlanMutationError = ErrorType<void>
+
+    export const useAssignAdminBusinessPlan = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignAdminBusinessPlan>>, TError,{businessId: number;data: BodyType<AdminBusinessPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignAdminBusinessPlan>>,
+        TError,
+        {businessId: number;data: BodyType<AdminBusinessPlanInput>},
+        TContext
+      > => {
+      return useMutation(getAssignAdminBusinessPlanMutationOptions(options));
+    }
+
+export const getActivateAdminBusinessUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/invoicing/${businessId}/activate`
+}
+
+export const activateAdminBusiness = async (businessId: number, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceOverview> => {
+
+  return customFetch<InvoiceOverview>(getActivateAdminBusinessUrl(businessId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getActivateAdminBusinessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateAdminBusiness>>, TError,{businessId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof activateAdminBusiness>>, TError,{businessId: number}, TContext> => {
+
+const mutationKey = ['activateAdminBusiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof activateAdminBusiness>>, {businessId: number}> = (props) => {
+          const {businessId} = props ?? {};
+
+          return  activateAdminBusiness(businessId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActivateAdminBusinessMutationResult = NonNullable<Awaited<ReturnType<typeof activateAdminBusiness>>>
+
+    export type ActivateAdminBusinessMutationError = ErrorType<void>
+
+    export const useActivateAdminBusiness = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateAdminBusiness>>, TError,{businessId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof activateAdminBusiness>>,
+        TError,
+        {businessId: number},
+        TContext
+      > => {
+      return useMutation(getActivateAdminBusinessMutationOptions(options));
     }
 
 export const getMarkManualInvoicePaidUrl = (invoiceId: number,) => {

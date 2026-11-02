@@ -6,7 +6,7 @@
 - [Secure secret submission](secure-secret-submission.md) — wait for the platform’s added-secret confirmation before restarting dependent workflows.
 - [Browser navigation tests](browser-navigation-tests.md) — inject full-page redirects in UI tests because jsdom makes window.location.assign non-spyable.
 - [Retell onboarding fallback](retell-onboarding-fallback.md) — persist core business setup independently from optional Retell phone provisioning.
-- [Onboarding website review](onboarding-website-review.md) — website suggestions require owner review; unknown facts stay blank and scraping failure never blocks manual setup.
+- [Onboarding call quality](onboarding-website-review.md) — call quality is Corvlio's core value; require accurate intake details and keep website suggestions owner-reviewed.
 - [Admin route authorization](admin-route-authorization.md) — keep authorization on protected APIs and return a consistent 404 instead of client-side redirects.
 - [OpenAPI Zod generation constraints](openapi-zod-generation-constraints.md) — keep email/URL checks and strict unknown-key rejection explicit at server boundaries with current codegen.
 - [Phone cost safety](phone-cost-safety.md) — demos never purchase or scrape; pending purchases need recovery, and missing pre-call signatures remain allowed during rollout.
@@ -26,3 +26,4 @@
 - [Manual invoice boundaries](manual-invoice-boundaries.md) — keep Stripe disabled, preserve existing accounts, and review uncertain Gmail sends instead of risking duplicates.
 - [Gmail configuration boundary](gmail-configuration-boundary.md) — Google Cloud activation belongs to the owner; historical lead failures require explicit batch approval before replay.
 - [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.
+- [Native client setup boundary](native-client-setup-scope.md) — the native app is for Corvlio clients; keep plan assignment and activation in the web admin.

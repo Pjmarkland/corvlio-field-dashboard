@@ -49,7 +49,7 @@ export async function guardedProvisioning(
       ...input,
       retellPhoneNumber: null,
       retellAgentId: null,
-      provisioningState: input.isSample ? "sample" : "pending",
+      provisioningState: input.provisioningState ?? (input.isSample ? "sample" : "pending"),
     });
     const result = (current: Business, error: unknown = null) => ({
       business: current,
@@ -57,6 +57,9 @@ export async function guardedProvisioning(
       provisioningError: error,
     });
     if (business.isSample || business.retellPhoneNumber) return result(business);
+    // Native clients remain planless and unprovisioned until an admin assigns a
+    // plan, confirms the first payment, and explicitly activates the account.
+    if (business.provisioningState === "awaiting_activation") return result(business);
     if (business.chosenPlan && !business.firstInvoicePaidAt) {
       await store.state(business.id, "awaiting_payment");
       return result({ ...business, provisioningState: "awaiting_payment" });
