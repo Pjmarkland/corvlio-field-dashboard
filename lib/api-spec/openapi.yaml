@@ -818,7 +818,10 @@ paths:
               $ref: "#/components/schemas/InternalBusinessInput"
       responses:
         "200":
-          description: Created internal business
+          description: >
+            Creates a non-billed internal business and locally associates the
+            supplied existing Retell number. Does not call Retell, change number
+            routing, edit a shared agent, or purchase a phone number.
           content:
             application/json:
               schema:
@@ -1679,22 +1682,83 @@ components:
       required: [retellAgentId]
     InternalBusinessInput:
       type: object
+      additionalProperties: false
       properties:
         businessName:
           type: string
+          enum: [Corvlio]
+          minLength: 1
+          maxLength: 160
         retellPhoneNumber:
           type: string
+          enum: ["+12397882087"]
+          pattern: "^\\+[1-9]\\d{7,14}$"
         ownerUserId:
           type: string
-        retellAgentId:
-          type: [string, "null"]
-      required: [businessName, retellPhoneNumber, ownerUserId]
+          minLength: 1
+          maxLength: 200
+        businessType:
+          type: string
+          minLength: 1
+          maxLength: 200
+        servicesOffered:
+          type: string
+          minLength: 1
+          maxLength: 500
+        servicesNotOffered:
+          type: string
+          minLength: 1
+          maxLength: 500
+        serviceArea:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        majorIssueExamples:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        businessHours:
+          type: string
+          minLength: 1
+          maxLength: 500
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 100
+        emergencyAvailable:
+          type: boolean
+        emergencyEscalationPhone:
+          type: ["string", "null"]
+          maxLength: 16
+          pattern: "^\\+[1-9]\\d{7,14}$"
+        aiPromisePolicy:
+          type: string
+          enum: [callback_only, appointment_windows]
+      required:
+        - businessName
+        - retellPhoneNumber
+        - ownerUserId
+        - businessType
+        - servicesOffered
+        - servicesNotOffered
+        - serviceArea
+        - majorIssueExamples
+        - businessHours
+        - timeZone
+        - emergencyAvailable
+        - emergencyEscalationPhone
+        - aiPromisePolicy
     InternalBusinessRecord:
       type: object
       properties:
         id:
           type: number
         businessName:
+          type: string
+        isInternal:
+          type: boolean
+          enum: [true]
+        agentName:
           type: string
         retellPhoneNumber:
           type: string
@@ -1704,7 +1768,7 @@ components:
           type: string
         ownerEmail:
           type: string
-      required: [id, businessName, retellPhoneNumber, retellAgentId, ownerUserId, ownerEmail]
+      required: [id, businessName, isInternal, agentName, retellPhoneNumber, retellAgentId, ownerUserId, ownerEmail]
     InternalBusinessDirectory:
       type: object
       properties:

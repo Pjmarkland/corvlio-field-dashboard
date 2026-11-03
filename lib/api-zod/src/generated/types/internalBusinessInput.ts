@@ -5,11 +5,64 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InternalBusinessInputAiPromisePolicy } from './internalBusinessInputAiPromisePolicy';
+import type { InternalBusinessInputBusinessName } from './internalBusinessInputBusinessName';
+import type { InternalBusinessInputRetellPhoneNumber } from './internalBusinessInputRetellPhoneNumber';
 
 export interface InternalBusinessInput {
-  businessName: string;
-  retellPhoneNumber: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  businessName: InternalBusinessInputBusinessName;
+  /** @pattern ^\+[1-9]\d{7,14}$ */
+  retellPhoneNumber: InternalBusinessInputRetellPhoneNumber;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   ownerUserId: string;
-  /** @nullable */
-  retellAgentId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  businessType: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesNotOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  serviceArea: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  majorIssueExamples: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  businessHours: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  timeZone: string;
+  emergencyAvailable: boolean;
+  /**
+     * @maxLength 16
+     * @nullable
+     * @pattern ^\+[1-9]\d{7,14}$
+     */
+  emergencyEscalationPhone: string | null;
+  aiPromisePolicy: InternalBusinessInputAiPromisePolicy;
 }

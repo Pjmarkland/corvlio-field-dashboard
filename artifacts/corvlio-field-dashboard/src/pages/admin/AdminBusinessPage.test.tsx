@@ -33,12 +33,13 @@ vi.mock('@workspace/api-client-react', () => ({
 
 import AdminBusinessPage from './AdminBusinessPage';
 
-function setBusiness(enabled: boolean) {
+function setBusiness(enabled: boolean, isInternal = false) {
   h.query = {
     data: {
       business: {
         id: 44,
         businessName: 'Northline Heating',
+        isInternal,
         managedReportsEnabled: enabled,
         provisioningStatus: 'pending',
         provisioningState: 'pending',
@@ -88,5 +89,11 @@ describe('AdminBusinessPage managed reports setting', () => {
     );
     h.mutate.mock.calls[0][1].onSuccess();
     expect(h.invalidate).toHaveBeenCalledWith({ queryKey: ['admin-business', 44] });
+  });
+
+  it('clearly labels an internal business in its admin detail', () => {
+    setBusiness(false, true);
+    render(<AdminBusinessPage />);
+    expect(screen.getByTestId('badge-internal-detail').textContent).toContain('Internal / non-billed');
   });
 });

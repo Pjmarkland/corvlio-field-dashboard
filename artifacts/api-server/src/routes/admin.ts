@@ -1,4 +1,5 @@
 import {
+  CreateAdminInternalBusinessBody,
   GetAdminBusinessParams,
   LinkAdminAppReviewDemoBody,
 } from "@workspace/api-zod";
@@ -15,24 +16,37 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { businessesTable, db, leadInfoFlagsTable, leadsTable, pool } from "@workspace/db";
 import { createInternalBusiness, internalBusinessDirectory, internalBusinessRecord, InternalBusinessError } from "../lib/internalBusinesses";
 import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
+import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 
 const router: IRouter = Router();
 
 router.use("/admin", requireAdmin);
-const internalInput = z.object({
-  businessName: z.string().trim().min(1).max(160),
-  retellPhoneNumber: z.string().regex(/^\+[1-9]\d{7,14}$/),
-  ownerUserId: z.string().trim().min(1).max(200),
-  retellAgentId: z.string().trim().max(200).nullable().optional(),
-}).strict();
 router.get("/admin/internal-businesses", async (req,res) => {
   res.set("Cache-Control","private, no-store");
   try { res.json(await internalBusinessDirectory()); }
   catch { req.log.error("Internal business directory unavailable"); res.status(503).json({error:"Internal businesses could not load."}); }
 });
 router.post("/admin/internal-businesses", async (req,res) => {
-  const body=internalInput.safeParse(req.body);
-  if (!body.success) {res.status(400).json({error:"Enter a name, E.164 phone number, and verified admin owner. Billing fields are not allowed."});return;}
+  const body=CreateAdminInternalBusinessBody.safeParse(req.body);
+  if (!body.success) {res.status(400).json({error:"Complete the internal business profile and select a verified admin owner. Billing and Retell routing fields are not allowed."});return;}
+  const requiredProfile = [
+    body.data.businessName, body.data.businessType, body.data.servicesOffered,
+    body.data.servicesNotOffered, body.data.serviceArea, body.data.majorIssueExamples,
+    body.data.businessHours, body.data.timeZone,
+  ];
+  if (requiredProfile.some((value) => !value.trim())) {
+    res.status(400).json({error:"Complete all required receptionist profile fields."});
+    return;
+  }
+  if (!parseBusinessHours(body.data.businessHours) || !validTimeZone(body.data.timeZone)) {
+    res.status(400).json({error:"Enter valid business hours and a time zone."});
+    return;
+  }
+  if (body.data.emergencyAvailable && (!body.data.emergencyEscalationPhone
+    || !/^\+[1-9]\d{7,14}$/.test(body.data.emergencyEscalationPhone))) {
+    res.status(400).json({error:"Add a valid country-code emergency escalation phone when emergency calls are enabled."});
+    return;
+  }
   try { res.json(await createInternalBusiness(body.data)); }
   catch (e) {res.status(e instanceof InternalBusinessError ? e.status : 503).json({error:e instanceof InternalBusinessError ? e.message : "Internal business could not be created."});}
 });

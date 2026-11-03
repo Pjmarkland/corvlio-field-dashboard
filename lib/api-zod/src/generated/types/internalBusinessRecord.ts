@@ -9,6 +9,8 @@
 export interface InternalBusinessRecord {
   id: number;
   businessName: string;
+  isInternal: true;
+  agentName: string;
   retellPhoneNumber: string;
   /** @nullable */
   retellAgentId: string | null;

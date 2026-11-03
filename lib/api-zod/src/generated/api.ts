@@ -1026,6 +1026,8 @@ export const GetAdminInternalBusinessesResponse = zod.object({
   "businesses": zod.array(zod.object({
   "id": zod.number(),
   "businessName": zod.string(),
+  "isInternal": zod.literal(true),
+  "agentName": zod.string(),
   "retellPhoneNumber": zod.string(),
   "retellAgentId": zod.string().nullable(),
   "ownerUserId": zod.string(),
@@ -1039,16 +1041,49 @@ export const GetAdminInternalBusinessesResponse = zod.object({
 })
 
 
+export const createAdminInternalBusinessBodyOwnerUserIdMax = 200;
+
+export const createAdminInternalBusinessBodyBusinessTypeMax = 200;
+
+export const createAdminInternalBusinessBodyServicesOfferedMax = 500;
+
+export const createAdminInternalBusinessBodyServicesNotOfferedMax = 500;
+
+export const createAdminInternalBusinessBodyServiceAreaMax = 4000;
+
+export const createAdminInternalBusinessBodyMajorIssueExamplesMax = 4000;
+
+export const createAdminInternalBusinessBodyBusinessHoursMax = 500;
+
+export const createAdminInternalBusinessBodyTimeZoneMax = 100;
+
+export const createAdminInternalBusinessBodyEmergencyEscalationPhoneMax = 16;
+
+
+export const createAdminInternalBusinessBodyEmergencyEscalationPhoneRegExp = new RegExp('^\\+[1-9]\\d{7,14}$');
+
+
 export const CreateAdminInternalBusinessBody = zod.object({
-  "businessName": zod.string(),
-  "retellPhoneNumber": zod.string(),
-  "ownerUserId": zod.string(),
-  "retellAgentId": zod.string().nullish()
+  "businessName": zod.enum(['Corvlio']),
+  "retellPhoneNumber": zod.enum(['+12397882087']),
+  "ownerUserId": zod.string().min(1).max(createAdminInternalBusinessBodyOwnerUserIdMax),
+  "businessType": zod.string().min(1).max(createAdminInternalBusinessBodyBusinessTypeMax),
+  "servicesOffered": zod.string().min(1).max(createAdminInternalBusinessBodyServicesOfferedMax),
+  "servicesNotOffered": zod.string().min(1).max(createAdminInternalBusinessBodyServicesNotOfferedMax),
+  "serviceArea": zod.string().min(1).max(createAdminInternalBusinessBodyServiceAreaMax),
+  "majorIssueExamples": zod.string().min(1).max(createAdminInternalBusinessBodyMajorIssueExamplesMax),
+  "businessHours": zod.string().min(1).max(createAdminInternalBusinessBodyBusinessHoursMax),
+  "timeZone": zod.string().min(1).max(createAdminInternalBusinessBodyTimeZoneMax),
+  "emergencyAvailable": zod.boolean(),
+  "emergencyEscalationPhone": zod.string().max(createAdminInternalBusinessBodyEmergencyEscalationPhoneMax).regex(createAdminInternalBusinessBodyEmergencyEscalationPhoneRegExp).nullable(),
+  "aiPromisePolicy": zod.enum(['callback_only', 'appointment_windows'])
 })
 
 export const CreateAdminInternalBusinessResponse = zod.object({
   "id": zod.number(),
   "businessName": zod.string(),
+  "isInternal": zod.literal(true),
+  "agentName": zod.string(),
   "retellPhoneNumber": zod.string(),
   "retellAgentId": zod.string().nullable(),
   "ownerUserId": zod.string(),
@@ -1067,6 +1102,8 @@ export const UpdateAdminInternalBusinessBody = zod.object({
 export const UpdateAdminInternalBusinessResponse = zod.object({
   "id": zod.number(),
   "businessName": zod.string(),
+  "isInternal": zod.literal(true),
+  "agentName": zod.string(),
   "retellPhoneNumber": zod.string(),
   "retellAgentId": zod.string().nullable(),
   "ownerUserId": zod.string(),

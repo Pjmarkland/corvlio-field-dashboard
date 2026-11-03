@@ -562,17 +562,98 @@ export interface InternalBusinessAgentUpdate {
   retellAgentId: string | null;
 }
 
+/**
+ * @minLength 1
+ * @maxLength 160
+ */
+export type InternalBusinessInputBusinessName = typeof InternalBusinessInputBusinessName[keyof typeof InternalBusinessInputBusinessName];
+
+
+export const InternalBusinessInputBusinessName = {
+  Corvlio: 'Corvlio',
+} as const;
+
+/**
+ * @pattern ^\+[1-9]\d{7,14}$
+ */
+export type InternalBusinessInputRetellPhoneNumber = typeof InternalBusinessInputRetellPhoneNumber[keyof typeof InternalBusinessInputRetellPhoneNumber];
+
+
+export const InternalBusinessInputRetellPhoneNumber = {
+  '+12397882087': '+12397882087',
+} as const;
+
+export type InternalBusinessInputAiPromisePolicy = typeof InternalBusinessInputAiPromisePolicy[keyof typeof InternalBusinessInputAiPromisePolicy];
+
+
+export const InternalBusinessInputAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
+
 export interface InternalBusinessInput {
-  businessName: string;
-  retellPhoneNumber: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  businessName: InternalBusinessInputBusinessName;
+  /** @pattern ^\+[1-9]\d{7,14}$ */
+  retellPhoneNumber: InternalBusinessInputRetellPhoneNumber;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   ownerUserId: string;
-  /** @nullable */
-  retellAgentId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  businessType: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesNotOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  serviceArea: string;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  majorIssueExamples: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  businessHours: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  timeZone: string;
+  emergencyAvailable: boolean;
+  /**
+     * @maxLength 16
+     * @nullable
+     * @pattern ^\+[1-9]\d{7,14}$
+     */
+  emergencyEscalationPhone: string | null;
+  aiPromisePolicy: InternalBusinessInputAiPromisePolicy;
 }
 
 export interface InternalBusinessRecord {
   id: number;
   businessName: string;
+  isInternal: true;
+  agentName: string;
   retellPhoneNumber: string;
   /** @nullable */
   retellAgentId: string | null;
