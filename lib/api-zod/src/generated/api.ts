@@ -1203,6 +1203,9 @@ export const getAdminBusinessResponseBusinessContactedLeadCountMultipleOf = 1;
 
 export const getAdminBusinessResponseBusinessPushEnabledDeviceCountMultipleOf = 1;
 
+export const getAdminBusinessResponseFallbackRoutingOverridePhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+export const getAdminBusinessResponseFallbackRoutingResolvedPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+export const getAdminBusinessResponseFallbackRoutingDefaultPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
 export const getAdminBusinessResponseLeadsItemIdMultipleOf = 1;
 
 export const getAdminBusinessResponseLeadsItemBusinessIdMultipleOf = 1;
@@ -1243,6 +1246,11 @@ export const GetAdminBusinessResponse = zod.object({
   "hasNoLeads": zod.boolean(),
   "hasUncontactedOver24Hours": zod.boolean(),
   "oldestUncontactedAt": zod.coerce.date().nullable()
+}),
+  "fallbackRouting": zod.object({
+  "overridePhoneNumber": zod.string().regex(getAdminBusinessResponseFallbackRoutingOverridePhoneNumberRegExp).nullable(),
+  "resolvedPhoneNumber": zod.string().regex(getAdminBusinessResponseFallbackRoutingResolvedPhoneNumberRegExp),
+  "defaultPhoneNumber": zod.string().regex(getAdminBusinessResponseFallbackRoutingDefaultPhoneNumberRegExp)
 }),
   "onboarding": zod.object({
   "businessName": zod.string(),
@@ -1292,6 +1300,67 @@ export const GetAdminBusinessResponse = zod.object({
   "outcome": zod.string().nullable(),
   "recordedAt": zod.coerce.date()
 }))
+})
+
+
+/**
+ * @summary Get the global fallback phone number setting
+ */
+export const getAdminFallbackPhoneSettingsResponseDefaultFallbackPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+
+
+export const GetAdminFallbackPhoneSettingsResponse = zod.object({
+  "defaultFallbackPhoneNumber": zod.string().regex(getAdminFallbackPhoneSettingsResponseDefaultFallbackPhoneNumberRegExp)
+})
+
+
+/**
+ * @summary Update the global fallback phone number
+ */
+export const updateAdminFallbackPhoneSettingsBodyDefaultFallbackPhoneNumberMax = 32;
+
+
+
+export const UpdateAdminFallbackPhoneSettingsBody = zod.object({
+  "defaultFallbackPhoneNumber": zod.string().min(1).max(updateAdminFallbackPhoneSettingsBodyDefaultFallbackPhoneNumberMax)
+})
+
+export const updateAdminFallbackPhoneSettingsResponseDefaultFallbackPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+
+
+export const UpdateAdminFallbackPhoneSettingsResponse = zod.object({
+  "defaultFallbackPhoneNumber": zod.string().regex(updateAdminFallbackPhoneSettingsResponseDefaultFallbackPhoneNumberRegExp)
+})
+
+
+/**
+ * @summary Set or clear a business fallback phone override
+ */
+export const updateAdminBusinessFallbackPhonePathBusinessIdMultipleOf = 1;
+
+
+
+export const UpdateAdminBusinessFallbackPhoneParams = zod.object({
+  "businessId": zod.coerce.number().min(1).multipleOf(updateAdminBusinessFallbackPhonePathBusinessIdMultipleOf)
+})
+
+export const updateAdminBusinessFallbackPhoneBodyFallbackPhoneNumberMax = 32;
+
+
+
+export const UpdateAdminBusinessFallbackPhoneBody = zod.object({
+  "fallbackPhoneNumber": zod.string().max(updateAdminBusinessFallbackPhoneBodyFallbackPhoneNumberMax).nullable()
+})
+
+export const updateAdminBusinessFallbackPhoneResponseOverridePhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+export const updateAdminBusinessFallbackPhoneResponseResolvedPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+export const updateAdminBusinessFallbackPhoneResponseDefaultPhoneNumberRegExp = new RegExp('^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$');
+
+
+export const UpdateAdminBusinessFallbackPhoneResponse = zod.object({
+  "overridePhoneNumber": zod.string().regex(updateAdminBusinessFallbackPhoneResponseOverridePhoneNumberRegExp).nullable(),
+  "resolvedPhoneNumber": zod.string().regex(updateAdminBusinessFallbackPhoneResponseResolvedPhoneNumberRegExp),
+  "defaultPhoneNumber": zod.string().regex(updateAdminBusinessFallbackPhoneResponseDefaultPhoneNumberRegExp)
 })
 
 

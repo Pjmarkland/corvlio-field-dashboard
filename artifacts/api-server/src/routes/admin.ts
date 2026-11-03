@@ -2,6 +2,12 @@ import {
   CreateAdminInternalBusinessBody,
   GetAdminBusinessParams,
   LinkAdminAppReviewDemoBody,
+  GetAdminFallbackPhoneSettingsResponse,
+  UpdateAdminFallbackPhoneSettingsBody,
+  UpdateAdminFallbackPhoneSettingsResponse,
+  UpdateAdminBusinessFallbackPhoneParams,
+  UpdateAdminBusinessFallbackPhoneBody,
+  UpdateAdminBusinessFallbackPhoneResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
 import {
@@ -18,10 +24,98 @@ import { createInternalBusiness, internalBusinessDirectory, internalBusinessReco
 import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { getAdminRetellWebhookUrls } from "../lib/retellWebhookUrls";
+import {
+  DEFAULT_FALLBACK_PHONE_NUMBER,
+  getDefaultFallbackPhoneNumber,
+  saveDefaultFallbackPhoneNumber,
+} from "../lib/fallbackPhoneSettings";
+import { normalizeUsPhoneNumber } from "../lib/usPhoneNumber";
 
 const router: IRouter = Router();
 
 router.use("/admin", requireAdmin);
+router.get("/admin/fallback-phone-settings", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    const defaultFallbackPhoneNumber = await getDefaultFallbackPhoneNumber();
+    res.json(GetAdminFallbackPhoneSettingsResponse.parse({ defaultFallbackPhoneNumber }));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Default fallback phone setting could not be loaded",
+    );
+    res.status(502).json({ error: "Fallback phone settings could not be loaded." });
+  }
+});
+
+router.patch("/admin/fallback-phone-settings", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const body = UpdateAdminFallbackPhoneSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Enter a valid US fallback phone number." });
+    return;
+  }
+  const normalized = normalizeUsPhoneNumber(body.data.defaultFallbackPhoneNumber);
+  if (!normalized) {
+    res.status(400).json({ error: "Enter a valid US phone number, such as +1 (863) 446-3029." });
+    return;
+  }
+
+  try {
+    const defaultFallbackPhoneNumber = await saveDefaultFallbackPhoneNumber(normalized);
+    res.json(UpdateAdminFallbackPhoneSettingsResponse.parse({ defaultFallbackPhoneNumber }));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Default fallback phone setting could not be saved",
+    );
+    res.status(502).json({ error: "Fallback phone settings could not be saved." });
+  }
+});
+
+router.patch("/admin/businesses/:businessId/fallback-phone", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const params = UpdateAdminBusinessFallbackPhoneParams.safeParse(req.params);
+  const body = UpdateAdminBusinessFallbackPhoneBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Enter a valid business and fallback phone number." });
+    return;
+  }
+
+  const input = body.data.fallbackPhoneNumber?.trim() ?? "";
+  const fallbackPhoneNumber = input ? normalizeUsPhoneNumber(input) : null;
+  if (input && !fallbackPhoneNumber) {
+    res.status(400).json({ error: "Enter a valid US phone number, such as +1 (863) 446-3029." });
+    return;
+  }
+
+  try {
+    const [business] = await db.update(businessesTable)
+      .set({ fallbackPhoneNumber, updatedAt: new Date() })
+      .where(eq(businessesTable.id, params.data.businessId))
+      .returning({ fallbackPhoneNumber: businessesTable.fallbackPhoneNumber });
+    if (!business) {
+      res.status(404).json({ error: "Business not found." });
+      return;
+    }
+    const defaultPhoneNumber = await getDefaultFallbackPhoneNumber().catch(() => DEFAULT_FALLBACK_PHONE_NUMBER);
+    res.json(UpdateAdminBusinessFallbackPhoneResponse.parse({
+      overridePhoneNumber: business.fallbackPhoneNumber,
+      resolvedPhoneNumber: business.fallbackPhoneNumber ?? defaultPhoneNumber,
+      defaultPhoneNumber,
+    }));
+  } catch (error) {
+    req.log.error(
+      {
+        businessId: params.data.businessId,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "Business fallback phone setting could not be saved",
+    );
+    res.status(502).json({ error: "Business fallback phone setting could not be saved." });
+  }
+});
+
 router.get("/admin/retell-webhook-urls", (_req, res): void => {
   res.set("Cache-Control", "private, no-store").json(getAdminRetellWebhookUrls());
 });

@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
   query: {} as Record<string, unknown>,
   mutate: vi.fn(),
+  fallbackMutate: vi.fn(),
   invalidate: vi.fn(),
+  setQueryData: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: h.invalidate }),
+  useQueryClient: () => ({ invalidateQueries: h.invalidate, setQueryData: h.setQueryData }),
 }));
 vi.mock('wouter', () => ({ useParams: () => ({ businessId: '44' }) }));
 vi.mock('./AdminShared', () => ({
@@ -29,6 +31,7 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetAdminBusinessQueryKey: (id: number) => ['admin-business', id],
   useGetAdminBusiness: () => h.query,
   useUpdateAdminManagedReports: () => ({ mutate: h.mutate, isPending: false, isError: false }),
+  useUpdateAdminBusinessFallbackPhone: () => ({ mutate: h.fallbackMutate, isPending: false }),
 }));
 
 import AdminBusinessPage from './AdminBusinessPage';
@@ -60,6 +63,11 @@ function setBusiness(enabled: boolean, isInternal = false) {
         averageResponseTimeMs: null,
         pushEnabledDeviceCount: 0,
         pushPlatforms: [],
+      },
+      fallbackRouting: {
+        overridePhoneNumber: null,
+        resolvedPhoneNumber: '+18634463029',
+        defaultPhoneNumber: '+18634463029',
       },
       onboarding: { websiteEnrichmentSources: {}, websiteEnrichmentAttemptedAt: null, agreementsAcceptedAt: null },
       leads: [],
@@ -95,5 +103,26 @@ describe('AdminBusinessPage managed reports setting', () => {
     setBusiness(false, true);
     render(<AdminBusinessPage />);
     expect(screen.getByTestId('badge-internal-detail').textContent).toContain('Internal / non-billed');
+  });
+
+  it('shows the resolved number and saves a business-specific US fallback', () => {
+    render(<AdminBusinessPage />);
+    expect(screen.getByTestId('text-resolved-fallback-phone').textContent).toBe('+18634463029');
+    expect(screen.getByText(/where calls ring if the AI is unavailable/i)).toBeTruthy();
+    fireEvent.change(screen.getByTestId('input-business-fallback-phone'), {
+      target: { value: '+1 (650) 555-0123' },
+    });
+    fireEvent.click(screen.getByTestId('button-save-fallback-phone'));
+
+    expect(h.fallbackMutate).toHaveBeenCalledWith(
+      { businessId: 44, data: { fallbackPhoneNumber: '+1 (650) 555-0123' } },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    act(() => h.fallbackMutate.mock.calls[0][1].onSuccess({
+      overridePhoneNumber: '+16505550123',
+      resolvedPhoneNumber: '+16505550123',
+      defaultPhoneNumber: '+18634463029',
+    }));
+    expect(screen.getByTestId('status-fallback-phone').textContent).toContain('saved');
   });
 });

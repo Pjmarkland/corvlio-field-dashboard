@@ -952,6 +952,79 @@ paths:
           description: Invalid business ID
         "404":
           description: Not found, business missing, or administrator access unavailable
+  /admin/fallback-phone-settings:
+    get:
+      operationId: getAdminFallbackPhoneSettings
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get the global fallback phone number setting
+      responses:
+        "200":
+          description: Global fallback phone configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFallbackPhoneSettings"
+        "502":
+          description: Could not load fallback phone settings
+    patch:
+      operationId: updateAdminFallbackPhoneSettings
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Update the global fallback phone number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminFallbackPhoneSettingsUpdate"
+      responses:
+        "200":
+          description: Global fallback phone configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFallbackPhoneSettings"
+        "400":
+          description: Invalid US phone number
+        "502":
+          description: Could not update fallback phone settings
+  /admin/businesses/{businessId}/fallback-phone:
+    patch:
+      operationId: updateAdminBusinessFallbackPhone
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Set or clear a business fallback phone override
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminBusinessFallbackPhoneUpdate"
+      responses:
+        "200":
+          description: Business fallback phone routing updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessFallbackRouting"
+        "400":
+          description: Invalid US phone number or business ID
+        "404":
+          description: Business not found
+        "502":
+          description: Could not update business fallback phone routing
   /admin/businesses/{businessId}/managed-reports:
     patch:
       operationId: updateAdminManagedReports
@@ -2724,6 +2797,8 @@ components:
       properties:
         business:
           $ref: "#/components/schemas/AdminBusinessSummary"
+        fallbackRouting:
+          $ref: "#/components/schemas/AdminBusinessFallbackRouting"
         onboarding:
           $ref: "#/components/schemas/AdminOnboardingAnswers"
         leads:
@@ -2734,7 +2809,46 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminCallRecord"
-      required: [business, onboarding, leads, calls]
+      required: [business, fallbackRouting, onboarding, leads, calls]
+    AdminFallbackPhoneSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        defaultFallbackPhoneNumber:
+          type: string
+          pattern: "^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$"
+      required: [defaultFallbackPhoneNumber]
+    AdminFallbackPhoneSettingsUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        defaultFallbackPhoneNumber:
+          type: string
+          minLength: 1
+          maxLength: 32
+      required: [defaultFallbackPhoneNumber]
+    AdminBusinessFallbackPhoneUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        fallbackPhoneNumber:
+          type: [string, "null"]
+          maxLength: 32
+      required: [fallbackPhoneNumber]
+    AdminBusinessFallbackRouting:
+      type: object
+      additionalProperties: false
+      properties:
+        overridePhoneNumber:
+          type: [string, "null"]
+          pattern: "^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$"
+        resolvedPhoneNumber:
+          type: string
+          pattern: "^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$"
+        defaultPhoneNumber:
+          type: string
+          pattern: "^\\+1[2-9][0-9]{2}[2-9][0-9]{6}$"
+      required: [overridePhoneNumber, resolvedPhoneNumber, defaultPhoneNumber]
     EmailHealthRecord:
       type: object
       required: [at, timestampExact, error, cause, hint]

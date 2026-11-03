@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, ExternalLink, FileText, Globe2, Phone, Radio, UserRound } from 'lucide-react';
 import { useParams } from 'wouter';
-import { getGetAdminBusinessQueryKey, useGetAdminBusiness, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers } from '@workspace/api-client-react';
+import { getGetAdminBusinessQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers } from '@workspace/api-client-react';
 
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, BackLink, SectionHeading, formatAdminDate, formatAdminDuration, formatAdminResponse } from './AdminShared';
 
@@ -67,6 +67,85 @@ function CallsPanel({ detail }: { detail: AdminBusinessDetail }) {
   return <div className="admin-panel overflow-hidden rounded-2xl"><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="bg-[#f1f4ee]"><tr><th className="px-5 py-3 admin-label">Call started</th><th className="px-5 py-3 admin-label">Duration</th><th className="px-5 py-3 admin-label">Outcome</th><th className="px-5 py-3 admin-label">Recorded</th><th className="px-5 py-3 admin-label">Retell ID</th></tr></thead><tbody>{detail.calls.map((call) => <tr key={call.id} className="border-t border-[#e1e6df] text-sm text-[#4d5c53]" data-testid={`row-admin-call-${call.id}`}><td className="px-5 py-4">{formatAdminDate(call.callStartedAt)}</td><td className="px-5 py-4 font-mono">{formatAdminDuration(call.durationMs)}</td><td className="px-5 py-4">{call.outcome ?? 'Not recorded'}</td><td className="px-5 py-4">{formatAdminDate(call.recordedAt)}</td><td className="max-w-[180px] truncate px-5 py-4 font-mono text-xs text-[#819087]" title={call.retellCallId}>{call.retellCallId}</td></tr>)}</tbody></table></div></div>;
 }
 
+function BusinessFallbackPhoneSettings({
+  businessId,
+  detail,
+}: {
+  businessId: number;
+  detail: AdminBusinessDetail;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useUpdateAdminBusinessFallbackPhone();
+  const [draft, setDraft] = useState(detail.fallbackRouting.overridePhoneNumber ?? '');
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    setDraft(detail.fallbackRouting.overridePhoneNumber ?? '');
+  }, [detail.fallbackRouting.overridePhoneNumber]);
+
+  const save = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (mutation.isPending) return;
+    setNotice(null);
+    mutation.mutate(
+      {
+        businessId,
+        data: { fallbackPhoneNumber: draft.trim() || null },
+      },
+      {
+        onSuccess: (fallbackRouting) => {
+          queryClient.setQueryData<AdminBusinessDetail>(
+            getGetAdminBusinessQueryKey(businessId),
+            (current) => current ? { ...current, fallbackRouting } : current,
+          );
+          setDraft(fallbackRouting.overridePhoneNumber ?? '');
+          setNotice({ type: 'success', message: 'Fallback phone saved.' });
+        },
+        onError: (error) => {
+          const payload = error.data as unknown;
+          const message = error.status === 400 && payload && typeof payload === 'object'
+            && 'error' in payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Could not save the fallback phone. Check the number and try again.';
+          setNotice({ type: 'error', message });
+        },
+      },
+    );
+  };
+
+  return <section className="admin-panel mb-7 rounded-2xl p-5" data-testid="section-fallback-phone">
+    <div className="grid gap-5 md:grid-cols-[1fr_1.1fr] md:items-end">
+      <div>
+        <p className="admin-label">Resolved fallback destination</p>
+        <p className="mt-2 text-xl font-800 tracking-tight text-[#25362e]" data-testid="text-resolved-fallback-phone">{detail.fallbackRouting.resolvedPhoneNumber}</p>
+        <p className="mt-2 text-xs leading-relaxed text-[#68766c]">This is where calls should ring if the AI is unavailable. Retell phone-number routing must also be configured; changing this value alone does not activate forwarding.</p>
+        <p className="mt-1 text-xs text-[#77847b]">Global default: {detail.fallbackRouting.defaultPhoneNumber}</p>
+      </div>
+      <form onSubmit={save} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="min-w-0 flex-1 text-xs font-semibold text-[#34443b]">
+          Business-specific fallback
+          <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            maxLength={32}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={detail.fallbackRouting.defaultPhoneNumber}
+            data-testid="input-business-fallback-phone"
+            className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d8e1d8] bg-white px-3 text-sm text-[#25362e] outline-none focus:ring-2 focus:ring-[#4e8867]"
+          />
+          <span className="mt-1 block font-normal text-[#77847b]">Enter a US number; it is saved in E.164 format. Leave blank to use the global default.</span>
+        </label>
+        <button type="submit" disabled={mutation.isPending} data-testid="button-save-fallback-phone" className="min-h-11 shrink-0 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-white disabled:opacity-60">
+          {mutation.isPending ? 'Saving…' : 'Save fallback'}
+        </button>
+      </form>
+    </div>
+    {notice ? <p role={notice.type === 'error' ? 'alert' : 'status'} data-testid="status-fallback-phone" className={`mt-3 text-sm ${notice.type === 'error' ? 'text-[#a3432d]' : 'text-[#2c6b56]'}`}>{notice.message}</p> : null}
+  </section>;
+}
+
 export default function AdminBusinessPage() {
   const params = useParams<{ businessId: string }>();
   const queryClient = useQueryClient();
@@ -100,6 +179,7 @@ export default function AdminBusinessPage() {
       </button>
       {managedReportsMutation.isError ? <p role="alert" className="text-xs text-[#a3432d]">The report setting could not be saved.</p> : null}
     </section>
+    <BusinessFallbackPhoneSettings businessId={businessId} detail={data} />
     <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <AdminMetric label="Onboarding" value={`${business.onboardingCompletenessPercent}%`} detail={`${business.completedOnboardingFieldCount} of ${business.onboardingFieldCount} fields`} tone={business.onboardingCompletenessPercent === 100 ? 'moss' : 'neutral'} icon={FileText} />
       <AdminMetric label="Total leads" value={business.totalLeadCount} detail={`${business.contactedLeadCount} contacted`} icon={UserRound} />

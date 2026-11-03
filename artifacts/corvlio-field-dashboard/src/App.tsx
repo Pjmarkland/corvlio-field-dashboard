@@ -68,6 +68,7 @@ import AdminBillingPage from '@/pages/admin/AdminBillingPage';
 import AdminSmsPage from '@/pages/admin/AdminSmsPage';
 import { useBillingAvailability } from '@/hooks/useBilling';
 import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
+import AdminFallbackPhoneSettingsPage from '@/pages/admin/AdminFallbackPhoneSettingsPage';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -927,6 +928,10 @@ function AdminSmsRoute() {
   return <AdminGuard><AdminSmsPage /></AdminGuard>;
 }
 
+function AdminFallbackPhoneSettingsRoute() {
+  return <AdminGuard><AdminFallbackPhoneSettingsPage /></AdminGuard>;
+}
+
 function BillingRoute() {
   if (Capacitor.isNativePlatform()) return <><Show when="signed-in"><NativeBillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
   return <><Show when="signed-in"><BillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
@@ -965,7 +970,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/admin/sms" component={AdminSmsRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/admin/sms" component={AdminSmsRoute} /><Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {

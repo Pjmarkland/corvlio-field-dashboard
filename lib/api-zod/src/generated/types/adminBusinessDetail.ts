@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminBusinessFallbackRouting } from './adminBusinessFallbackRouting';
 import type { AdminBusinessSummary } from './adminBusinessSummary';
 import type { AdminCallRecord } from './adminCallRecord';
 import type { AdminLeadActivity } from './adminLeadActivity';
@@ -12,6 +13,7 @@ import type { AdminOnboardingAnswers } from './adminOnboardingAnswers';
 
 export interface AdminBusinessDetail {
   business: AdminBusinessSummary;
+  fallbackRouting: AdminBusinessFallbackRouting;
   onboarding: AdminOnboardingAnswers;
   leads: AdminLeadActivity[];
   calls: AdminCallRecord[];

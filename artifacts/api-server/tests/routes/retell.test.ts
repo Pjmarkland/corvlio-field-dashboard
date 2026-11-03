@@ -7,6 +7,7 @@ import { retellMalformedJsonAlertHandler } from "../../src/lib/retellWebhookAler
 
 const mocks = vi.hoisted(() => ({
   findBusinessByPhoneNumber: vi.fn(),
+  getDefaultFallbackPhoneNumber: vi.fn(),
   sendLeadNotificationEmail: vi.fn(),
   runNotificationOutboxNow: vi.fn(),
   persistAnalyzedCall: vi.fn(),
@@ -27,6 +28,10 @@ vi.mock("@workspace/db", () => ({
 
 vi.mock("../../src/lib/businessDirectory", () => ({
   findBusinessByPhoneNumber: mocks.findBusinessByPhoneNumber,
+}));
+vi.mock("../../src/lib/fallbackPhoneSettings", () => ({
+  DEFAULT_FALLBACK_PHONE_NUMBER: "+18634463029",
+  getDefaultFallbackPhoneNumber: mocks.getDefaultFallbackPhoneNumber,
 }));
 
 vi.mock("../../src/lib/gmail", () => ({
@@ -55,6 +60,7 @@ const OTHER_DYNAMIC_VARIABLE_KEYS = [
   "receptionist_tone_style", "receptionist_tone_guidance", "intake_trade", "trade_question_1", "trade_question_2",
   "business_hours", "time_zone", "current_local_time", "business_is_open", "next_opening", "transfer_available",
   "business_name",
+  "fallback_phone_number",
   "business_type",
   "service_area",
   "major_issue_examples",
@@ -151,6 +157,7 @@ beforeEach(() => {
   mocks.recordOperationalFailure.mockResolvedValue(true);
   mocks.queueFounderPushNotification.mockResolvedValue(true);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
+  mocks.getDefaultFallbackPhoneNumber.mockResolvedValue("+18634463029");
 });
 
 const signedRequest = (path: string, body: string, timestamp = Date.now(), signedBody = body) => {
@@ -176,6 +183,21 @@ describe("Retell webhook safety", () => {
       summary: "Inbound business lookup failed; generic fallback used",
       details: expect.stringMatching(/Database unavailable|3500ms/),
     }));
+  });
+
+  it("includes the per-business resolved fallback number in pre-call variables", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValueOnce(makeBusiness({
+      fallbackPhoneNumber: "+16505550123",
+    }));
+    const result = await requestPreCall();
+    expect(result.status).toBe(200);
+    expect(result.body.call_inbound.dynamic_variables.fallback_phone_number).toBe("+16505550123");
+  });
+
+  it("uses the configured global fallback when the business has no override", async () => {
+    mocks.getDefaultFallbackPhoneNumber.mockResolvedValueOnce("+12025550123");
+    const result = await requestPreCall();
+    expect(result.body.call_inbound.dynamic_variables.fallback_phone_number).toBe("+12025550123");
   });
 
   it("bounds a stalled lookup to 3.5 seconds, returns generic variables, and handles a late rejection", async () => {

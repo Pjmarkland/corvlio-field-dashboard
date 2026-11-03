@@ -15,6 +15,10 @@ import { dynamicVariables } from "../lib/retellVariables";
 import { queueFounderPushNotification, recordOperationalFailure } from "../lib/operationalFailures";
 import type { OperationalFailureSource } from "../lib/operationalFailures";
 import { alertRejectedRetellWebhook } from "../lib/retellWebhookAlerts";
+import {
+  DEFAULT_FALLBACK_PHONE_NUMBER,
+  getDefaultFallbackPhoneNumber,
+} from "../lib/fallbackPhoneSettings";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -204,8 +208,17 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
 
   let lookupTimer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const business = await Promise.race([
-      Promise.resolve().then(() => findBusinessByPhoneNumber(phoneNumber)),
+    const [business, defaultFallbackPhoneNumber] = await Promise.race([
+      Promise.all([
+        Promise.resolve().then(() => findBusinessByPhoneNumber(phoneNumber)),
+        getDefaultFallbackPhoneNumber().catch((error) => {
+          req.log.error(
+            { errorName: error instanceof Error ? error.name : "UnknownError" },
+            "Could not load the default fallback phone number; using the built-in default",
+          );
+          return DEFAULT_FALLBACK_PHONE_NUMBER;
+        }),
+      ]),
       new Promise<never>((_resolve, reject) => {
         lookupTimer = setTimeout(() => reject(new Error("Business lookup exceeded the 3500ms pre-call deadline")), 3500);
         lookupTimer.unref();
@@ -216,7 +229,10 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     }
     res.json({
       call_inbound: {
-        dynamic_variables: dynamicVariables(business ?? null),
+        dynamic_variables: dynamicVariables(
+          business ?? null,
+          business?.fallbackPhoneNumber ?? defaultFallbackPhoneNumber,
+        ),
       },
     });
   } catch (error) {
@@ -229,7 +245,11 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
       summary: "Inbound business lookup failed; generic fallback used",
       details,
     });
-    res.status(200).json({ call_inbound: { dynamic_variables: dynamicVariables(null) } });
+    res.status(200).json({
+      call_inbound: {
+        dynamic_variables: dynamicVariables(null, DEFAULT_FALLBACK_PHONE_NUMBER),
+      },
+    });
   } finally {
     if (lookupTimer) clearTimeout(lookupTimer);
   }

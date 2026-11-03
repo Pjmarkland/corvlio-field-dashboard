@@ -31,3 +31,4 @@ export * from "./accountDeletions";
 export * from "./manualInvoices";
 export * from "./webPush";
 export * from "./ownerSmsMessages";
+export * from "./fallbackPhoneSettings";

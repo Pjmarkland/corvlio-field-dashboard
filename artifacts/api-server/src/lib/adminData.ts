@@ -4,6 +4,7 @@ import {
   GetAdminBusinessResponse,
   GetAdminOverviewResponse,
 } from "@workspace/api-zod";
+import { getDefaultFallbackPhoneNumber } from "./fallbackPhoneSettings";
 import {
   businessesTable,
   db,
@@ -265,7 +266,7 @@ export async function getAdminBusiness(businessId: number) {
     .limit(1);
   if (!business) return undefined;
 
-  const [leads, callRecords, pushDevices] = await Promise.all([
+  const [leads, callRecords, pushDevices, defaultPhoneNumber] = await Promise.all([
     db
       .select()
       .from(leadsTable)
@@ -287,6 +288,7 @@ export async function getAdminBusiness(businessId: number) {
         eq(notificationDevicesTable.enabled, true),
         isNull(notificationDevicesTable.invalidatedAt),
       )),
+    getDefaultFallbackPhoneNumber(),
   ]);
   const profile = await loadOwnerProfile(business.clerkUserId);
   const [attempt] = await db.select().from(provisioningAttemptsTable)
@@ -303,6 +305,11 @@ export async function getAdminBusiness(businessId: number) {
 
   return GetAdminBusinessResponse.parse({
     business: businessSummary,
+    fallbackRouting: {
+      overridePhoneNumber: business.fallbackPhoneNumber,
+      resolvedPhoneNumber: business.fallbackPhoneNumber ?? defaultPhoneNumber,
+      defaultPhoneNumber,
+    },
     onboarding: {
       businessName: business.businessName,
       agentName: business.agentName,

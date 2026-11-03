@@ -1455,11 +1455,45 @@ export interface AdminCallRecord {
   recordedAt: string;
 }
 
+export interface AdminBusinessFallbackRouting {
+  /**
+     * @nullable
+     * @pattern ^\+1[2-9][0-9]{2}[2-9][0-9]{6}$
+     */
+  overridePhoneNumber: string | null;
+  /** @pattern ^\+1[2-9][0-9]{2}[2-9][0-9]{6}$ */
+  resolvedPhoneNumber: string;
+  /** @pattern ^\+1[2-9][0-9]{2}[2-9][0-9]{6}$ */
+  defaultPhoneNumber: string;
+}
+
 export interface AdminBusinessDetail {
   business: AdminBusinessSummary;
+  fallbackRouting: AdminBusinessFallbackRouting;
   onboarding: AdminOnboardingAnswers;
   leads: AdminLeadActivity[];
   calls: AdminCallRecord[];
+}
+
+export interface AdminFallbackPhoneSettings {
+  /** @pattern ^\+1[2-9][0-9]{2}[2-9][0-9]{6}$ */
+  defaultFallbackPhoneNumber: string;
+}
+
+export interface AdminFallbackPhoneSettingsUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 32
+     */
+  defaultFallbackPhoneNumber: string;
+}
+
+export interface AdminBusinessFallbackPhoneUpdate {
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  fallbackPhoneNumber: string | null;
 }
 
 export interface EmailHealthRecord {

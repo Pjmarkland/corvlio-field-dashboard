@@ -25,9 +25,13 @@ import type {
   AccountDeletionResult,
   AdminActivity,
   AdminBusinessDetail,
+  AdminBusinessFallbackPhoneUpdate,
+  AdminBusinessFallbackRouting,
   AdminBusinessPlanInput,
   AdminCallQuality,
   AdminEmailHealth,
+  AdminFallbackPhoneSettings,
+  AdminFallbackPhoneSettingsUpdate,
   AdminFlaggedLeadsResponse,
   AdminOverview,
   AdminResolveLeadFlagResult,
@@ -3206,6 +3210,226 @@ export function useGetAdminBusiness<TData = Awaited<ReturnType<typeof getAdminBu
 
 
 
+
+export const getGetAdminFallbackPhoneSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/fallback-phone-settings`
+}
+
+/**
+ * @summary Get the global fallback phone number setting
+ */
+export const getAdminFallbackPhoneSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminFallbackPhoneSettings> => {
+
+  return customFetch<AdminFallbackPhoneSettings>(getGetAdminFallbackPhoneSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminFallbackPhoneSettingsQueryKey = () => {
+    return [
+    `/api/admin/fallback-phone-settings`
+    ] as const;
+    }
+
+
+export const getGetAdminFallbackPhoneSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminFallbackPhoneSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>> = ({ signal }) => getAdminFallbackPhoneSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminFallbackPhoneSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>>
+export type GetAdminFallbackPhoneSettingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the global fallback phone number setting
+ */
+
+export function useGetAdminFallbackPhoneSettings<TData = Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminFallbackPhoneSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminFallbackPhoneSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminFallbackPhoneSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/fallback-phone-settings`
+}
+
+/**
+ * @summary Update the global fallback phone number
+ */
+export const updateAdminFallbackPhoneSettings = async (adminFallbackPhoneSettingsUpdate: AdminFallbackPhoneSettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminFallbackPhoneSettings> => {
+
+  return customFetch<AdminFallbackPhoneSettings>(getUpdateAdminFallbackPhoneSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminFallbackPhoneSettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminFallbackPhoneSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>, TError,{data: BodyType<AdminFallbackPhoneSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>, TError,{data: BodyType<AdminFallbackPhoneSettingsUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminFallbackPhoneSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>, {data: BodyType<AdminFallbackPhoneSettingsUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminFallbackPhoneSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminFallbackPhoneSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>>
+    export type UpdateAdminFallbackPhoneSettingsMutationBody = BodyType<AdminFallbackPhoneSettingsUpdate>
+    export type UpdateAdminFallbackPhoneSettingsMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the global fallback phone number
+ */
+export const useUpdateAdminFallbackPhoneSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>, TError,{data: BodyType<AdminFallbackPhoneSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminFallbackPhoneSettings>>,
+        TError,
+        {data: BodyType<AdminFallbackPhoneSettingsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminFallbackPhoneSettingsMutationOptions(options));
+    }
+
+export const getUpdateAdminBusinessFallbackPhoneUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}/fallback-phone`
+}
+
+/**
+ * @summary Set or clear a business fallback phone override
+ */
+export const updateAdminBusinessFallbackPhone = async (businessId: number,
+    adminBusinessFallbackPhoneUpdate: AdminBusinessFallbackPhoneUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminBusinessFallbackRouting> => {
+
+  return customFetch<AdminBusinessFallbackRouting>(getUpdateAdminBusinessFallbackPhoneUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminBusinessFallbackPhoneUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminBusinessFallbackPhoneMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>, TError,{businessId: number;data: BodyType<AdminBusinessFallbackPhoneUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>, TError,{businessId: number;data: BodyType<AdminBusinessFallbackPhoneUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminBusinessFallbackPhone'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>, {businessId: number;data: BodyType<AdminBusinessFallbackPhoneUpdate>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  updateAdminBusinessFallbackPhone(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminBusinessFallbackPhoneMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>>
+    export type UpdateAdminBusinessFallbackPhoneMutationBody = BodyType<AdminBusinessFallbackPhoneUpdate>
+    export type UpdateAdminBusinessFallbackPhoneMutationError = ErrorType<void>
+
+    /**
+ * @summary Set or clear a business fallback phone override
+ */
+export const useUpdateAdminBusinessFallbackPhone = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>, TError,{businessId: number;data: BodyType<AdminBusinessFallbackPhoneUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminBusinessFallbackPhone>>,
+        TError,
+        {businessId: number;data: BodyType<AdminBusinessFallbackPhoneUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminBusinessFallbackPhoneMutationOptions(options));
+    }
 
 export const getUpdateAdminManagedReportsUrl = (businessId: number,) => {
 

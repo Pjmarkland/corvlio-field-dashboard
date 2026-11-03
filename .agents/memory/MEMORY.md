@@ -11,7 +11,7 @@
 - [OpenAPI Zod generation constraints](openapi-zod-generation-constraints.md) — keep email/URL checks and strict unknown-key rejection explicit at server boundaries with current codegen.
 - [Phone cost safety](phone-cost-safety.md) — demos never purchase or scrape; pending purchases need recovery, and missing pre-call signatures remain allowed during rollout.
 - [Retell transfer isolation](retell-transfer-isolation.md) — inbound LLM overrides do not support per-call tools; shared transfers need enforced business isolation, not just prompting.
-- [Retell release boundaries](retell-release-boundaries.md) — separate agency sales KB dependencies from field intake; pin live versions before changing shared-agent webhook routing.
+- [Retell release boundaries](retell-release-boundaries.md) — pin live routes before shared-agent releases; webhook fallback values do not protect calls when the app is down.
 - [Call quality semantics](call-quality-semantics.md) — confirmation is not caller ID; preserve unknown historical capture evidence rather than inflating completeness.
 - [Publish expression indexes](publish-expression-indexes.md) — use generated normalization columns and column-only indexes to avoid Publish truncating nested index expressions.
 - [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.

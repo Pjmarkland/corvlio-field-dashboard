@@ -21,6 +21,7 @@ export const businessesTable = pgTable("businesses", {
   smsAlertsConsentAt: timestamp("sms_alerts_consent_at", { withTimezone: true }),
   leadAlertsEnabled: boolean("lead_alerts_enabled").notNull().default(true),
   retellPhoneNumber: text("retell_phone_number"),
+  fallbackPhoneNumber: text("fallback_phone_number"),
   // Keep the index column-only: Publish can truncate comma-containing index expressions.
   retellPhoneNormalized: text("retell_phone_normalized").generatedAlwaysAs(
     sql`NULLIF(regexp_replace(retell_phone_number, '[^0-9]', '', 'g'), '')`,

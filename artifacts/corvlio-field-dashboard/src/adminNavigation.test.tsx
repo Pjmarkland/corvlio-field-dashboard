@@ -65,7 +65,7 @@ describe('Admin dashboard switching', () => {
     expect(links[4].getAttribute('href')).toBe('/admin');
     fireEvent.click(links[4]);
     expect(screen.getByTestId('link-admin-back-dashboard').getAttribute('href')).toBe('/dashboard');
-    for (const [label, href] of [['Overview', '/admin'], ['Lead activity', '/admin/activity'], ['SMS alerts', '/admin/sms'], ['Invoices', '/admin/invoices']]) {
+    for (const [label, href] of [['Overview', '/admin'], ['Lead activity', '/admin/activity'], ['SMS alerts', '/admin/sms'], ['Invoices', '/admin/invoices'], ['Settings', '/admin/settings']]) {
       expect(within(screen.getByRole('navigation', { name: 'Founder console navigation' })).getByRole('link', { name: label }).getAttribute('href')).toBe(href);
     }
     expect(screen.getByTestId('link-admin-mobile-back-dashboard').getAttribute('href')).toBe('/dashboard');

@@ -1,12 +1,16 @@
 import type { Business } from "@workspace/db";
 import { businessClock } from "./businessHours";
 import { intakeTrade, toneGuidance, toneStyle, tradeQuestions } from "./receptionistStyle";
+import { DEFAULT_FALLBACK_PHONE_NUMBER } from "./fallbackPhoneSettings";
 
 const NO_PROMISES = "Not provided. Do not make any promises about this; say the owner will cover it when they call back.";
 const PASS_TO_OWNER = "Not provided. Do not claim or deny anything about this; offer to pass the question to the owner.";
 const NOTIFY_OWNER = "Not provided. Take the caller's details and tell them the owner will be notified.";
 
-export function dynamicVariables(business: Business | null) {
+export function dynamicVariables(
+  business: Business | null,
+  fallbackPhoneNumber: string = DEFAULT_FALLBACK_PHONE_NUMBER,
+) {
   // Preserve saved text verbatim and keep the no-business generic case unchanged.
   const detail = (value: string | null | undefined, fallback: string) =>
     business ? (value?.trim() ? value : fallback) : "";
@@ -22,6 +26,7 @@ export function dynamicVariables(business: Business | null) {
     business_hours: business ? hours : "", time_zone: business ? timeZone : "",
     ...(business && hours.trim() && timeZone.trim() ? businessClock(hours, timeZone) : { current_local_time: "", business_is_open: "unknown", next_opening: "" }),
     transfer_available: "false", agent_name: agentName || "Aria",
+    fallback_phone_number: business?.fallbackPhoneNumber ?? fallbackPhoneNumber,
     business_name: business?.businessName ?? "our team", business_type: business?.businessType ?? "",
     service_area: detail(business?.serviceArea, "Not provided. Do not guess whether an address is covered; take the caller's location and ask the owner to confirm."),
     services_offered: detail(business?.servicesOffered, PASS_TO_OWNER),
