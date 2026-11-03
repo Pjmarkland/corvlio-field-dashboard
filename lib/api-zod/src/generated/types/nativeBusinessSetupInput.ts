@@ -64,6 +64,13 @@ export interface NativeBusinessSetupInput {
   agentName?: string;
   /** @maxLength 2048 */
   businessWebsiteUrl?: string;
+  /**
+     * @maxLength 16
+     * @nullable
+     * @pattern ^\+[1-9]\d{7,14}$
+     */
+  ownerPhone?: string | null;
+  smsAlertsConsent?: boolean;
   websiteScrapePreviewed?: boolean;
   websiteSuggestionsReviewed?: boolean;
   websitePreviewAttempted?: boolean;

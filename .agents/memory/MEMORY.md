@@ -27,3 +27,4 @@
 - [Gmail configuration boundary](gmail-configuration-boundary.md) — Google Cloud activation belongs to the owner; historical lead failures require explicit batch approval before replay.
 - [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.
 - [Native client setup boundary](native-client-setup-scope.md) — the native app is for Corvlio clients; keep plan assignment and activation in the web admin.
+- [SMS alert consent boundary](sms-alert-consent.md) — SMS consent is optional and owner-only; keep delivery disabled until Twilio A2P approval.

@@ -17,6 +17,8 @@ export const businessesTable = pgTable("businesses", {
   manualPaymentState: text("manual_payment_state"),
   firstInvoicePaidAt: timestamp("first_invoice_paid_at", { withTimezone: true }),
   ownerPhone: text("owner_phone"),
+  smsAlertsConsent: boolean("sms_alerts_consent").notNull().default(false),
+  smsAlertsConsentAt: timestamp("sms_alerts_consent_at", { withTimezone: true }),
   leadAlertsEnabled: boolean("lead_alerts_enabled").notNull().default(true),
   retellPhoneNumber: text("retell_phone_number"),
   // Keep the index column-only: Publish can truncate comma-containing index expressions.

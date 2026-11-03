@@ -490,6 +490,15 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
       setSubmission({ kind: 'error', message: coverageError });
       return;
     }
+    const ownerPhone = form.ownerPhone.trim();
+    if (ownerPhone && !/^\+[1-9]\d{7,14}$/.test(ownerPhone)) {
+      setSubmission({ kind: 'error', message: 'Enter the owner mobile number with a country code.' });
+      return;
+    }
+    if (form.smsAlertsConsent && !ownerPhone) {
+      setSubmission({ kind: 'error', message: 'Enter a mobile number to receive text alerts.' });
+      return;
+    }
 
     if (!nativeMode && !chosenPlan) {
       setSubmission({ kind: 'error', message: 'Choose a plan before finishing.' });
@@ -508,6 +517,8 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
         await submitNativeBusinessSetup({
           businessName: form.businessName.trim(),
           ownerEmail: form.ownerEmail.trim(),
+          ownerPhone: ownerPhone || null,
+          smsAlertsConsent: form.smsAlertsConsent,
           businessType: form.businessType.trim(),
           servicesOffered: form.servicesOffered.trim(),
           servicesNotOffered: form.servicesNotOffered.trim(),
@@ -563,6 +574,8 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           otherPolicies: form.otherPolicies,
           websiteSuggestionsReviewed: websiteReviewed,
           ownerEmail: form.ownerEmail,
+          ownerPhone: ownerPhone || null,
+          smsAlertsConsent: form.smsAlertsConsent,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
           majorIssueExamples: form.majorIssueExamples,
@@ -715,6 +728,40 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                    hint="Optional. Read the site now to suggest answers for your review. Nothing is saved automatically."
                 />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
+                <div className="space-y-2" data-testid="owner-sms-consent-fields">
+                  <label htmlFor="ownerPhone" className="block text-xs font-semibold">Owner mobile number</label>
+                  <input
+                    id="ownerPhone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={16}
+                    required={form.smsAlertsConsent}
+                    value={form.ownerPhone}
+                    onChange={(event) => updateField('ownerPhone', event.target.value)}
+                    placeholder="+14155550123"
+                    data-testid="input-owner-phone"
+                    className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground"
+                  />
+                  <p className="text-xs leading-relaxed text-muted-foreground">Use a country code if you opt in to text alerts.</p>
+                  <label className="flex items-start gap-2.5 text-xs leading-relaxed" htmlFor="smsAlertsConsent">
+                    <input
+                      id="smsAlertsConsent"
+                      type="checkbox"
+                      checked={form.smsAlertsConsent}
+                      disabled={form.isSample}
+                      onChange={(event) => updateField('smsAlertsConsent', event.target.checked)}
+                      data-testid="checkbox-sms-alert-consent"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+                    />
+                    <span>
+                      I agree to receive text message alerts from Corvlio about new leads at this number. Msg frequency varies. Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help. See our{' '}
+                      <Link href="/terms" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-terms">Terms</Link>
+                      {' '}and{' '}
+                      <Link href="/privacy" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-privacy">Privacy Policy</Link>.
+                    </span>
+                  </label>
+                </div>
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required error={requiredError('serviceArea')} showError={Boolean(requiredError('serviceArea'))} />
               </div>
               {!form.isSample ? <div className="mt-4">

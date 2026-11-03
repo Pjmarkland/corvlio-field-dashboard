@@ -524,11 +524,31 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
       res.status(409).json({ error: "A business setup is already linked to this account." });
       return;
     }
+    const ownerPhone = body.data.ownerPhone === undefined
+      ? existingBusiness?.ownerPhone ?? null
+      : body.data.ownerPhone?.trim() || null;
+    if (ownerPhone && !/^\+[1-9]\d{7,14}$/.test(ownerPhone)) {
+      res.status(400).json({ error: "Owner mobile number must include a country code, for example +14155550123." });
+      return;
+    }
+    const smsAlertsConsent = body.data.smsAlertsConsent
+      ?? existingBusiness?.smsAlertsConsent
+      ?? false;
+    if (smsAlertsConsent && !ownerPhone) {
+      res.status(400).json({ error: "Enter a mobile number before opting in to text alerts." });
+      return;
+    }
+    const smsAlertsConsentAt = body.data.smsAlertsConsent === undefined
+      ? existingBusiness?.smsAlertsConsentAt ?? (smsAlertsConsent ? new Date() : null)
+      : smsAlertsConsent ? new Date() : null;
 
     await saveBusinessWithOptionalPhone({
       clerkUserId: userId,
       businessName: body.data.businessName.trim(),
       ownerEmail: body.data.ownerEmail.trim(),
+      ownerPhone,
+      smsAlertsConsent,
+      smsAlertsConsentAt,
       businessType: body.data.businessType.trim(),
       servicesOffered: body.data.servicesOffered.trim(),
       servicesNotOffered: body.data.servicesNotOffered.trim(),
@@ -603,6 +623,8 @@ const OnboardBusinessBody = z.object({
   emergencyAvailable: z.boolean(),
   emergencyEscalationPhone: z.string().trim().max(16).nullable(),
   aiPromisePolicy: z.enum(["callback_only", "appointment_windows"]),
+  ownerPhone: z.string().trim().max(16).nullable().optional(),
+  smsAlertsConsent: z.boolean().optional(),
   websiteScrapePreviewed: z.boolean().optional(),
   websiteSuggestionsReviewed: z.boolean().optional(),
   websitePreviewAttempted: z.boolean().optional(),
@@ -686,6 +708,11 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     aiPromisePolicy: body.data.aiPromisePolicy,
     agreementsAcceptedAt: new Date(),
   };
+  const submittedOwnerPhone = body.data.ownerPhone?.trim() || null;
+  if (submittedOwnerPhone && !/^\+[1-9]\d{7,14}$/.test(submittedOwnerPhone)) {
+    res.status(400).json({ error: "Owner mobile number must include a country code, for example +14155550123." });
+    return;
+  }
   const rawWebsiteUrl = body.data.businessWebsiteUrl?.trim() || "";
   const websiteUrl = !isSample && rawWebsiteUrl.length <= 2048 ? rawWebsiteUrl || null : null;
 
@@ -694,8 +721,26 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     if (existingBusiness?.chosenPlan && existingBusiness.chosenPlan !== body.data.chosenPlan) {
       res.status(409).json({error:"Your plan is already saved. Please contact support to change it."});return;
     }
+    const ownerPhone = isSample ? null : body.data.ownerPhone === undefined
+      ? existingBusiness?.ownerPhone ?? null
+      : submittedOwnerPhone;
+    const smsAlertsConsent = !isSample && (body.data.smsAlertsConsent
+      ?? existingBusiness?.smsAlertsConsent
+      ?? false);
+    if (smsAlertsConsent && !ownerPhone) {
+      res.status(400).json({ error: "Enter a mobile number before opting in to text alerts." });
+      return;
+    }
+    const smsAlertsConsentAt = !smsAlertsConsent
+      ? null
+      : body.data.smsAlertsConsent === undefined
+        ? existingBusiness?.smsAlertsConsentAt ?? new Date()
+        : new Date();
     const result = await saveBusinessWithOptionalPhone({
       ...businessInfo,
+      ownerPhone,
+      smsAlertsConsent,
+      smsAlertsConsentAt,
       chosenPlan: existingBusiness ? existingBusiness.chosenPlan : body.data.chosenPlan,
       startupAgeMonths: existingBusiness ? existingBusiness.startupAgeMonths : body.data.startupAgeMonths ?? null,
       manualPaymentState: existingBusiness ? existingBusiness.manualPaymentState

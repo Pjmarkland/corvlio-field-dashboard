@@ -1323,6 +1323,8 @@ components:
         timeZone: { type: string, minLength: 1, maxLength: 100 }
         agentName: { type: string, maxLength: 40 }
         businessWebsiteUrl: { type: string, maxLength: 2048 }
+        ownerPhone: { type: [string, "null"], maxLength: 16, pattern: "^\\+[1-9]\\d{7,14}$" }
+        smsAlertsConsent: { type: boolean, default: false }
         websiteScrapePreviewed: { type: boolean }
         websiteSuggestionsReviewed: { type: boolean }
         websitePreviewAttempted: { type: boolean }

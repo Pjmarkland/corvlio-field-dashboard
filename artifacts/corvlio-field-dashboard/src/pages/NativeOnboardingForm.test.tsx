@@ -41,6 +41,11 @@ describe('native business setup', () => {
     const { container } = renderForm();
     expect(screen.getByTestId('input-businessName')).toBeTruthy();
     expect(screen.getByTestId('input-ownerEmail')).toBeTruthy();
+    expect(screen.getByTestId('input-owner-phone')).toBeTruthy();
+    expect((screen.getByTestId('checkbox-sms-alert-consent') as HTMLInputElement).required).toBe(false);
+    expect(screen.getByTestId('link-sms-terms').getAttribute('href')).toBe('/terms');
+    expect(screen.getByTestId('link-sms-privacy').getAttribute('href')).toBe('/privacy');
+    expect(container.textContent).toContain('I agree to receive text message alerts from Corvlio about new leads at this number.');
     expect(screen.getByTestId('select-business-type')).toBeTruthy();
     expect(screen.getByTestId('input-servicesOffered')).toBeTruthy();
     expect(screen.getByTestId('input-servicesNotOffered')).toBeTruthy();
@@ -83,6 +88,8 @@ describe('native business setup', () => {
     expect(nativeMocks.submit).toHaveBeenCalledWith(expect.objectContaining({
       businessName: 'Northline Heating',
       ownerEmail: 'owner@northline.example',
+      ownerPhone: null,
+      smsAlertsConsent: false,
       businessType: 'HVAC',
       servicesOffered: 'Heating repair and installation.',
       servicesNotOffered: 'None',
@@ -103,5 +110,57 @@ describe('native business setup', () => {
     expect(payload).not.toHaveProperty('plan');
     expect(payload).not.toHaveProperty('pricingPolicy');
     expect(payload).not.toHaveProperty('paymentLink');
+  });
+
+  it('submits explicit SMS opt-in only when the owner checks the separate checkbox', async () => {
+    renderForm();
+    fireEvent.change(screen.getByTestId('input-businessName'), { target: { value: 'Northline Heating' } });
+    fireEvent.change(screen.getByTestId('input-ownerEmail'), { target: { value: 'owner@northline.example' } });
+    fireEvent.change(screen.getByTestId('input-owner-phone'), { target: { value: '+14155550123' } });
+    fireEvent.change(screen.getByTestId('select-business-type'), { target: { value: 'HVAC' } });
+    fireEvent.change(screen.getByTestId('input-serviceArea'), { target: { value: 'North Bay' } });
+    fireEvent.change(screen.getByTestId('input-servicesOffered'), { target: { value: 'Heating repair and installation.' } });
+    fireEvent.change(screen.getByTestId('input-servicesNotOffered'), { target: { value: 'None' } });
+    fireEvent.change(screen.getByTestId('select-emergency-availability'), { target: { value: 'no' } });
+    fireEvent.change(screen.getByTestId('select-promise-policy'), { target: { value: 'callback_only' } });
+    fireEvent.change(screen.getByTestId('input-majorIssueExamples'), { target: { value: 'No heat in winter or a gas smell.' } });
+    fireEvent.change(screen.getByTestId('input-onboarding-businessHours'), { target: { value: 'Mon-Fri 08:00-17:00' } });
+    fireEvent.change(screen.getByTestId('input-onboarding-timeZone'), { target: { value: 'America/Los_Angeles' } });
+    fireEvent.change(screen.getByTestId('input-agentName'), { target: { value: 'Aria' } });
+    fireEvent.click(screen.getByTestId('checkbox-privacy-policy'));
+    fireEvent.click(screen.getByTestId('checkbox-terms'));
+    fireEvent.click(screen.getByTestId('checkbox-client-service-agreement'));
+    fireEvent.click(screen.getByTestId('checkbox-sms-alert-consent'));
+    fireEvent.submit(screen.getByTestId('form-onboarding'));
+
+    await waitFor(() => expect(nativeMocks.submit).toHaveBeenCalledOnce());
+    expect(nativeMocks.submit).toHaveBeenCalledWith(expect.objectContaining({
+      ownerPhone: '+14155550123',
+      smsAlertsConsent: true,
+    }));
+  });
+
+  it('does not submit SMS consent without a mobile number', async () => {
+    renderForm();
+    fireEvent.change(screen.getByTestId('input-businessName'), { target: { value: 'Northline Heating' } });
+    fireEvent.change(screen.getByTestId('input-ownerEmail'), { target: { value: 'owner@northline.example' } });
+    fireEvent.change(screen.getByTestId('select-business-type'), { target: { value: 'HVAC' } });
+    fireEvent.change(screen.getByTestId('input-serviceArea'), { target: { value: 'North Bay' } });
+    fireEvent.change(screen.getByTestId('input-servicesOffered'), { target: { value: 'Heating repair and installation.' } });
+    fireEvent.change(screen.getByTestId('input-servicesNotOffered'), { target: { value: 'None' } });
+    fireEvent.change(screen.getByTestId('select-emergency-availability'), { target: { value: 'no' } });
+    fireEvent.change(screen.getByTestId('select-promise-policy'), { target: { value: 'callback_only' } });
+    fireEvent.change(screen.getByTestId('input-majorIssueExamples'), { target: { value: 'No heat in winter or a gas smell.' } });
+    fireEvent.change(screen.getByTestId('input-onboarding-businessHours'), { target: { value: 'Mon-Fri 08:00-17:00' } });
+    fireEvent.change(screen.getByTestId('input-onboarding-timeZone'), { target: { value: 'America/Los_Angeles' } });
+    fireEvent.change(screen.getByTestId('input-agentName'), { target: { value: 'Aria' } });
+    fireEvent.click(screen.getByTestId('checkbox-privacy-policy'));
+    fireEvent.click(screen.getByTestId('checkbox-terms'));
+    fireEvent.click(screen.getByTestId('checkbox-client-service-agreement'));
+    fireEvent.click(screen.getByTestId('checkbox-sms-alert-consent'));
+    fireEvent.submit(screen.getByTestId('form-onboarding'));
+
+    await waitFor(() => expect(screen.getByTestId('status-onboarding-submit').textContent).toContain('Enter a mobile number'));
+    expect(nativeMocks.submit).not.toHaveBeenCalled();
   });
 });

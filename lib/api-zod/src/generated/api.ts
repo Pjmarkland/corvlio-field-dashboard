@@ -482,7 +482,11 @@ export const submitNativeBusinessSetupBodyAgentNameMax = 40;
 
 export const submitNativeBusinessSetupBodyBusinessWebsiteUrlMax = 2048;
 
+export const submitNativeBusinessSetupBodyOwnerPhoneMax = 16;
 
+
+export const submitNativeBusinessSetupBodyOwnerPhoneRegExp = new RegExp('^\\+[1-9]\\d{7,14}$');
+export const submitNativeBusinessSetupBodySmsAlertsConsentDefault = false;
 
 export const SubmitNativeBusinessSetupBody = zod.object({
   "businessName": zod.string().min(1).max(submitNativeBusinessSetupBodyBusinessNameMax),
@@ -499,6 +503,8 @@ export const SubmitNativeBusinessSetupBody = zod.object({
   "timeZone": zod.string().min(1).max(submitNativeBusinessSetupBodyTimeZoneMax),
   "agentName": zod.string().max(submitNativeBusinessSetupBodyAgentNameMax).optional(),
   "businessWebsiteUrl": zod.string().max(submitNativeBusinessSetupBodyBusinessWebsiteUrlMax).optional(),
+  "ownerPhone": zod.string().max(submitNativeBusinessSetupBodyOwnerPhoneMax).regex(submitNativeBusinessSetupBodyOwnerPhoneRegExp).nullish(),
+  "smsAlertsConsent": zod.boolean().default(submitNativeBusinessSetupBodySmsAlertsConsentDefault),
   "websiteScrapePreviewed": zod.boolean().optional(),
   "websiteSuggestionsReviewed": zod.boolean().optional(),
   "websitePreviewAttempted": zod.boolean().optional(),

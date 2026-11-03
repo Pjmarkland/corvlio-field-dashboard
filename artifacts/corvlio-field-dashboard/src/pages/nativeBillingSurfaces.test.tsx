@@ -27,4 +27,14 @@ describe('native payment surfaces', () => {
     const { container } = render(<Page />);
     expect(container.textContent).toMatch(/fees and payment/i);
   });
+  it('includes SMS alert disclosures in the Terms without adding product-price copy to native legal pages', () => {
+    m.native = true;
+    const { container } = render(<TermsPage />);
+    expect(screen.getByTestId('terms-sms-section').textContent).toMatch(/opt in during signup/i);
+    expect(container.textContent).toMatch(/callers never receive texts/i);
+    expect(container.textContent).toMatch(/reply STOP to opt out and HELP for help/i);
+    expect(container.textContent).toMatch(/hello@corvlio.com/);
+    expect(container.textContent).toMatch(/mobile numbers and SMS consent are never sold or shared/i);
+    expect(container.textContent).not.toMatch(/\\$\\d/);
+  });
 });

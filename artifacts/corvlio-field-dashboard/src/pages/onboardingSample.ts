@@ -7,6 +7,8 @@ export type OnboardingForm = {
   businessType: string;
   businessWebsiteUrl: string;
   ownerEmail: string;
+  ownerPhone: string;
+  smsAlertsConsent: boolean;
   serviceArea: string;
   receptionistTone: string;
   servicesOffered: string;
@@ -39,6 +41,8 @@ export const initialForm: OnboardingForm = {
   businessType: '',
   businessWebsiteUrl: '',
   ownerEmail: '',
+  ownerPhone: '',
+  smsAlertsConsent: false,
   serviceArea: '',
   receptionistTone: 'Friendly and professional',
   servicesOffered: '',
@@ -119,6 +123,8 @@ export function applySampleBusiness(current: OnboardingForm): OnboardingForm {
     businessType: 'Plumbing',
     businessWebsiteUrl: '',
     ownerEmail: 'owner@example.com',
+    ownerPhone: '',
+    smsAlertsConsent: false,
     serviceArea: 'Example City and Example County (fictional sample area)',
     receptionistTone: toneOptions[0].value,
     servicesOffered: 'Fictional sample only: residential sink leaks, faucet repairs, and drain clearing in Example City.',

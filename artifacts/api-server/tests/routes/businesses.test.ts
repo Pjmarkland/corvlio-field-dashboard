@@ -120,6 +120,9 @@ beforeEach(() => {
     emergencyAvailable: null,
     emergencyEscalationPhone: null,
     aiPromisePolicy: null,
+    ownerPhone: null,
+    smsAlertsConsent: false,
+    smsAlertsConsentAt: null,
     retellPhoneNumber: null,
     websiteEnrichmentAttemptedAt: null,
     websiteEnrichmentSources: {},
@@ -239,6 +242,9 @@ describe("owner business profile API", () => {
       clerkUserId: "clerk-user-44",
       businessName: "Example Heating",
       ownerEmail: "owner@example.test",
+      ownerPhone: null,
+      smsAlertsConsent: false,
+      smsAlertsConsentAt: null,
       businessType: "HVAC",
       servicesOffered: "Residential heating repair and replacement.",
       servicesNotOffered: "None",
@@ -261,6 +267,71 @@ describe("owner business profile API", () => {
     expect(mocks.updateBusiness).not.toHaveBeenCalled();
     expect(mocks.claimWebsiteEnrichment).not.toHaveBeenCalled();
     expect(mocks.enrichBusinessFromWebsite).not.toHaveBeenCalled();
+  });
+
+  it("stores affirmative native SMS consent and a server timestamp with the owner mobile number", async () => {
+    business = undefined;
+    const response = await submitNativeSetup({
+      ...validNativeBody,
+      ownerPhone: "+14155550123",
+      smsAlertsConsent: true,
+    });
+
+    expect(response.status).toBe(201);
+    const saved = mocks.saveBusinessWithOptionalPhone.mock.calls[0][0];
+    expect(saved).toMatchObject({
+      ownerPhone: "+14155550123",
+      smsAlertsConsent: true,
+    });
+    expect(saved.smsAlertsConsentAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects native SMS consent without an owner mobile number", async () => {
+    business = undefined;
+    const response = await submitNativeSetup({
+      ...validNativeBody,
+      smsAlertsConsent: true,
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+  });
+
+  it("stores web onboarding SMS consent and its server timestamp", async () => {
+    business = {
+      ...business!,
+      chosenPlan: "starter",
+      retellPhoneNumber: "+14155550000",
+    };
+    const response = await onboard({
+      ...validBody,
+      ownerPhone: "+14155550123",
+      smsAlertsConsent: true,
+    });
+
+    expect(response.status).toBe(200);
+    const saved = mocks.saveBusinessWithOptionalPhone.mock.calls[0][0];
+    expect(saved).toMatchObject({
+      ownerPhone: "+14155550123",
+      smsAlertsConsent: true,
+    });
+    expect(saved.smsAlertsConsentAt).toBeInstanceOf(Date);
+  });
+
+  it("allows web onboarding without SMS consent or a mobile number", async () => {
+    business = {
+      ...business!,
+      chosenPlan: "starter",
+      retellPhoneNumber: "+14155550000",
+    };
+    const response = await onboard(validBody);
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({
+      ownerPhone: null,
+      smsAlertsConsent: false,
+      smsAlertsConsentAt: null,
+    });
   });
 
   it.each([

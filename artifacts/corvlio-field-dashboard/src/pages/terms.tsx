@@ -94,6 +94,11 @@ function TermsPage() {
             <p>Client may not assign these Terms without consent; Corvlio may assign in a merger or sale of substantially all its business. Neither party is liable for delay from force majeure events, including third-party provider failures. These Terms plus the Client&apos;s signed service agreement are the entire agreement. If a provision is invalid, the rest remains in force. Corvlio may update these Terms with notice; continued use constitutes acceptance.</p>
           </section>
 
+          <section data-testid="terms-sms-section">
+            <h2 className="mb-3 text-xl font-800 tracking-[-0.025em] text-foreground">TEXT MESSAGING (SMS)</h2>
+            <p>Corvlio sends text message alerts only to business owners who opt in during signup, and only about new leads for their own business. Callers never receive texts. Message frequency varies with call volume. Msg and data rates may apply. Reply STOP to opt out and HELP for help. For support, contact <a href="mailto:hello@corvlio.com" className="font-semibold text-primary underline">hello@corvlio.com</a>. Mobile numbers and SMS consent are never sold or shared with third parties or affiliates for marketing or promotional purposes.</p>
+          </section>
+
           <section className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">Terms questions</p>
             <h2 className="mt-2 text-xl font-800">Contact Corvlio</h2>
