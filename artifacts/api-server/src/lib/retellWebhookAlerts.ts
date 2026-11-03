@@ -1,44 +1,33 @@
 import type { ErrorRequestHandler } from "express";
-import { recordOperationalFailure } from "./operationalFailures";
-import { runNotificationOutboxNow } from "./notificationService";
+import { recordRetellSystemAlert } from "./retellSystemAlerts";
 import { logger } from "./logger";
 
 export type RetellWebhookEndpoint = "pre-call" | "post-call";
 export type RetellWebhookRejection = "invalid_signature" | "malformed_payload";
 
-const ALERT_WINDOW_MS = 15 * 60_000;
-
 /**
- * Persist at most one rejected-webhook alert per endpoint per 15-minute window.
- * The unique event key also deduplicates across API instances; request bodies
- * and source IPs are deliberately excluded from stored details.
+ * Store the rejection without retaining the request body, signature, or source IP.
+ * The system-alert recorder deduplicates the issue across API instances.
  */
 export async function alertRejectedRetellWebhook(
   endpoint: RetellWebhookEndpoint,
   reason: RetellWebhookRejection,
 ): Promise<void> {
-  const bucket = Math.floor(Date.now() / ALERT_WINDOW_MS);
   const label = reason === "invalid_signature" ? "invalid signature" : "malformed payload";
   try {
-    const inserted = await recordOperationalFailure({
-      eventKey: `retell-webhook-rejected:${endpoint}:${bucket}`,
-      source: endpoint === "pre-call" ? "pre_call_fallback" : "post_call_webhook",
+    await recordRetellSystemAlert({
+      issueKey: `retell:${endpoint}:${reason}`,
+      endpoint,
+      category: reason,
       summary: `Rejected Retell ${endpoint} webhook: ${label}`,
       details: reason === "invalid_signature"
         ? "A Retell webhook was rejected because its signature was missing, invalid, expired, or did not match the request body."
         : "A Retell webhook was rejected because its JSON or payload shape was malformed.",
+      source: endpoint === "pre-call" ? "pre_call_fallback" : "post_call_webhook",
     });
-    if (inserted) {
-      void runNotificationOutboxNow().catch((error) => {
-        logger.error(
-          { error: error instanceof Error ? error.message : "Unknown outbox error" },
-          "Could not dispatch the rejected Retell webhook alert immediately",
-        );
-      });
-    }
   } catch (error) {
     logger.error(
-      { error: error instanceof Error ? error.message : "Unknown operational failure error" },
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
       "Could not record a rejected Retell webhook for admin review",
     );
   }

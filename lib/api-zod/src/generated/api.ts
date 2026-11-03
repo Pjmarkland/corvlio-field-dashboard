@@ -1424,6 +1424,92 @@ export const ResolveAdminLeadInformationFlagResponse = zod.object({
 
 
 /**
+ * @summary List recent Retell system alerts
+ */
+export const getAdminSystemAlertsResponseAlertsItemIdMultipleOf = 1;
+
+export const getAdminSystemAlertsResponseAlertsItemBusinessIdMultipleOf = 1;
+
+export const getAdminSystemAlertsResponseAlertsItemOccurrenceCountMultipleOf = 1;
+
+export const getAdminSystemAlertsResponseOpenCountMin = 0;
+export const getAdminSystemAlertsResponseOpenCountMultipleOf = 1;
+
+
+
+export const GetAdminSystemAlertsResponse = zod.object({
+  "alerts": zod.array(zod.object({
+  "id": zod.number().min(1).multipleOf(getAdminSystemAlertsResponseAlertsItemIdMultipleOf),
+  "endpoint": zod.enum(['pre-call', 'post-call']),
+  "category": zod.string(),
+  "summary": zod.string(),
+  "details": zod.string(),
+  "businessId": zod.number().multipleOf(getAdminSystemAlertsResponseAlertsItemBusinessIdMultipleOf).nullable(),
+  "businessName": zod.string().nullable(),
+  "firstSeenAt": zod.coerce.date(),
+  "lastSeenAt": zod.coerce.date(),
+  "occurrenceCount": zod.number().min(1).multipleOf(getAdminSystemAlertsResponseAlertsItemOccurrenceCountMultipleOf),
+  "status": zod.enum(['open', 'resolved']),
+  "resolvedAt": zod.coerce.date().nullable(),
+  "resolvedBy": zod.string().nullable()
+})),
+  "openCount": zod.number().min(getAdminSystemAlertsResponseOpenCountMin).multipleOf(getAdminSystemAlertsResponseOpenCountMultipleOf)
+})
+
+
+/**
+ * @summary Resolve a Retell system alert
+ */
+export const resolveAdminSystemAlertPathAlertIdMultipleOf = 1;
+
+
+
+export const ResolveAdminSystemAlertParams = zod.object({
+  "alertId": zod.coerce.number().min(1).multipleOf(resolveAdminSystemAlertPathAlertIdMultipleOf)
+})
+
+export const ResolveAdminSystemAlertResponse = zod.object({
+  "resolved": zod.boolean()
+})
+
+
+/**
+ * @summary Read Retell webhook health
+ */
+export const getAdminHealthCheckResponseOpenAlertCountMin = 0;
+export const getAdminHealthCheckResponseOpenAlertCountMultipleOf = 1;
+
+export const getAdminHealthCheckResponseOpenAlertsItemIdMultipleOf = 1;
+
+export const getAdminHealthCheckResponseOpenAlertsItemBusinessIdMultipleOf = 1;
+
+export const getAdminHealthCheckResponseOpenAlertsItemOccurrenceCountMultipleOf = 1;
+
+
+
+export const GetAdminHealthCheckResponse = zod.object({
+  "lastPreCallSuccessfulAt": zod.coerce.date().nullable(),
+  "lastPostCallSuccessfulAt": zod.coerce.date().nullable(),
+  "openAlertCount": zod.number().min(getAdminHealthCheckResponseOpenAlertCountMin).multipleOf(getAdminHealthCheckResponseOpenAlertCountMultipleOf),
+  "openAlerts": zod.array(zod.object({
+  "id": zod.number().min(1).multipleOf(getAdminHealthCheckResponseOpenAlertsItemIdMultipleOf),
+  "endpoint": zod.enum(['pre-call', 'post-call']),
+  "category": zod.string(),
+  "summary": zod.string(),
+  "details": zod.string(),
+  "businessId": zod.number().multipleOf(getAdminHealthCheckResponseOpenAlertsItemBusinessIdMultipleOf).nullable(),
+  "businessName": zod.string().nullable(),
+  "firstSeenAt": zod.coerce.date(),
+  "lastSeenAt": zod.coerce.date(),
+  "occurrenceCount": zod.number().min(1).multipleOf(getAdminHealthCheckResponseOpenAlertsItemOccurrenceCountMultipleOf),
+  "status": zod.enum(['open', 'resolved']),
+  "resolvedAt": zod.coerce.date().nullable(),
+  "resolvedBy": zod.string().nullable()
+}))
+})
+
+
+/**
  * @summary Get the global lead activity feed
  */
 export const getAdminActivityResponseBusinessCountMultipleOf = 1;

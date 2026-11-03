@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   persistBlankCall: vi.fn(),
   recordOperationalFailure: vi.fn(),
   queueFounderPushNotification: vi.fn(),
+  recordRetellSystemAlert: vi.fn(),
+  recordRetellWebhookSuccess: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
@@ -48,6 +50,10 @@ vi.mock("../../src/lib/retellPersistence", () => ({
 vi.mock("../../src/lib/operationalFailures", () => ({
   recordOperationalFailure: mocks.recordOperationalFailure,
   queueFounderPushNotification: mocks.queueFounderPushNotification,
+}));
+vi.mock("../../src/lib/retellSystemAlerts", () => ({
+  recordRetellSystemAlert: mocks.recordRetellSystemAlert,
+  recordRetellWebhookSuccess: mocks.recordRetellWebhookSuccess,
 }));
 
 import retellRouter from "../../src/routes/retell";
@@ -156,6 +162,8 @@ beforeEach(() => {
   mocks.runNotificationOutboxNow.mockResolvedValue(undefined);
   mocks.recordOperationalFailure.mockResolvedValue(true);
   mocks.queueFounderPushNotification.mockResolvedValue(true);
+  mocks.recordRetellSystemAlert.mockResolvedValue(undefined);
+  mocks.recordRetellWebhookSuccess.mockResolvedValue(undefined);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
   mocks.getDefaultFallbackPhoneNumber.mockResolvedValue("+18634463029");
 });
@@ -178,10 +186,11 @@ describe("Retell webhook safety", () => {
       expect.objectContaining({ databaseError: expect.objectContaining({ message: "Database unavailable" }) }),
       expect.stringContaining("answering with generic"),
     );
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      source: "pre_call_fallback",
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      endpoint: "pre-call",
+      category: "pre_call_error",
       summary: "Inbound business lookup failed; generic fallback used",
-      details: expect.stringMatching(/Database unavailable|3500ms/),
+      details: "Database unavailable",
     }));
   });
 
@@ -192,6 +201,7 @@ describe("Retell webhook safety", () => {
     const result = await requestPreCall();
     expect(result.status).toBe(200);
     expect(result.body.call_inbound.dynamic_variables.fallback_phone_number).toBe("+16505550123");
+    expect(mocks.recordRetellWebhookSuccess).toHaveBeenCalledWith("pre-call");
   });
 
   it("uses the configured global fallback when the business has no override", async () => {
@@ -211,6 +221,10 @@ describe("Retell webhook safety", () => {
       expect.objectContaining({ databaseError: expect.objectContaining({ message: expect.stringContaining("3500ms pre-call deadline") }) }),
       expect.stringContaining("answering with generic"),
     );
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:pre-call:business-lookup-timeout",
+      category: "pre_call_timeout",
+    }));
     rejectLookup(new Error("Late database error"));
     await new Promise(resolve => setImmediate(resolve));
     expect(mocks.logError).toHaveBeenCalledTimes(1);
@@ -266,7 +280,7 @@ describe("Retell webhook safety", () => {
       suppressAlert: true,
     }));
   });
-  it("records unmatched call failures by call ID and alerts the founder without storing transcripts", async () => {
+  it("records unmatched post-call incidents without storing the full number or transcript", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValueOnce(undefined);
     const raw = JSON.stringify({ event: "call_analyzed", call: {
       call_id: "unmatched-call-42", to_number: "+14155550999", start_timestamp: 1_800_000_000_000,
@@ -275,19 +289,16 @@ describe("Retell webhook safety", () => {
     } });
     expect((await signedRequest("post-call", raw)).status).toBe(204);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: "retell-unmatched:unmatched-call-42",
-      summary: "Retell post-call webhook for unmatched number",
-      details: expect.stringContaining("Called number: +14155550999"),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      endpoint: "post-call",
+      category: "unmatched_business",
+      summary: "Post-call event did not match a business",
+      details: expect.stringContaining("destination ends in 0999"),
     }));
-    const failure = mocks.recordOperationalFailure.mock.calls[0][0];
-    expect(failure.details).toContain("12 sec");
-    expect(failure.details).not.toContain("Never include this transcript");
-    expect(mocks.queueFounderPushNotification).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: "retell-unmatched:unmatched-call-42",
-      body: expect.stringContaining("+14155550999"),
-    }));
-    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+    const alert = mocks.recordRetellSystemAlert.mock.calls[0][0];
+    expect(alert.details).not.toContain("+14155550999");
+    expect(alert.details).not.toContain("Never include this transcript");
+    expect(mocks.recordRetellWebhookSuccess).not.toHaveBeenCalled();
   });
   it("alerts once when the third consecutive blank call is recorded", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 7, businessName: "Oak Plumbing" }));
@@ -341,8 +352,9 @@ describe("Retell webhook safety", () => {
     });
     expect(response.status).toBe(401);
     expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: expect.stringMatching(/^retell-webhook-rejected:pre-call:/),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:pre-call:invalid_signature",
+      endpoint: "pre-call",
       summary: expect.stringContaining("invalid signature"),
     }));
   });
@@ -389,48 +401,31 @@ describe("Retell webhook safety", () => {
     });
     expect(response.status).toBe(401);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: expect.stringMatching(/^retell-webhook-rejected:post-call:/),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:post-call:invalid_signature",
+      endpoint: "post-call",
       summary: expect.stringContaining("invalid signature"),
     }));
   });
-  it("rate-limits rejected webhook alerts by endpoint and 15-minute bucket", async () => {
-    const baseTime = 1_800_000_000_000;
-    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(baseTime);
-    mocks.recordOperationalFailure
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    try {
-      for (let index = 0; index < 2; index++) {
-        const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: '{"event":"call_analyzed"}',
-        });
-        expect(response.status).toBe(401);
-      }
-      nowSpy.mockReturnValue(baseTime + 15 * 60_000);
-      const nextWindow = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+  it("uses a stable issue key for repeated webhook rejections", async () => {
+    for (let index = 0; index < 2; index++) {
+      const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: '{"event":"call_analyzed"}',
       });
-      expect(nextWindow.status).toBe(401);
-    } finally {
-      nowSpy.mockRestore();
+      expect(response.status).toBe(401);
     }
-    const alertCalls = mocks.recordOperationalFailure.mock.calls.map(([input]) => input);
-    expect(alertCalls).toHaveLength(3);
-    expect(alertCalls[0].eventKey).toBe(alertCalls[1].eventKey);
-    expect(alertCalls[2].eventKey).not.toBe(alertCalls[0].eventKey);
-    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledTimes(2);
+    const alertCalls = mocks.recordRetellSystemAlert.mock.calls.map(([input]) => input);
+    expect(alertCalls).toHaveLength(2);
+    expect(alertCalls[0].issueKey).toBe(alertCalls[1].issueKey);
   });
   it("records malformed signed payloads and malformed JSON through the rate-limited alert path", async () => {
     const invalidPayload = await signedRequest("post-call", JSON.stringify({ event: "call_analyzed" }));
     expect(invalidPayload.status).toBe(400);
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: expect.stringMatching(/^retell-webhook-rejected:post-call:/),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:post-call:malformed_payload",
+      endpoint: "post-call",
       summary: expect.stringContaining("malformed payload"),
     }));
 
@@ -440,8 +435,9 @@ describe("Retell webhook safety", () => {
       body: '{"call_inbound":',
     });
     expect(malformedJson.status).toBe(400);
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: expect.stringMatching(/^retell-webhook-rejected:pre-call:/),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:pre-call:malformed_payload",
+      endpoint: "pre-call",
       summary: expect.stringContaining("malformed payload"),
     }));
   });
@@ -452,13 +448,14 @@ describe("Retell webhook safety", () => {
       call_analysis: { call_summary: "The caller has a leaking pipe." },
     } });
     expect((await signedRequest("post-call", raw)).status).toBe(500);
-    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
-      eventKey: expect.stringMatching(/^retell-post-call:/),
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:post-call:processing-error:unknown",
+      endpoint: "post-call",
       source: "post_call_webhook",
       summary: "Post-call webhook processing failed",
       details: "Database unavailable",
     }));
-    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+    expect(mocks.runNotificationOutboxNow).not.toHaveBeenCalled();
   });
 });
 

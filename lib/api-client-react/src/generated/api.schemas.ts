@@ -1655,6 +1655,64 @@ export interface AdminResolveLeadFlagResult {
   resolved: boolean;
 }
 
+export type AdminSystemAlertEndpoint = typeof AdminSystemAlertEndpoint[keyof typeof AdminSystemAlertEndpoint];
+
+
+export const AdminSystemAlertEndpoint = {
+  'pre-call': 'pre-call',
+  'post-call': 'post-call',
+} as const;
+
+export type AdminSystemAlertStatus = typeof AdminSystemAlertStatus[keyof typeof AdminSystemAlertStatus];
+
+
+export const AdminSystemAlertStatus = {
+  open: 'open',
+  resolved: 'resolved',
+} as const;
+
+export interface AdminSystemAlert {
+  /** @minimum 1 */
+  id: number;
+  endpoint: AdminSystemAlertEndpoint;
+  category: string;
+  summary: string;
+  details: string;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  /** @minimum 1 */
+  occurrenceCount: number;
+  status: AdminSystemAlertStatus;
+  /** @nullable */
+  resolvedAt: string | null;
+  /** @nullable */
+  resolvedBy: string | null;
+}
+
+export interface AdminSystemAlertsResponse {
+  alerts: AdminSystemAlert[];
+  /** @minimum 0 */
+  openCount: number;
+}
+
+export interface AdminResolveSystemAlertResponse {
+  resolved: boolean;
+}
+
+export interface AdminHealthCheck {
+  /** @nullable */
+  lastPreCallSuccessfulAt: string | null;
+  /** @nullable */
+  lastPostCallSuccessfulAt: string | null;
+  /** @minimum 0 */
+  openAlertCount: number;
+  openAlerts: AdminSystemAlert[];
+}
+
 export type CreateOwnerDemoCall200 = {
   callId: string;
   message: string;

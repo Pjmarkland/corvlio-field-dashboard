@@ -1099,6 +1099,64 @@ paths:
           description: Invalid flag ID
         "404":
           description: Flag not found or administrator access is unavailable
+  /admin/system-alerts:
+    get:
+      operationId: getAdminSystemAlerts
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: List recent Retell system alerts
+      responses:
+        "200":
+          description: Recent incidents and open alert count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSystemAlertsResponse"
+        "404":
+          description: Not found or administrator access is unavailable
+  /admin/system-alerts/{alertId}/resolve:
+    patch:
+      operationId: resolveAdminSystemAlert
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Resolve a Retell system alert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: number
+            multipleOf: 1
+            minimum: 1
+      responses:
+        "200":
+          description: Alert resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminResolveSystemAlertResponse"
+        "400":
+          description: Invalid alert ID
+        "404":
+          description: Alert not found or administrator access is unavailable
+  /admin/health-check:
+    get:
+      operationId: getAdminHealthCheck
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Read Retell webhook health
+      responses:
+        "200":
+          description: Last successful webhook times and unresolved alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminHealthCheck"
+        "404":
+          description: Not found or administrator access is unavailable
   /admin/activity:
     get:
       operationId: getAdminActivity
@@ -3061,4 +3119,61 @@ components:
         - alertAttempts
         - alertSentAt
         - alertLastError
+    AdminSystemAlert:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: number, multipleOf: 1, minimum: 1 }
+        endpoint: { type: string, enum: [pre-call, post-call] }
+        category: { type: string }
+        summary: { type: string }
+        details: { type: string }
+        businessId: { type: [number, "null"], multipleOf: 1 }
+        businessName: { type: [string, "null"] }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        occurrenceCount: { type: number, multipleOf: 1, minimum: 1 }
+        status: { type: string, enum: [open, resolved] }
+        resolvedAt: { type: [string, "null"], format: date-time }
+        resolvedBy: { type: [string, "null"] }
+      required:
+        - id
+        - endpoint
+        - category
+        - summary
+        - details
+        - businessId
+        - businessName
+        - firstSeenAt
+        - lastSeenAt
+        - occurrenceCount
+        - status
+        - resolvedAt
+        - resolvedBy
+    AdminSystemAlertsResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/AdminSystemAlert" }
+        openCount: { type: number, multipleOf: 1, minimum: 0 }
+      required: [alerts, openCount]
+    AdminResolveSystemAlertResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        resolved: { type: boolean }
+      required: [resolved]
+    AdminHealthCheck:
+      type: object
+      additionalProperties: false
+      properties:
+        lastPreCallSuccessfulAt: { type: [string, "null"], format: date-time }
+        lastPostCallSuccessfulAt: { type: [string, "null"], format: date-time }
+        openAlertCount: { type: number, multipleOf: 1, minimum: 0 }
+        openAlerts:
+          type: array
+          items: { $ref: "#/components/schemas/AdminSystemAlert" }
+      required: [lastPreCallSuccessfulAt, lastPostCallSuccessfulAt, openAlertCount, openAlerts]
 

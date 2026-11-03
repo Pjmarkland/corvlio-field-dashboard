@@ -19,6 +19,10 @@ import {
   DEFAULT_FALLBACK_PHONE_NUMBER,
   getDefaultFallbackPhoneNumber,
 } from "../lib/fallbackPhoneSettings";
+import {
+  recordRetellSystemAlert,
+  recordRetellWebhookSuccess,
+} from "../lib/retellSystemAlerts";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -33,6 +37,16 @@ function firstString(...values: unknown[]): string | null {
 
 function callPhoneNumber(call: { to_number?: string }, fallback?: string): string | null {
   return firstString(call.to_number, fallback);
+}
+
+function retellPhoneIssueKey(kind: string, phoneNumber: string): string {
+  const normalized = phoneNumber.replace(/\D/g, "");
+  const digest = createHash("sha256").update(normalized || phoneNumber).digest("hex").slice(0, 16);
+  return `retell:${kind}:${digest}`;
+}
+
+function phoneSuffix(phoneNumber: string): string {
+  return phoneNumber.replace(/\D/g, "").slice(-4);
 }
 
 function callStartedAt(timestamp: number | undefined): Date | null {
@@ -119,6 +133,7 @@ async function recordRetellFailure(
     businessName?: string;
     eventKey?: string;
     suppressAlert?: boolean;
+    systemAlert?: { issueKey: string; category: string; summary?: string; details?: string };
     founderPush?: {
       eventKey: string;
       title: string;
@@ -128,6 +143,19 @@ async function recordRetellFailure(
   },
 ): Promise<void> {
   try {
+    if (input.systemAlert) {
+      await recordRetellSystemAlert({
+        issueKey: input.systemAlert.issueKey,
+        endpoint: source === "pre_call_fallback" ? "pre-call" : "post-call",
+        category: input.systemAlert.category,
+        summary: input.systemAlert.summary ?? input.summary,
+        details: input.systemAlert.details ?? input.details,
+        source,
+        businessId: input.businessId,
+        businessName: input.businessName,
+      });
+      return;
+    }
     const rawBody = req.rawBody ?? Buffer.from("");
     const eventKey = input.eventKey
       ?? `${eventPrefix}:${createHash("sha256").update(rawBody).digest("hex")}`;
@@ -168,6 +196,7 @@ function recordPostCallFailure(
     businessName?: string;
     eventKey?: string;
     suppressAlert?: boolean;
+    systemAlert?: { issueKey: string; category: string; summary?: string; details?: string };
     founderPush?: {
       eventKey: string;
       title: string;
@@ -226,6 +255,17 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     ]);
     if (!business) {
       req.log.warn("No business matched the inbound number; using generic message fallback");
+      const suffix = phoneSuffix(phoneNumber);
+      await recordRetellSystemAlert({
+        issueKey: retellPhoneIssueKey("pre-call-unmatched-business", phoneNumber),
+        endpoint: "pre-call",
+        category: "unmatched_business",
+        summary: "Inbound call number did not match a business",
+        details: `No business is configured for this inbound number${suffix ? ` ending in ${suffix}` : ""}.`,
+        source: "pre_call_fallback",
+      });
+    } else {
+      void recordRetellWebhookSuccess("pre-call");
     }
     res.json({
       call_inbound: {
@@ -237,6 +277,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     });
   } catch (error) {
     const details = error instanceof Error ? error.message : "Unknown business lookup error";
+    const timedOut = details.includes("3500ms pre-call deadline");
     req.log.error(
       databaseErrorFields(error),
       "Retell pre-call business lookup failed; answering with generic no-business variables",
@@ -244,6 +285,10 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     await recordRetellFailure(req, "retell-pre-call", "pre_call_fallback", {
       summary: "Inbound business lookup failed; generic fallback used",
       details,
+      systemAlert: {
+        issueKey: timedOut ? "retell:pre-call:business-lookup-timeout" : "retell:pre-call:business-lookup-error",
+        category: timedOut ? "pre_call_timeout" : "pre_call_error",
+      },
     });
     res.status(200).json({
       call_inbound: {
@@ -268,6 +313,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   // calls are excluded from inbound customer leads, even if metadata is absent.
   const rawCall = req.body?.call;
   if (rawCall?.direction === "outbound" || rawCall?.metadata?.corvlio_call_type === "owner_test") {
+    void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
     return;
   }
@@ -281,6 +327,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   }
 
   if (!["call_analyzed", "call_ended"].includes(body.data.event ?? "")) {
+    void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
     return;
   }
@@ -293,6 +340,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     return;
   }
   if (isPendingCallEnded(body.data.event, call)) {
+    void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
     return;
   }
@@ -304,8 +352,12 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     return;
   }
 
+  let processingBusiness: { id: number; businessName: string } | null = null;
   try {
     const business = await findBusinessByPhoneNumber(phoneNumber);
+    processingBusiness = business
+      ? { id: business.id, businessName: business.businessName }
+      : null;
     const retellCallId = firstString(call.call_id)
       ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     const startedAt = callStartedAt(call.start_timestamp);
@@ -319,6 +371,12 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         eventKey,
         summary: isBlankCall(call) ? "Blank or failed call" : "Retell post-call webhook for unmatched number",
         details: `Called number: ${phoneNumber}; call time: ${occurredAt.toISOString()}; duration: ${durationText}; business: unmatched number.`,
+        systemAlert: {
+          issueKey: retellPhoneIssueKey("post-call-unmatched-business", phoneNumber),
+          category: "unmatched_business",
+          summary: "Post-call event did not match a business",
+          details: `A post-call event could not be associated with a configured business${phoneSuffix(phoneNumber) ? `; destination ends in ${phoneSuffix(phoneNumber)}` : ""}.`,
+        },
         founderPush: {
           eventKey,
           title: "Unmatched Retell call",
@@ -373,12 +431,14 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           });
         }
       }
+      void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
     }
 
     if (body.data.event === "call_ended" && !call.call_id) {
       req.log.warn("Call-ended webhook missing call ID; waiting for analyzed event to avoid duplicate legacy leads");
+      void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
     }
@@ -415,6 +475,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     });
     }
 
+    void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
   } catch (error) {
     const details = error instanceof Error ? error.message : "Unknown Retell post-call processing error";
@@ -425,6 +486,12 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     await recordPostCallFailure(req, {
       summary: "Post-call webhook processing failed",
       details,
+      businessId: processingBusiness?.id,
+      businessName: processingBusiness?.businessName,
+      systemAlert: {
+        issueKey: `retell:post-call:processing-error:${processingBusiness?.id ?? "unknown"}`,
+        category: "post_call_processing_error",
+      },
     });
     res.status(500).json({ error: "Unable to process Retell post-call webhook" });
   }

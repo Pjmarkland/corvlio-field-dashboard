@@ -33,10 +33,13 @@ import type {
   AdminFallbackPhoneSettings,
   AdminFallbackPhoneSettingsUpdate,
   AdminFlaggedLeadsResponse,
+  AdminHealthCheck,
   AdminOverview,
   AdminResolveLeadFlagResult,
+  AdminResolveSystemAlertResponse,
   AdminRetellWebhookUrls,
   AdminSmsMessagesResponse,
+  AdminSystemAlertsResponse,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
   AppReviewDemoStatus,
@@ -3650,6 +3653,231 @@ export const useResolveAdminLeadInformationFlag = <TError = ErrorType<void>,
       > => {
       return useMutation(getResolveAdminLeadInformationFlagMutationOptions(options));
     }
+
+export const getGetAdminSystemAlertsUrl = () => {
+
+
+
+
+  return `/api/admin/system-alerts`
+}
+
+/**
+ * @summary List recent Retell system alerts
+ */
+export const getAdminSystemAlerts = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminSystemAlertsResponse> => {
+
+  return customFetch<AdminSystemAlertsResponse>(getGetAdminSystemAlertsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminSystemAlertsQueryKey = () => {
+    return [
+    `/api/admin/system-alerts`
+    ] as const;
+    }
+
+
+export const getGetAdminSystemAlertsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSystemAlerts>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSystemAlertsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSystemAlerts>>> = ({ signal }) => getAdminSystemAlerts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemAlerts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSystemAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSystemAlerts>>>
+export type GetAdminSystemAlertsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List recent Retell system alerts
+ */
+
+export function useGetAdminSystemAlerts<TData = Awaited<ReturnType<typeof getAdminSystemAlerts>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSystemAlertsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getResolveAdminSystemAlertUrl = (alertId: number,) => {
+
+
+
+
+  return `/api/admin/system-alerts/${alertId}/resolve`
+}
+
+/**
+ * @summary Resolve a Retell system alert
+ */
+export const resolveAdminSystemAlert = async (alertId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminResolveSystemAlertResponse> => {
+
+  return customFetch<AdminResolveSystemAlertResponse>(getResolveAdminSystemAlertUrl(alertId),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveAdminSystemAlertMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminSystemAlert>>, TError,{alertId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveAdminSystemAlert>>, TError,{alertId: number}, TContext> => {
+
+const mutationKey = ['resolveAdminSystemAlert'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveAdminSystemAlert>>, {alertId: number}> = (props) => {
+          const {alertId} = props ?? {};
+
+          return  resolveAdminSystemAlert(alertId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveAdminSystemAlertMutationResult = NonNullable<Awaited<ReturnType<typeof resolveAdminSystemAlert>>>
+
+    export type ResolveAdminSystemAlertMutationError = ErrorType<void>
+
+    /**
+ * @summary Resolve a Retell system alert
+ */
+export const useResolveAdminSystemAlert = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminSystemAlert>>, TError,{alertId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveAdminSystemAlert>>,
+        TError,
+        {alertId: number},
+        TContext
+      > => {
+      return useMutation(getResolveAdminSystemAlertMutationOptions(options));
+    }
+
+export const getGetAdminHealthCheckUrl = () => {
+
+
+
+
+  return `/api/admin/health-check`
+}
+
+/**
+ * @summary Read Retell webhook health
+ */
+export const getAdminHealthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminHealthCheck> => {
+
+  return customFetch<AdminHealthCheck>(getGetAdminHealthCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminHealthCheckQueryKey = () => {
+    return [
+    `/api/admin/health-check`
+    ] as const;
+    }
+
+
+export const getGetAdminHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof getAdminHealthCheck>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminHealthCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminHealthCheck>>> = ({ signal }) => getAdminHealthCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminHealthCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminHealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminHealthCheck>>>
+export type GetAdminHealthCheckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read Retell webhook health
+ */
+
+export function useGetAdminHealthCheck<TData = Awaited<ReturnType<typeof getAdminHealthCheck>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetAdminActivityUrl = () => {
 

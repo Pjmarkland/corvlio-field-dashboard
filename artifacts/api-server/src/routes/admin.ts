@@ -8,6 +8,10 @@ import {
   UpdateAdminBusinessFallbackPhoneParams,
   UpdateAdminBusinessFallbackPhoneBody,
   UpdateAdminBusinessFallbackPhoneResponse,
+  GetAdminSystemAlertsResponse,
+  ResolveAdminSystemAlertParams,
+  ResolveAdminSystemAlertResponse,
+  GetAdminHealthCheckResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
 import {
@@ -30,6 +34,11 @@ import {
   saveDefaultFallbackPhoneNumber,
 } from "../lib/fallbackPhoneSettings";
 import { normalizeUsPhoneNumber } from "../lib/usPhoneNumber";
+import {
+  getAdminRetellHealthCheck,
+  getAdminRetellSystemAlerts,
+  resolveRetellSystemAlert,
+} from "../lib/retellSystemAlerts";
 
 const router: IRouter = Router();
 
@@ -113,6 +122,58 @@ router.patch("/admin/businesses/:businessId/fallback-phone", async (req, res): P
       "Business fallback phone setting could not be saved",
     );
     res.status(502).json({ error: "Business fallback phone setting could not be saved." });
+  }
+});
+
+router.get("/admin/system-alerts", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(GetAdminSystemAlertsResponse.parse(await getAdminRetellSystemAlerts()));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Admin Retell system alerts could not be loaded",
+    );
+    res.status(502).json({ error: "System alerts could not be loaded." });
+  }
+});
+
+router.patch("/admin/system-alerts/:alertId/resolve", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const params = ResolveAdminSystemAlertParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Enter a valid alert ID." });
+    return;
+  }
+  try {
+    const resolved = await resolveRetellSystemAlert(
+      params.data.alertId,
+      typeof res.locals.adminEmail === "string" ? res.locals.adminEmail : "admin",
+    );
+    if (!resolved) {
+      res.status(404).json({ error: "Open system alert not found." });
+      return;
+    }
+    res.json(ResolveAdminSystemAlertResponse.parse({ resolved }));
+  } catch (error) {
+    req.log.error(
+      { alertId: params.data.alertId, errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Admin Retell system alert could not be resolved",
+    );
+    res.status(502).json({ error: "System alert could not be resolved." });
+  }
+});
+
+router.get("/admin/health-check", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(GetAdminHealthCheckResponse.parse(await getAdminRetellHealthCheck()));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Admin Retell health check could not be loaded",
+    );
+    res.status(502).json({ error: "Health check could not be loaded." });
   }
 });
 

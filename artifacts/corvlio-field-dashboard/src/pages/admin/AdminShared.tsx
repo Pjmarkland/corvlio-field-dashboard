@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect } from 'react';
-import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, FileText, LayoutDashboard, LockKeyhole, MessageSquare, Radio, RefreshCw, Settings, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, FileText, LayoutDashboard, LockKeyhole, MessageSquare, Radio, RefreshCw, Settings, ShieldAlert, Users, Activity } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
-import type { AdminBusinessSummary } from '@workspace/api-client-react';
+import { getGetAdminSystemAlertsQueryKey, useGetAdminSystemAlerts, type AdminBusinessSummary } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 
@@ -10,6 +10,8 @@ const BILLING_NAV = { href: '/admin/billing', label: 'Billing', icon: BarChart3 
 
 export const ADMIN_NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
+  { href: '/admin/system-alerts', label: 'System alerts', icon: AlertTriangle },
+  { href: '/admin/health-check', label: 'Health check', icon: Activity },
   { href: '/admin/activity', label: 'Lead activity', icon: Radio },
   { href: '/admin/sms', label: 'SMS alerts', icon: MessageSquare },
   { href: '/admin/invoices', label: 'Invoices', icon: FileText },
@@ -70,7 +72,18 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
   const [location] = useLocation();
   const { enabled: billingOn } = useBillingAvailability();
   const adminAccess = useAdminAccess();
+  const alertsQuery = useGetAdminSystemAlerts({
+    query: {
+      queryKey: getGetAdminSystemAlertsQueryKey(),
+      retry: false,
+      refetchInterval: 30_000,
+    },
+  });
+  const openAlertCount = alertsQuery.data?.openCount ?? 0;
   const navItems = billingOn ? [...ADMIN_NAV, BILLING_NAV] : ADMIN_NAV;
+  const alertBadge = (small = false) => openAlertCount > 0
+    ? <span aria-label={`${openAlertCount} open system alerts`} className={`rounded-full bg-[#b94739] px-1.5 py-0.5 font-mono text-[9px] font-bold leading-none text-white ${small ? 'ml-1' : 'ml-auto'}`}>{openAlertCount > 99 ? '99+' : openAlertCount}</span>
+    : null;
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -94,6 +107,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
               <Link key={href} href={href} data-testid={`link-admin-nav-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`admin-link flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c] hover:bg-[#e3eae2] hover:text-[#244d3f]'}`}>
                 <Icon size={17} strokeWidth={active ? 2.5 : 1.8} />
                 <span>{label}</span>
+                {href === '/admin/system-alerts' ? alertBadge() : null}
                 {active ? <ChevronRight size={14} className="ml-auto opacity-60" /> : null}
               </Link>
             );
@@ -117,7 +131,7 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
             {adminAccess ? <Link href="/dashboard" className="admin-link whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-[#66736c]" data-testid="link-admin-mobile-back-dashboard"><ArrowLeft size={13} className="mr-1.5 inline-block" />Back to dashboard</Link> : null}
             {navItems.map(({ href, label, icon: Icon }) => {
               const active = href === '/admin' ? location === href : location.startsWith(href);
-              return <Link key={href} href={href} data-testid={`link-admin-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c]'}`}><Icon size={13} className="mr-1.5 inline-block" />{label}</Link>;
+              return <Link key={href} href={href} data-testid={`link-admin-mobile-${label.toLowerCase().replace(/\s+/g, '-')}`} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active ? 'bg-[#dcebe1] text-[#244d3f]' : 'text-[#66736c]'}`}><Icon size={13} className="mr-1.5 inline-block" />{label}{href === '/admin/system-alerts' ? alertBadge(true) : null}</Link>;
             })}
           </nav>
         </header>

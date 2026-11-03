@@ -61,6 +61,8 @@ import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/Accoun
 import NativeBillingSection from '@/components/NativeBillingSection';
 import NativeBillingPage from '@/pages/NativeBillingPage';
 import AdminActivityPage from '@/pages/admin/AdminActivityPage';
+import AdminSystemAlertsPage from '@/pages/admin/AdminSystemAlertsPage';
+import AdminHealthCheckPage from '@/pages/admin/AdminHealthCheckPage';
 import BillingPage from '@/pages/billing';
 import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage';
 import OwnerInvoicePanel from '@/components/OwnerInvoicePanel';
@@ -916,6 +918,14 @@ function AdminActivityRoute() {
   return <AdminGuard><AdminActivityPage /></AdminGuard>;
 }
 
+function AdminSystemAlertsRoute() {
+  return <AdminGuard><AdminSystemAlertsPage /></AdminGuard>;
+}
+
+function AdminHealthCheckRoute() {
+  return <AdminGuard><AdminHealthCheckPage /></AdminGuard>;
+}
+
 function AdminInvoicesRoute() {
   return <AdminGuard><AdminInvoicesPage /></AdminGuard>;
 }
@@ -970,7 +980,7 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/admin/sms" component={AdminSmsRoute} /><Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/admin/sms" component={AdminSmsRoute} /><Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} /><Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} /><Route path="/admin/health-check" component={AdminHealthCheckRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
 }
 
 function App() {
