@@ -13,6 +13,7 @@ import leadAlertsRouter from "./leadAlerts";
 import webPushRouter from "./webPush";
 import billingRouter from "./billing";
 import accountRouter from "./account";
+import ownerSmsRouter from "./ownerSms";
 import pendingReleasesRouter from "./pendingReleases";
 import invoicingRouter from "./invoicing";
 import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
@@ -20,6 +21,7 @@ import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
 const router: IRouter = Router();
 router.use(accountDeletionGuard);
 router.use(accountRouter);
+router.use(ownerSmsRouter);
 router.use(pendingReleasesRouter);
 router.use(invoicingRouter);
 

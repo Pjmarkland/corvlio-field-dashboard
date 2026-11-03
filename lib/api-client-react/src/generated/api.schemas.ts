@@ -281,6 +281,21 @@ export const BillingReadinessSecretKeyMode = {
   missing: 'missing',
 } as const;
 
+export interface OwnerSmsReadiness {
+  smsEnabled: boolean;
+  ready: boolean;
+  accountSidPresent: boolean;
+  accountSidValid: boolean;
+  apiKeySidPresent: boolean;
+  apiKeySidValid: boolean;
+  apiKeySecretPresent: boolean;
+  messagingServiceSidPresent: boolean;
+  messagingServiceSidValid: boolean;
+  authTokenPresent: boolean;
+  inboundWebhookUrlSet: boolean;
+  inboundWebhookUrlValid: boolean;
+}
+
 export interface BillingReadiness {
   enabled: boolean;
   mode: BillingReadinessMode;
@@ -296,6 +311,73 @@ export interface BillingReadiness {
   webhookUrl: string | null;
   /** @nullable */
   webhookReachable: boolean | null;
+  sms: OwnerSmsReadiness;
+}
+
+export interface SmsTestInput {
+  /** @pattern ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ */
+  requestId: string;
+  /** @pattern ^\+[1-9][0-9]{7,14}$ */
+  to: string;
+}
+
+export type SmsTestResultStatus = typeof SmsTestResultStatus[keyof typeof SmsTestResultStatus];
+
+
+export const SmsTestResultStatus = {
+  queued: 'queued',
+  sent: 'sent',
+  delivered: 'delivered',
+  failed: 'failed',
+  undelivered: 'undelivered',
+} as const;
+
+export interface SmsTestResult {
+  id: number;
+  status: SmsTestResultStatus;
+  /** @nullable */
+  twilioMessageSid: string | null;
+  /** @nullable */
+  errorCode: string | null;
+}
+
+export type AdminSmsMessageCategory = typeof AdminSmsMessageCategory[keyof typeof AdminSmsMessageCategory];
+
+
+export const AdminSmsMessageCategory = {
+  lead_alert: 'lead_alert',
+  test: 'test',
+  help_reply: 'help_reply',
+} as const;
+
+export type AdminSmsMessageStatus = typeof AdminSmsMessageStatus[keyof typeof AdminSmsMessageStatus];
+
+
+export const AdminSmsMessageStatus = {
+  failed: 'failed',
+  undelivered: 'undelivered',
+} as const;
+
+export interface AdminSmsMessage {
+  id: number;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  /** @nullable */
+  leadId: number | null;
+  category: AdminSmsMessageCategory;
+  recipientMasked: string;
+  status: AdminSmsMessageStatus;
+  /** @nullable */
+  errorCode: string | null;
+  /** @nullable */
+  twilioMessageSid: string | null;
+  createdAt: string;
+}
+
+export interface AdminSmsMessagesResponse {
+  messages: AdminSmsMessage[];
 }
 
 export interface AccountDeletionEligibility {

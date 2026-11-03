@@ -31,6 +31,7 @@ import type {
   AdminFlaggedLeadsResponse,
   AdminOverview,
   AdminResolveLeadFlagResult,
+  AdminSmsMessagesResponse,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
   AppReviewDemoStatus,
@@ -80,6 +81,8 @@ import type {
   OwnerDemoConfirmation,
   PaymentInstructions,
   PendingRetellRelease,
+  SmsTestInput,
+  SmsTestResult,
   StartupEligibilityInput,
   WebPushConfig,
   WebPushSubscriptionInput,
@@ -4225,6 +4228,142 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCheckAdminBillingReadinessMutationOptions(options));
+    }
+
+export const getGetAdminSmsMessagesUrl = () => {
+
+
+
+
+  return `/api/admin/sms/messages`
+}
+
+export const getAdminSmsMessages = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminSmsMessagesResponse> => {
+
+  return customFetch<AdminSmsMessagesResponse>(getGetAdminSmsMessagesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminSmsMessagesQueryKey = () => {
+    return [
+    `/api/admin/sms/messages`
+    ] as const;
+    }
+
+
+export const getGetAdminSmsMessagesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSmsMessages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSmsMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSmsMessagesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSmsMessages>>> = ({ signal }) => getAdminSmsMessages({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSmsMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSmsMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSmsMessages>>>
+export type GetAdminSmsMessagesQueryError = ErrorType<unknown>
+
+
+
+export function useGetAdminSmsMessages<TData = Awaited<ReturnType<typeof getAdminSmsMessages>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSmsMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSmsMessagesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendAdminSmsTestUrl = () => {
+
+
+
+
+  return `/api/admin/sms/test`
+}
+
+export const sendAdminSmsTest = async (smsTestInput: SmsTestInput, options?: Parameters<typeof customFetch>[1]): Promise<SmsTestResult> => {
+
+  return customFetch<SmsTestResult>(getSendAdminSmsTestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(smsTestInput)
+  }
+);}
+
+
+
+
+
+export const getSendAdminSmsTestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminSmsTest>>, TError,{data: BodyType<SmsTestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendAdminSmsTest>>, TError,{data: BodyType<SmsTestInput>}, TContext> => {
+
+const mutationKey = ['sendAdminSmsTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendAdminSmsTest>>, {data: BodyType<SmsTestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendAdminSmsTest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendAdminSmsTestMutationResult = NonNullable<Awaited<ReturnType<typeof sendAdminSmsTest>>>
+    export type SendAdminSmsTestMutationBody = BodyType<SmsTestInput>
+    export type SendAdminSmsTestMutationError = ErrorType<unknown>
+
+    export const useSendAdminSmsTest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendAdminSmsTest>>, TError,{data: BodyType<SmsTestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendAdminSmsTest>>,
+        TError,
+        {data: BodyType<SmsTestInput>},
+        TContext
+      > => {
+      return useMutation(getSendAdminSmsTestMutationOptions(options));
     }
 
 export const getSetStartupEligibilityUrl = (businessId: number,) => {

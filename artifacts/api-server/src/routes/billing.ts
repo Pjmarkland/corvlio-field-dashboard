@@ -9,6 +9,7 @@ import { billingStore } from "../billing/store";
 import { BillingError, billingGate } from "../billing/policy";
 import { readNativeBillingSummary } from "../billing/nativeSummary";
 import { checkBillingReadiness } from "../billing/readiness";
+import { getOwnerSmsReadiness } from "../lib/ownerSms";
 
 const router: IRouter = Router();
 // Read-only exception BEFORE the unchanged payment gate. This cannot enable billing.
@@ -31,7 +32,8 @@ router.get("/billing/availability", (_req, res) => {
 router.post("/admin/billing/readiness-check", requireAdmin, async (req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");
   try {
-    res.json(await checkBillingReadiness());
+    const readiness = await checkBillingReadiness();
+    res.json({ ...readiness, sms: getOwnerSmsReadiness() });
   } catch {
     req.log?.error("Admin billing readiness check failed");
     res.status(503).json({ error: "Billing readiness could not be checked." });

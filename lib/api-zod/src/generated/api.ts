@@ -1695,7 +1695,66 @@ export const CheckAdminBillingReadinessResponse = zod.object({
   "webhookSecretValid": zod.boolean(),
   "publicApiBaseValid": zod.boolean(),
   "webhookUrl": zod.string().nullable(),
-  "webhookReachable": zod.boolean().nullable()
+  "webhookReachable": zod.boolean().nullable(),
+  "sms": zod.object({
+  "smsEnabled": zod.boolean(),
+  "ready": zod.boolean(),
+  "accountSidPresent": zod.boolean(),
+  "accountSidValid": zod.boolean(),
+  "apiKeySidPresent": zod.boolean(),
+  "apiKeySidValid": zod.boolean(),
+  "apiKeySecretPresent": zod.boolean(),
+  "messagingServiceSidPresent": zod.boolean(),
+  "messagingServiceSidValid": zod.boolean(),
+  "authTokenPresent": zod.boolean(),
+  "inboundWebhookUrlSet": zod.boolean(),
+  "inboundWebhookUrlValid": zod.boolean()
+})
+})
+
+
+export const getAdminSmsMessagesResponseMessagesItemIdMultipleOf = 1;
+
+export const getAdminSmsMessagesResponseMessagesItemBusinessIdMultipleOf = 1;
+
+export const getAdminSmsMessagesResponseMessagesItemLeadIdMultipleOf = 1;
+
+
+
+export const GetAdminSmsMessagesResponse = zod.object({
+  "messages": zod.array(zod.object({
+  "id": zod.number().multipleOf(getAdminSmsMessagesResponseMessagesItemIdMultipleOf),
+  "businessId": zod.number().multipleOf(getAdminSmsMessagesResponseMessagesItemBusinessIdMultipleOf).nullable(),
+  "businessName": zod.string().nullable(),
+  "leadId": zod.number().multipleOf(getAdminSmsMessagesResponseMessagesItemLeadIdMultipleOf).nullable(),
+  "category": zod.enum(['lead_alert', 'test', 'help_reply']),
+  "recipientMasked": zod.string(),
+  "status": zod.enum(['failed', 'undelivered']),
+  "errorCode": zod.string().nullable(),
+  "twilioMessageSid": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+export const sendAdminSmsTestBodyRequestIdRegExp = new RegExp('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+export const sendAdminSmsTestBodyToRegExp = new RegExp('^\\+[1-9][0-9]{7,14}$');
+
+
+export const SendAdminSmsTestBody = zod.object({
+  "requestId": zod.string().regex(sendAdminSmsTestBodyRequestIdRegExp),
+  "to": zod.string().regex(sendAdminSmsTestBodyToRegExp)
+})
+
+export const sendAdminSmsTestResponseIdMultipleOf = 1;
+
+
+
+export const SendAdminSmsTestResponse = zod.object({
+  "id": zod.number().multipleOf(sendAdminSmsTestResponseIdMultipleOf),
+  "status": zod.enum(['queued', 'sent', 'delivered', 'failed', 'undelivered']),
+  "twilioMessageSid": zod.string().nullable(),
+  "errorCode": zod.string().nullable()
 })
 
 

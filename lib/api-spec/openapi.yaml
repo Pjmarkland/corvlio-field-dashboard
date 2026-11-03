@@ -1124,6 +1124,25 @@ paths:
         - clerkSession: []
       responses:
         "200": {description: Admin-only configuration and webhook readiness, content: {application/json: {schema: {$ref: "#/components/schemas/BillingReadiness"}}}}
+  /admin/sms/messages:
+    get:
+      operationId: getAdminSmsMessages
+      security:
+        - clerkSession: []
+      responses:
+        "200": {description: Recent SMS delivery failures, content: {application/json: {schema: {$ref: "#/components/schemas/AdminSmsMessagesResponse"}}}}
+  /admin/sms/test:
+    post:
+      operationId: sendAdminSmsTest
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SmsTestInput"}
+      responses:
+        "200": {description: Result of one admin test text, content: {application/json: {schema: {$ref: "#/components/schemas/SmsTestResult"}}}}
   /admin/billing/{businessId}/startup:
     patch:
       operationId: setStartupEligibility
@@ -1404,7 +1423,64 @@ components:
         publicApiBaseValid: {type: boolean}
         webhookUrl: {type: [string, "null"]}
         webhookReachable: {type: [boolean, "null"]}
-      required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable]
+        sms: {$ref: "#/components/schemas/OwnerSmsReadiness"}
+      required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable, sms]
+    OwnerSmsReadiness:
+      type: object
+      properties:
+        smsEnabled: {type: boolean}
+        ready: {type: boolean}
+        accountSidPresent: {type: boolean}
+        accountSidValid: {type: boolean}
+        apiKeySidPresent: {type: boolean}
+        apiKeySidValid: {type: boolean}
+        apiKeySecretPresent: {type: boolean}
+        messagingServiceSidPresent: {type: boolean}
+        messagingServiceSidValid: {type: boolean}
+        authTokenPresent: {type: boolean}
+        inboundWebhookUrlSet: {type: boolean}
+        inboundWebhookUrlValid: {type: boolean}
+      required: [smsEnabled, ready, accountSidPresent, accountSidValid, apiKeySidPresent, apiKeySidValid, apiKeySecretPresent, messagingServiceSidPresent, messagingServiceSidValid, authTokenPresent, inboundWebhookUrlSet, inboundWebhookUrlValid]
+    SmsTestInput:
+      type: object
+      additionalProperties: false
+      properties:
+        requestId:
+          type: string
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+        to:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+      required: [requestId, to]
+    SmsTestResult:
+      type: object
+      properties:
+        id: {type: number, multipleOf: 1}
+        status: {type: string, enum: [queued, sent, delivered, failed, undelivered]}
+        twilioMessageSid: {type: [string, "null"]}
+        errorCode: {type: [string, "null"]}
+      required: [id, status, twilioMessageSid, errorCode]
+    AdminSmsMessage:
+      type: object
+      properties:
+        id: {type: number, multipleOf: 1}
+        businessId: {type: [number, "null"], multipleOf: 1}
+        businessName: {type: [string, "null"]}
+        leadId: {type: [number, "null"], multipleOf: 1}
+        category: {type: string, enum: [lead_alert, test, help_reply]}
+        recipientMasked: {type: string}
+        status: {type: string, enum: [failed, undelivered]}
+        errorCode: {type: [string, "null"]}
+        twilioMessageSid: {type: [string, "null"]}
+        createdAt: {type: string, format: date-time}
+      required: [id, businessId, businessName, leadId, category, recipientMasked, status, errorCode, twilioMessageSid, createdAt]
+    AdminSmsMessagesResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items: {$ref: "#/components/schemas/AdminSmsMessage"}
+      required: [messages]
     AccountDeletionEligibility:
       type: object
       properties:

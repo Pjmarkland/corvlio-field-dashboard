@@ -9,6 +9,7 @@ import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { persistAnalyzedCall, persistBlankCall } from "../lib/retellPersistence";
+import { sendOwnerLeadSms } from "../lib/ownerSms";
 import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
 import { queueFounderPushNotification, recordOperationalFailure } from "../lib/operationalFailures";
@@ -384,6 +385,12 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           error: error instanceof Error ? error.message : "Unknown outbox error",
         },
         "Immediate Retell notification delivery failed",
+      );
+    });
+    void sendOwnerLeadSms(business.id, lead.id).catch(() => {
+      req.log.warn(
+        { leadId: lead.id, businessId: business.id },
+        "Owner SMS alert failed without affecting other lead notifications",
       );
     });
     }
