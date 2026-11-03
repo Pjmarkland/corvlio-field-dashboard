@@ -17,10 +17,14 @@ import { businessesTable, db, leadInfoFlagsTable, leadsTable, pool } from "@work
 import { createInternalBusiness, internalBusinessDirectory, internalBusinessRecord, InternalBusinessError } from "../lib/internalBusinesses";
 import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
+import { getAdminRetellWebhookUrls } from "../lib/retellWebhookUrls";
 
 const router: IRouter = Router();
 
 router.use("/admin", requireAdmin);
+router.get("/admin/retell-webhook-urls", (_req, res): void => {
+  res.set("Cache-Control", "private, no-store").json(getAdminRetellWebhookUrls());
+});
 router.get("/admin/internal-businesses", async (req,res) => {
   res.set("Cache-Control","private, no-store");
   try { res.json(await internalBusinessDirectory()); }

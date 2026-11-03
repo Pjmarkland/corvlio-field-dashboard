@@ -826,6 +826,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InternalBusinessRecord"
+  /admin/retell-webhook-urls:
+    get:
+      operationId: getAdminRetellWebhookUrls
+      tags: [admin]
+      security: [{ ClerkSession: [] }]
+      summary: Get Retell webhook URLs built from the configured public API base
+      responses:
+        "200":
+          description: Configured production webhook destinations; no Retell settings are changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRetellWebhookUrls"
+        "404": { description: Not authorized }
   /admin/internal-businesses/{businessId}:
     patch:
       operationId: updateAdminInternalBusiness
@@ -1424,7 +1438,24 @@ components:
         webhookUrl: {type: [string, "null"]}
         webhookReachable: {type: [boolean, "null"]}
         sms: {$ref: "#/components/schemas/OwnerSmsReadiness"}
-      required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable, sms]
+        webPush: {$ref: "#/components/schemas/WebPushReadiness"}
+      required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable, sms, webPush]
+    WebPushReadiness:
+      type: object
+      properties:
+        configured: {type: boolean}
+        publicKeyPresent: {type: boolean}
+        privateKeyPresent: {type: boolean}
+        subjectPresent: {type: boolean}
+        subjectValid: {type: boolean}
+      required: [configured, publicKeyPresent, privateKeyPresent, subjectPresent, subjectValid]
+    AdminRetellWebhookUrls:
+      type: object
+      properties:
+        configured: {type: boolean}
+        preCallWebhookUrl: {type: [string, "null"]}
+        postCallWebhookUrl: {type: [string, "null"]}
+      required: [configured, preCallWebhookUrl, postCallWebhookUrl]
     OwnerSmsReadiness:
       type: object
       properties:

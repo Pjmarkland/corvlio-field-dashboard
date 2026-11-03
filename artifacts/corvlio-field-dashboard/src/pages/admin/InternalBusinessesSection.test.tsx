@@ -7,9 +7,15 @@ const create = vi.fn();
 const update = vi.fn();
 vi.mock('@workspace/api-client-react', () => ({
   getGetAdminInternalBusinessesQueryKey: () => ['d'], getGetAdminOverviewQueryKey: () => ['o'], getGetAdminBusinessQueryKey: (id: number) => ['b', id],
+  getGetAdminRetellWebhookUrlsQueryKey: () => ['retell-webhook-urls'],
   useGetAdminInternalBusinesses: () => ({ isLoading: false, isError: false, data: {
     businesses: [{ id: 3, businessName: 'Corvlio', isInternal: true, agentName: 'Aria', retellPhoneNumber: '+15550001111', retellAgentId: 'agent_1', ownerUserId: 'u1', ownerEmail: 'hello@corvlio.com' }],
     owners: [{ userId: 'u1', email: 'a@x.co', linkedBusinessName: 'Corvlio' }, { userId: 'u2', email: 'b@x.co', linkedBusinessName: null }] } }),
+  useGetAdminRetellWebhookUrls: () => ({ data: {
+    configured: true,
+    preCallWebhookUrl: 'https://field.example/api/webhooks/retell/pre-call',
+    postCallWebhookUrl: 'https://field.example/api/webhooks/retell/post-call',
+  } }),
   useCreateAdminInternalBusiness: () => ({ mutate: create, isPending: false }),
   useUpdateAdminInternalBusiness: () => ({ mutate: update, isPending: false }),
 }));
@@ -34,6 +40,8 @@ describe('InternalBusinessesSection', () => {
     fireEvent.click(screen.getByTestId('button-review-internal'));
     expect(screen.getByTestId('internal-change-preview').textContent).toContain('does not call Retell, change the number’s current agent or webhook');
     expect(screen.getByTestId('internal-change-preview').textContent).toContain('per-number pre-call webhook already points to this app');
+    expect(screen.getByText('https://field.example/api/webhooks/retell/pre-call')).toBeTruthy();
+    expect(screen.getByText('https://field.example/api/webhooks/retell/post-call')).toBeTruthy();
     expect(create).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('button-create-internal'));
     expect(create.mock.calls[0][0]).toEqual({ data: {

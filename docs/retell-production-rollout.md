@@ -7,10 +7,8 @@
 - The draft's `webhook_url` is the development origin plus `/api/webhooks/retell/post-call`.
 - The published agent's post-call destination is an existing **Make** webhook, not the development app.
 - No agent, LLM, phone-number routing, knowledge base, or production deployment was changed in this batch.
-- The registered production application URL was obtained from deployment metadata:
-  `https://corvlio-field-dashboard--pjmarkland08.replit.app`
-- The proposed production results endpoint is:
-  `https://corvlio-field-dashboard--pjmarkland08.replit.app/api/webhooks/retell/post-call`
+- The configured `PUBLIC_API_BASE_URL` is the source of truth for production webhook URLs.
+- Build the production results endpoint as `/api/webhooks/retell/post-call` on that configured HTTPS origin.
 - Publishing alone DOES NOT rewrite the development webhook. Publishing the draft as-is would send its call results to development.
 
 ## Knowledge-base review: not a lossless replacement for the live sales agent

@@ -10,7 +10,7 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string; `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` — Web Push key pair (Replit Secrets; `VAPID_SUBJECT` is optional and defaults to Corvlio support)
-- `VITE_NATIVE_API_BASE_URL` — (native Capacitor builds only) absolute API origin, e.g. `https://corvlio-field-dashboard--pjmarkland08.replit.app`. Web PWA builds leave this unset and continue to use same-origin relative paths.
+- `VITE_NATIVE_API_BASE_URL` — the configured public API origin used by native Capacitor builds. Keep it aligned with `PUBLIC_API_BASE_URL`; web PWA builds leave it unset and use same-origin relative paths.
 
 ## Stack
 

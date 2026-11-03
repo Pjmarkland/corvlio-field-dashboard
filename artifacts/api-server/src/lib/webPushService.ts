@@ -31,18 +31,57 @@ type ClaimedDelivery = {
   is_sample: boolean;
 };
 
+export type WebPushReadiness = {
+  configured: boolean;
+  publicKeyPresent: boolean;
+  privateKeyPresent: boolean;
+  subjectPresent: boolean;
+  subjectValid: boolean;
+};
+
+function isValidVapidSubject(subject: string | undefined): boolean {
+  if (!subject) return false;
+  if (subject.startsWith("mailto:")) return /^mailto:[^\s@]+@[^\s@]+$/.test(subject);
+  try {
+    const url = new URL(subject);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+export function getWebPushReadiness(
+  env: Record<string, string | undefined> = process.env,
+): WebPushReadiness {
+  const publicKeyPresent = Boolean(env.VAPID_PUBLIC_KEY?.trim());
+  const privateKeyPresent = Boolean(env.VAPID_PRIVATE_KEY?.trim());
+  const subject = env.VAPID_SUBJECT?.trim();
+  const subjectPresent = Boolean(subject);
+  const subjectValid = isValidVapidSubject(subject);
+  return {
+    configured: publicKeyPresent && privateKeyPresent && subjectValid,
+    publicKeyPresent,
+    privateKeyPresent,
+    subjectPresent,
+    subjectValid,
+  };
+}
+
 function getVapidConfiguration(): VapidConfiguration | null {
   const publicKey = process.env.VAPID_PUBLIC_KEY?.trim();
   const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
-  if (!publicKey && !privateKey) return null;
+  const subject = process.env.VAPID_SUBJECT?.trim();
+  if (!publicKey && !privateKey && !subject) return null;
   if (!publicKey || !privateKey) {
     throw new WebPushConfigurationError("Both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured");
   }
-  return {
-    publicKey,
-    privateKey,
-    subject: process.env.VAPID_SUBJECT?.trim() || "mailto:hello@corvlio.com",
-  };
+  if (!subject) {
+    throw new WebPushConfigurationError("VAPID_SUBJECT must be configured");
+  }
+  if (!isValidVapidSubject(subject)) {
+    throw new WebPushConfigurationError("VAPID_SUBJECT must be a valid mailto: or HTTPS URL");
+  }
+  return { publicKey, privateKey, subject };
 }
 
 export function getWebPushPublicConfig(): { available: boolean; publicKey: string | null } {

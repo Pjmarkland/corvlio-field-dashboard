@@ -8,6 +8,7 @@
 import type { BillingReadinessMode } from './billingReadinessMode';
 import type { BillingReadinessSecretKeyMode } from './billingReadinessSecretKeyMode';
 import type { OwnerSmsReadiness } from './ownerSmsReadiness';
+import type { WebPushReadiness } from './webPushReadiness';
 
 export interface BillingReadiness {
   enabled: boolean;
@@ -25,4 +26,5 @@ export interface BillingReadiness {
   /** @nullable */
   webhookReachable: boolean | null;
   sms: OwnerSmsReadiness;
+  webPush: WebPushReadiness;
 }

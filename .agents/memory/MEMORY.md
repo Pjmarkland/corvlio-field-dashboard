@@ -28,3 +28,4 @@
 - [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.
 - [Native client setup boundary](native-client-setup-scope.md) — the native app is for Corvlio clients; keep plan assignment and activation in the web admin.
 - [SMS alert consent boundary](sms-alert-consent.md) — owner-only consent; keep sends off until A2P approval, required Twilio secrets, and signed HTTPS webhooks are ready.
+- [Browser push configuration](browser-push-configuration.md) — require explicit VAPID public/private keys and subject; admin readiness reports status without values.

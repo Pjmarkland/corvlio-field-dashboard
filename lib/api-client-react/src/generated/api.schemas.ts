@@ -296,6 +296,14 @@ export interface OwnerSmsReadiness {
   inboundWebhookUrlValid: boolean;
 }
 
+export interface WebPushReadiness {
+  configured: boolean;
+  publicKeyPresent: boolean;
+  privateKeyPresent: boolean;
+  subjectPresent: boolean;
+  subjectValid: boolean;
+}
+
 export interface BillingReadiness {
   enabled: boolean;
   mode: BillingReadinessMode;
@@ -312,6 +320,15 @@ export interface BillingReadiness {
   /** @nullable */
   webhookReachable: boolean | null;
   sms: OwnerSmsReadiness;
+  webPush: WebPushReadiness;
+}
+
+export interface AdminRetellWebhookUrls {
+  configured: boolean;
+  /** @nullable */
+  preCallWebhookUrl: string | null;
+  /** @nullable */
+  postCallWebhookUrl: string | null;
 }
 
 export interface SmsTestInput {

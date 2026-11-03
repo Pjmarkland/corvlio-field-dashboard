@@ -18,6 +18,7 @@ vi.mock("web-push", () => ({
 import {
   enqueueWebPushDeliveries,
   getWebPushPublicConfig,
+  getWebPushReadiness,
   processWebPushOutbox,
   registerWebPushSubscription,
 } from "../../src/lib/webPushService";
@@ -47,12 +48,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("business-scoped Web Push", () => {
-  it("keeps configuration unavailable until both VAPID values exist", () => {
+  it("requires both VAPID keys and a valid subject before reporting readiness", () => {
     expect(getWebPushPublicConfig()).toEqual({ available: false, publicKey: null });
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-test-key");
     expect(() => getWebPushPublicConfig()).toThrow(/Both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY/);
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-test-key");
+    expect(() => getWebPushPublicConfig()).toThrow(/VAPID_SUBJECT/);
+    expect(getWebPushReadiness()).toEqual({
+      configured: false,
+      publicKeyPresent: true,
+      privateKeyPresent: true,
+      subjectPresent: false,
+      subjectValid: false,
+    });
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test");
     expect(getWebPushPublicConfig()).toEqual({ available: true, publicKey: "public-test-key" });
+    expect(getWebPushReadiness().configured).toBe(true);
+    expect(getWebPushReadiness()).not.toHaveProperty("publicKey");
+    expect(getWebPushReadiness()).not.toHaveProperty("privateKey");
   });
 
   it("queues a new event only for subscriptions attached to its business", async () => {
@@ -68,6 +81,7 @@ describe("business-scoped Web Push", () => {
   it("registers an endpoint only for the same existing user and business", async () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-test-key");
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-test-key");
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test");
     mocks.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1 }] });
     const registered = await registerWebPushSubscription({
       clerkUserId: "owner-a",
@@ -97,6 +111,7 @@ describe("business-scoped Web Push", () => {
   it("delivers the event payload to a matching business subscription", async () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-test-key");
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-test-key");
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test");
     mocks.query.mockImplementation(async (query: string) => query.includes("WITH due AS")
       ? { rowCount: 1, rows: [delivery] }
       : { rowCount: 1, rows: [] });
@@ -118,6 +133,7 @@ describe("business-scoped Web Push", () => {
   it("prunes provider-expired subscriptions and retries temporary failures", async () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-test-key");
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-test-key");
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test");
     mocks.query.mockImplementation(async (query: string) => query.includes("WITH due AS")
       ? { rowCount: 1, rows: [delivery] }
       : { rowCount: 1, rows: [] });
@@ -145,6 +161,7 @@ describe("business-scoped Web Push", () => {
   it("marks a business-mismatched event as ineligible for delivery", async () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-test-key");
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-test-key");
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test");
     const mismatched = { ...delivery, lead_alerts_enabled: false };
     mocks.query.mockImplementation(async (query: string) => query.includes("WITH due AS")
       ? { rowCount: 1, rows: [mismatched] }

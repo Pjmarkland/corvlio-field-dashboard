@@ -51,6 +51,9 @@ beforeEach(() => {
   vi.stubEnv("STRIPE_SECRET_KEY", "");
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_offline_local");
   vi.stubEnv("PUBLIC_API_BASE_URL", "http://127.0.0.1:9999/api");
+  vi.stubEnv("VAPID_PUBLIC_KEY", "");
+  vi.stubEnv("VAPID_PRIVATE_KEY", "");
+  vi.stubEnv("VAPID_SUBJECT", "");
 });
 afterAll(() => vi.unstubAllEnvs());
 const ownerHeaders = { "x-test-owner": "owner-a", "content-type": "application/json" };
@@ -132,7 +135,16 @@ describe("billing authorization and feature flag", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ enabled: false, mode: "off", secretKeyPresent: false, webhookReachable: null });
+    expect(body.webPush).toEqual({
+      configured: false,
+      publicKeyPresent: false,
+      privateKeyPresent: false,
+      subjectPresent: false,
+      subjectValid: false,
+    });
     expect(body).not.toHaveProperty("secretKey");
+    expect(body.webPush).not.toHaveProperty("publicKey");
+    expect(body.webPush).not.toHaveProperty("privateKey");
   });
 });
 describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {

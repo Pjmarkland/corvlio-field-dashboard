@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import {
+  getGetAdminRetellWebhookUrlsQueryKey,
+  useGetAdminRetellWebhookUrls,
   useCreateAdminInternalBusiness,
   type InternalBusinessDirectoryOwnersItem,
   type InternalBusinessInput,
@@ -59,6 +61,9 @@ export default function InternalBusinessCreateForm({
   onCreated: () => void;
 }) {
   const create = useCreateAdminInternalBusiness();
+  const webhookUrls = useGetAdminRetellWebhookUrls({
+    query: { queryKey: getGetAdminRetellWebhookUrlsQueryKey(), retry: false },
+  });
   const [form, setForm] = useState(initialForm);
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [error, setError] = useState('');
@@ -188,8 +193,8 @@ export default function InternalBusinessCreateForm({
       <summary className="cursor-pointer font-semibold text-[#25362e]">Retell cutover and rollback steps — no changes are made now</summary>
       <ol className="mt-3 list-decimal space-y-2 pl-5 leading-relaxed">
         <li>Before creating the app mapping, read-only verify this number’s current inbound agent/version, weights, and inbound webhook URL. When cutover is explicitly approved, record those values and the current Make scenario so they can be restored.</li>
-        <li>In Retell, change only this number’s inbound-agent assignment to the approved shared-agent numeric version and set its per-number pre-call webhook to <code>https://corvlio-field-dashboard--pjmarkland08.replit.app/api/webhooks/retell/pre-call</code>. Preserve unrelated phone settings and verify the saved values.</li>
-        <li>The post-call webhook is configured on an agent version, not on the phone number. The project runbook records the published shared version posting to Make and the draft pointing at development. Do not publish that draft or change a shared version used by other numbers. Only use a reviewed production version with the post-call destination <code>https://corvlio-field-dashboard--pjmarkland08.replit.app/api/webhooks/retell/post-call</code>; confirm the effect on every number using that version first.</li>
+        <li>In Retell, change only this number’s inbound-agent assignment to the approved shared-agent numeric version and set its per-number pre-call webhook to <code>{webhookUrls.data?.preCallWebhookUrl ?? 'Unavailable — configure PUBLIC_API_BASE_URL'}</code>. Preserve unrelated phone settings and verify the saved values.</li>
+        <li>The post-call webhook is configured on an agent version, not on the phone number. The project runbook records the published shared version posting to Make and the draft pointing at development. Do not publish that draft or change a shared version used by other numbers. Only use a reviewed production version with the post-call destination <code>{webhookUrls.data?.postCallWebhookUrl ?? 'Unavailable — configure PUBLIC_API_BASE_URL'}</code>; confirm the effect on every number using that version first.</li>
         <li>Make one authorized test call. Verify one lead in the app, one email to hello@corvlio.com, and no duplicate Make email before expanding the cutover.</li>
       </ol>
       <p className="mt-3 leading-relaxed"><strong>Rollback:</strong> restore this number’s saved numeric agent version and old pre-call webhook. If a new agent version was used, point the number back to the old version that still posts to Make. Keep the old Make scenario and number; do not delete or release either.</p>

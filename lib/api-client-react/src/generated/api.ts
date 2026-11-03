@@ -31,6 +31,7 @@ import type {
   AdminFlaggedLeadsResponse,
   AdminOverview,
   AdminResolveLeadFlagResult,
+  AdminRetellWebhookUrls,
   AdminSmsMessagesResponse,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
@@ -2763,6 +2764,83 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateAdminInternalBusinessMutationOptions(options));
     }
+
+export const getGetAdminRetellWebhookUrlsUrl = () => {
+
+
+
+
+  return `/api/admin/retell-webhook-urls`
+}
+
+/**
+ * @summary Get Retell webhook URLs built from the configured public API base
+ */
+export const getAdminRetellWebhookUrls = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminRetellWebhookUrls> => {
+
+  return customFetch<AdminRetellWebhookUrls>(getGetAdminRetellWebhookUrlsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminRetellWebhookUrlsQueryKey = () => {
+    return [
+    `/api/admin/retell-webhook-urls`
+    ] as const;
+    }
+
+
+export const getGetAdminRetellWebhookUrlsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminRetellWebhookUrlsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>> = ({ signal }) => getAdminRetellWebhookUrls({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminRetellWebhookUrlsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>>
+export type GetAdminRetellWebhookUrlsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get Retell webhook URLs built from the configured public API base
+ */
+
+export function useGetAdminRetellWebhookUrls<TData = Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRetellWebhookUrls>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminRetellWebhookUrlsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getUpdateAdminInternalBusinessUrl = (businessId: number,) => {
 

@@ -85,6 +85,13 @@ function Content({ billingEnabled }: { billingEnabled: boolean }) {
         <p><span className="font-semibold">Webhook secret:</span> {readiness.data.webhookSecretValid ? 'Present and valid format' : 'Missing or invalid format'}</p>
         <p><span className="font-semibold">Public HTTPS API base:</span> {readiness.data.publicApiBaseValid ? 'Valid' : 'Missing or invalid'}</p>
         <p><span className="font-semibold">Webhook reachability:</span> {readiness.data.webhookReachable === true ? 'Reachable' : readiness.data.webhookReachable === false ? 'Unreachable' : 'Not checked'}</p>
+        <p data-testid="text-admin-web-push-readiness"><span className="font-semibold">Browser push:</span> {readiness.data.webPush.configured
+          ? 'Configured'
+          : `Missing or invalid ${[
+            !readiness.data.webPush.publicKeyPresent ? 'VAPID_PUBLIC_KEY' : '',
+            !readiness.data.webPush.privateKeyPresent ? 'VAPID_PRIVATE_KEY' : '',
+            !readiness.data.webPush.subjectPresent || !readiness.data.webPush.subjectValid ? 'VAPID_SUBJECT' : '',
+          ].filter(Boolean).join(', ')}`}</p>
         {readiness.data.webhookUrl ? <p className="break-all sm:col-span-2"><span className="font-semibold">Webhook endpoint:</span> <code>{readiness.data.webhookUrl}</code></p> : null}
       </div> : null}
     </section>

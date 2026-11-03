@@ -20,7 +20,7 @@ const {
   mockNativeState: { value: false },
   mockGetOwnerInvoices: vi.fn(),
   mockDashboardReports: {
-    callUsage: { data: { count: 18, includedCalls: 100 } },
+    callUsage: { data: { count: 18, includedCalls: 100 as number | null } },
     monthlyReport: { isLoading: false, isError: false, data: { enabled: false, month: '2026-11-01', calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [] } },
   },
 }));
@@ -393,6 +393,13 @@ describe('usage and managed report display', () => {
     const { container } = render(<CallUsageLine />);
     expect(screen.getByTestId('text-call-usage').textContent).toBe('18 of 100 calls this month');
     expect(container.textContent).not.toMatch(/price|plan|\$/i);
+  });
+
+  it('shows call usage for unlimited plans without a limit or upgrade language', () => {
+    mockDashboardReports.callUsage = { data: { count: 18, includedCalls: null } };
+    const { container } = render(<CallUsageLine />);
+    expect(screen.getByTestId('text-call-usage').textContent).toBe('18 calls this month');
+    expect(container.textContent).not.toMatch(/limit|upgrade|price|plan|\$/i);
   });
 
   it('keeps monthly results hidden until enabled, then renders the report', () => {

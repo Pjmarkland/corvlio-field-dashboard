@@ -1,9 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
 
-// Published URL verified through deployment metadata. Never use the dev domain.
-const publishedOrigin = 'https://corvlio-field-dashboard--pjmarkland08.replit.app';
-export const websiteBillingUrl = new URL('/billing', import.meta.env.VITE_NATIVE_API_BASE_URL || publishedOrigin).href;
+const configuredPublicBase = import.meta.env.VITE_NATIVE_API_BASE_URL?.trim();
+export const websiteBillingUrl = configuredPublicBase
+  ? new URL('/billing', configuredPublicBase).href
+  : null;
 
 async function launchExternal(url: URL) {
   if (!Capacitor.isNativePlatform()) throw new Error('External billing management is for the native app.');
@@ -14,6 +15,9 @@ async function launchExternal(url: URL) {
   if (!result.completed) throw new Error('The browser could not be opened. Please try again.');
 }
 export async function openBillingWebsite() {
+  if (!websiteBillingUrl) {
+    throw new Error('The public app URL is not configured. Set VITE_NATIVE_API_BASE_URL.');
+  }
   await launchExternal(new URL(websiteBillingUrl));
 }
 export async function openStripeBillingPortal(value: string) {

@@ -1093,6 +1093,16 @@ export const CreateAdminInternalBusinessResponse = zod.object({
 })
 
 
+/**
+ * @summary Get Retell webhook URLs built from the configured public API base
+ */
+export const GetAdminRetellWebhookUrlsResponse = zod.object({
+  "configured": zod.boolean(),
+  "preCallWebhookUrl": zod.string().nullable(),
+  "postCallWebhookUrl": zod.string().nullable()
+})
+
+
 export const UpdateAdminInternalBusinessParams = zod.object({
   "businessId": zod.coerce.number()
 })
@@ -1709,6 +1719,13 @@ export const CheckAdminBillingReadinessResponse = zod.object({
   "authTokenPresent": zod.boolean(),
   "inboundWebhookUrlSet": zod.boolean(),
   "inboundWebhookUrlValid": zod.boolean()
+}),
+  "webPush": zod.object({
+  "configured": zod.boolean(),
+  "publicKeyPresent": zod.boolean(),
+  "privateKeyPresent": zod.boolean(),
+  "subjectPresent": zod.boolean(),
+  "subjectValid": zod.boolean()
 })
 })
 

@@ -354,8 +354,11 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
 
 export function CallUsageLine() {
   const { data } = useGetBusinessCallUsage();
-  if (!data || data.includedCalls === null) return null;
-  return <p className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground" data-testid="text-call-usage">{data.count} of {data.includedCalls} calls this month</p>;
+  if (!data) return null;
+  const usageText = data.includedCalls === null
+    ? `${data.count} calls this month`
+    : `${data.count} of ${data.includedCalls} calls this month`;
+  return <p className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground" data-testid="text-call-usage">{usageText}</p>;
 }
 
 export function ManagedMonthlyResultsReport() {
