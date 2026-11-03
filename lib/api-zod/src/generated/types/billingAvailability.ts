@@ -5,7 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingAvailabilityMode } from './billingAvailabilityMode';
 
 export interface BillingAvailability {
   enabled: boolean;
+  mode: BillingAvailabilityMode;
 }

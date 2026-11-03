@@ -10,20 +10,20 @@ vi.mock('@workspace/api-client-react', () => ({
 import { useBillingAvailability } from './useBilling';
 beforeEach(() => {
   vi.clearAllMocks(); m.native = false; m.signedIn = true;
-  m.availability.mockReturnValue({ data: { enabled: true }, isLoading: false });
+  m.availability.mockReturnValue({ data: { enabled: true, mode: 'test' }, isLoading: false });
 });
 describe('native billing exclusion', () => {
   it.each(['ios', 'android'])('blocks %s even with cached enabled billing data and disables the request', () => {
     m.native = true;
     const { result } = renderHook(useBillingAvailability);
-    expect(result.current).toEqual({ enabled: false, settled: true, disabled: true });
+    expect(result.current).toEqual({ enabled: false, settled: true, disabled: true, mode: 'off' });
     expect(m.availability).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ enabled: false }),
     }));
   });
   it('preserves signed-in web/PWA availability', () => {
     const { result } = renderHook(useBillingAvailability);
-    expect(result.current).toEqual({ enabled: true, settled: true, disabled: false });
+    expect(result.current).toEqual({ enabled: true, settled: true, disabled: false, mode: 'test' });
     expect(m.availability).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ enabled: true }),
     }));

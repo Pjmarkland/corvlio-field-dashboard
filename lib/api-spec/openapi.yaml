@@ -1117,6 +1117,13 @@ paths:
       operationId: getAdminBilling
       responses:
         "200": {description: Admin billing, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/BillingSnapshot"}}}}}
+  /admin/billing/readiness-check:
+    post:
+      operationId: checkAdminBillingReadiness
+      security:
+        - clerkSession: []
+      responses:
+        "200": {description: Admin-only configuration and webhook readiness, content: {application/json: {schema: {$ref: "#/components/schemas/BillingReadiness"}}}}
   /admin/billing/{businessId}/startup:
     patch:
       operationId: setStartupEligibility
@@ -1380,7 +1387,24 @@ components:
       type: object
       properties:
         enabled: {type: boolean}
-      required: [enabled]
+        mode: {type: string, enum: [off, test, live]}
+      required: [enabled, mode]
+    BillingReadiness:
+      type: object
+      properties:
+        enabled: {type: boolean}
+        mode: {type: string, enum: [off, test, live]}
+        reason: {type: string}
+        liveModeOptIn: {type: boolean}
+        runningInProduction: {type: boolean}
+        secretKeyPresent: {type: boolean}
+        secretKeyMode: {type: string, enum: [live, test, unknown, missing]}
+        webhookSecretPresent: {type: boolean}
+        webhookSecretValid: {type: boolean}
+        publicApiBaseValid: {type: boolean}
+        webhookUrl: {type: [string, "null"]}
+        webhookReachable: {type: [boolean, "null"]}
+      required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable]
     AccountDeletionEligibility:
       type: object
       properties:
@@ -1825,6 +1849,9 @@ components:
       properties:
         isInternal:
           type: boolean
+        billingMode:
+          type: string
+          enum: [manual, square, stripe]
         ownerPhone:
           type: [string, "null"]
         leadAlertsEnabled:
@@ -1882,6 +1909,7 @@ components:
         retellPhoneNumber:
           type: [string, "null"]
       required:
+        - billingMode
         - businessName
         - agentName
         - businessType

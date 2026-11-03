@@ -23,7 +23,7 @@ vi.mock('@capacitor/core', async importOriginal => ({ ...await importOriginal<ob
 vi.mock('@workspace/api-client-react', async importOriginal => ({
   ...await importOriginal<object>(),
   useGetAdminOverview: (options: unknown) => { state.overview(options); return state.query; },
-  useGetBusinessProfile: () => ({ data: { isInternal: true }, isSuccess: true }),
+  useGetBusinessProfile: () => ({ data: { isInternal: true, billingMode: 'manual' }, isSuccess: true }),
   useGetOwnerInvoices: () => ({ data: undefined }),
 }));
 vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => ({ enabled: false }) }));

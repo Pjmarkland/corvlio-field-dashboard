@@ -3,19 +3,20 @@ name: Manual invoice boundaries
 description: Manual payment rollout scope, legacy-account safety and Gmail delivery uncertainty.
 ---
 
-Manual invoice onboarding is a separate payment phase. Keep the Stripe
-implementation intact and disabled; do not activate a payment-provider API as a
-side effect of working on this flow.
+Emailed invoices remain the default while Stripe is off. New businesses use the
+active provider mode at creation; existing manual-mode businesses remain on emailed
+invoices and cannot be converted automatically.
 
-**Why:** The user explicitly requested provider-free invoices while their payment
-provider setup is blocked, with manual confirmation and future hosted links.
+**Why:** The user authorized live Stripe under the LLC but requires a separate
+default-off gate and a single billing path per business. Existing manual invoices
+must not be replaced with a second charge path.
 
 **How to apply:** Manual remains the default. The user has authorized an optional
 Square card-autopay integration in the development workspace, with a mandatory
 stop after its Sandbox proof and billing-mode foundation. Do not proceed to signup
 consent, webhooks or admin integration until the user authorizes the next stages.
-Never publish as part of this work. Square must be the only invoice/reminder sender
-for Square-mode businesses; bank payers remain on monthly manual invoices.
+Square must be the only invoice/reminder sender for Square-mode businesses; bank
+payers remain on monthly manual invoices.
 
 **Why:** The user explicitly requested staged implementation, one billing owner
 per business, unchanged manual behavior and unchanged payment-gated provisioning.

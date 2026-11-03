@@ -1,5 +1,5 @@
 {
-  "documentation": "Development/test billing settings, not legal advice or final policy. Amounts are USD cents. No call blocking, suspension, automatic tier movement or per-call charges.",
+  "documentation": "Locked four-plan Corvlio pricing shared by test and live Stripe modes. Amounts are USD cents. No call blocking, suspension, automatic tier movement or per-call charges.",
   "currency": "usd",
   "plans": [
     {"id":"startup","label":"Startup","monthlyCents":50000,"setupCents":25000,"callLimit":100},

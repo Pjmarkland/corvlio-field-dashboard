@@ -98,6 +98,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   business = {
     id: 44,
+    billingMode: "manual",
     businessName: "Example Heating",
     agentName: null,
     businessType: "HVAC",
@@ -403,6 +404,7 @@ describe("owner business profile API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({
+      billingMode: "manual",
       businessName: "Example Heating",
       businessType: "HVAC",
       ownerEmail: "owner@example.com",

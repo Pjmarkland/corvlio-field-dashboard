@@ -1,16 +1,16 @@
 # Native Settings billing
 
 The current App Store hardening contract is documented in
-`ios-app-store-hardening.md`. It supersedes the older portal behavior described
-below: native Billing now shows plan/status/next invoice date only, and Manage
-billing always opens the website billing page, without creating a portal
-session. Internal businesses are excluded. Native `/billing` is the read-only
-screen; native purchase/plan-selection surfaces remain blocked. With Stripe
-disabled, web `/billing` shows existing manual invoices instead of enabling
-Stripe.
+`ios-app-store-hardening.md`. Native Billing shows subscription status and next
+invoice date only; it never shows prices or plan comparisons. “Manage billing”
+requests an authenticated Stripe portal session when Stripe is enabled and the
+owner has a Stripe customer, then opens that portal in the OS external browser.
+Internal businesses are excluded. Native checkout and plan-selection surfaces
+remain blocked. With Stripe disabled, manual-mode web accounts continue to use
+emailed invoices; existing Stripe-mode accounts are not silently converted.
 
-Implemented in development only. No publishing, redeployment, Secrets changes
-or deployment-setting changes are part of this work.
+The live-capable code remains disabled by default. No publishing, credential
+changes, Stripe resource creation or production-data changes are part of this work.
 
 - Capacitor iOS/Android Settings shows stored plan name, subscription status,
   and a future next charge date when recorded. Canceled/non-recurring accounts,
@@ -19,17 +19,16 @@ or deployment-setting changes are part of this work.
 - `/api/billing/native-summary` is authenticated and owner-scoped. It performs
   only a SELECT, returns no prices or Stripe identifiers, and does not contact
   Stripe, create accounts, refresh usage or send notices.
-- The existing production billing gate and mutation endpoints are unchanged.
-  A disabled gate still refuses portal creation, Checkout and plan changes.
-- “Manage billing” requests the existing authenticated Stripe portal only when
-  enabled and a customer exists. Otherwise a neutral website link is shown.
-  If the server gate closes during the action, the website opens externally.
+- “Manage billing” is disabled unless the server reports Stripe enabled and an
+  existing Stripe customer. Tapping it requests a portal URL from the authenticated
+  API; the portal session is created only for that user action.
 - Capacitor AppLauncher uses the operating system's external URL handling:
   `UIApplication.open` on iOS and `ACTION_VIEW` on Android. It does not use an
-  embedded browser, Capacitor Browser, or an app payment route.
+  embedded browser or Capacitor Browser.
 - Direct native billing/Checkout/plan-selection surfaces stay blocked. The
-  existing web/PWA page, navigation and price presentation are unchanged.
-- Browser failures produce a calm retry message, never a webview fallback.
+  web/PWA page remains the payment surface and displays whether Stripe is in
+  test or live mode.
+- API or browser failures produce a calm retry message, never a webview fallback.
 
 The fallback website origin was verified against published deployment metadata.
 An explicit native API URL uses its website origin for `/billing`.

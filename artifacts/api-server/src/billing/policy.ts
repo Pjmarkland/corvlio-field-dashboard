@@ -28,17 +28,47 @@ export function planFor(id: string) {
 export class BillingError extends Error {
   constructor(message: string, public status = 409) { super(message); }
 }
-export function billingGate(env: NodeJS.ProcessEnv = process.env) {
-  if (env.STRIPE_SECRET_KEY?.startsWith("sk_live_")) return { enabled: false, reason: "live_key_refused" };
-  if (env.NODE_ENV === "production") return { enabled: false, reason: "production_disabled" };
-  if (env.BILLING_ENABLED !== "true") return { enabled: false, reason: "flag_off" };
-  if (!env.STRIPE_SECRET_KEY?.startsWith("sk_test_") || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
-    return { enabled: false, reason: "missing_test_credentials" };
+export type StripeBillingMode = "off" | "test" | "live";
+
+export function publicApiBase(env: NodeJS.ProcessEnv = process.env): URL | null {
   try {
     const base = new URL(env.PUBLIC_API_BASE_URL ?? "");
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw new Error();
-  } catch { return { enabled: false, reason: "missing_or_invalid_public_base" }; }
-  return { enabled: true, reason: "test_only" };
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) return null;
+    return base;
+  } catch {
+    return null;
+  }
+}
+
+export function isConfiguredReplitHost(base: URL, env: NodeJS.ProcessEnv = process.env) {
+  const hosts = (env.REPLIT_DOMAINS ?? "").split(",").map((value) => {
+    const host = value.trim().replace(/^https?:\/\//, "").split("/")[0]?.toLowerCase();
+    return host?.replace(/:\d+$/, "");
+  }).filter(Boolean);
+  return hosts.includes(base.hostname.toLowerCase());
+}
+
+export function billingGate(env: NodeJS.ProcessEnv = process.env) {
+  const off = (reason: string) => ({ enabled: false, mode: "off" as const, reason });
+  if (env.BILLING_ENABLED !== "true") return off("flag_off");
+
+  const liveOptIn = env.STRIPE_LIVE_MODE_ENABLED === "true";
+  const secretKey = env.STRIPE_SECRET_KEY ?? "";
+  if (liveOptIn) {
+    if (env.NODE_ENV !== "production") return off("live_mode_requires_production");
+    if (!secretKey.startsWith("sk_live_") || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
+      return off("missing_live_credentials");
+    const base = publicApiBase(env);
+    if (!base || !isConfiguredReplitHost(base, env)) return off("invalid_production_base");
+    return { enabled: true, mode: "live" as const, reason: "live_ready" };
+  }
+
+  if (secretKey.startsWith("sk_live_")) return off("live_mode_flag_off");
+  if (env.NODE_ENV === "production") return off("production_disabled");
+  if (!secretKey.startsWith("sk_test_") || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
+    return off("missing_test_credentials");
+  if (!publicApiBase(env)) return off("missing_or_invalid_public_base");
+  return { enabled: true, mode: "test" as const, reason: "test_only" };
 }
 export function billingUrl(path = config.operations.ownerPath, portal = false) {
   const base = (process.env.PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "").replace(/\/api$/, "");

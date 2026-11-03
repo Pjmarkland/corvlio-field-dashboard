@@ -6,8 +6,9 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { billingEnabled } from "../billing/stripeClient";
 import { billingService } from "../billing/runtime";
 import { billingStore } from "../billing/store";
-import { BillingError } from "../billing/policy";
+import { BillingError, billingGate } from "../billing/policy";
 import { readNativeBillingSummary } from "../billing/nativeSummary";
+import { checkBillingReadiness } from "../billing/readiness";
 
 const router: IRouter = Router();
 // Read-only exception BEFORE the unchanged payment gate. This cannot enable billing.
@@ -24,7 +25,17 @@ router.get("/billing/native-summary", async (req, res): Promise<void> => {
   }
 });
 router.get("/billing/availability", (_req, res) => {
-  res.set("Cache-Control", "no-store").json({ enabled: billingEnabled() });
+  const gate = billingGate();
+  res.set("Cache-Control", "no-store").json({ enabled: gate.enabled, mode: gate.mode });
+});
+router.post("/admin/billing/readiness-check", requireAdmin, async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(await checkBillingReadiness());
+  } catch {
+    req.log?.error("Admin billing readiness check failed");
+    res.status(503).json({ error: "Billing readiness could not be checked." });
+  }
 });
 const enabled = (_req: Request, res: Response, next: NextFunction) => {
   if (!billingEnabled()) { res.sendStatus(404); return; }
@@ -50,7 +61,7 @@ function ownerAction(action: Action, input: "plan" | "empty" | "none" = "empty")
       res.json(await action(business.id, userId, req));
     } catch (error) {
       res.status(error instanceof BillingError ? error.status : 503)
-        .json({ error: error instanceof BillingError ? error.message : "Test billing temporarily unavailable. Calls continue." });
+        .json({ error: error instanceof BillingError ? error.message : "Billing is temporarily unavailable. Calls continue." });
     }
   };
 }
@@ -65,7 +76,7 @@ router.get("/admin/billing", async (_req, res): Promise<void> => {
   try {
     const businesses = await billingStore.businesses();
     res.json(await Promise.all(businesses.map(b => billingService.snapshot(b.id))));
-  } catch { res.status(503).json({ error: "Test billing temporarily unavailable" }); }
+  } catch { res.status(503).json({ error: "Billing is temporarily unavailable" }); }
 });
 router.patch("/admin/billing/:businessId/startup", async (req, res): Promise<void> => {
   const id = z.coerce.number().int().positive().safeParse(req.params.businessId);

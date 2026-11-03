@@ -9,6 +9,8 @@ export function billingFixture() {
   const events = new Map<string, { id: string; businessId: number; type: string; detail: string; actor: string | null; createdAt: string }>();
   const notices = new Map<string, BillingNotice>();
   const calls = new Map<number, number>();
+  const activations: number[] = [];
+  let activeMode: "test" | "live" = "test";
   let clock = new Date("2026-10-10T10:00:00Z");
   let subscription: SubscriptionData = {
     id: "sub_test_1", customer: "cus_test_1", status: "active", start_date: Date.parse("2026-10-01T00:00:00Z") / 1000,
@@ -33,6 +35,8 @@ export function billingFixture() {
           return true;
         },
         notice: async n => { const key = `${id}:${n.key}:${n.audience}`; if (!stagedNotices.has(key)) stagedNotices.set(key, n); },
+        prepareStripeBilling: async () => {},
+        markStripeFirstInvoicePaid: async () => true,
       });
       states.set(id, state);
       events.clear(); stagedEvents.forEach((v, k) => events.set(k, v));
@@ -40,18 +44,29 @@ export function billingFixture() {
       return result;
     },
   };
+  const products = new Map<string, { id: string; active: boolean; livemode: boolean; metadata: Record<string, string> }>();
   const prices = new Map<string, object>();
   const sdk = {
+    products: {
+      search: vi.fn(async ({ query }: { query: string }) => {
+        const plan = /metadata\['corvlio_plan'\]:'([^']+)'/.exec(query)?.[1];
+        return { data: [...products.values()].filter(product => product.metadata.corvlio_plan === plan) };
+      }),
+      create: vi.fn(async (params: { name: string; metadata: Record<string, string> }) => {
+        const product = { ...params, id: `prod_${params.metadata.corvlio_plan}`, active: true, livemode: activeMode === "live" };
+        products.set(product.id, product); return product;
+      }),
+    },
     prices: {
       list: vi.fn(async ({ lookup_keys }: { lookup_keys: string[] }) => ({ data: prices.has(lookup_keys[0]) ? [prices.get(lookup_keys[0])] : [] })),
       create: vi.fn(async (params: { lookup_key: string }) => {
-        const price = { ...params, id: `price_${params.lookup_key}`, livemode: false };
+        const price = { ...params, id: `price_${params.lookup_key}`, active: true, livemode: activeMode === "live" };
         prices.set(params.lookup_key, price); return price;
       }),
     },
-    customers: { create: vi.fn(async () => ({ id: "cus_test_1", livemode: false })) },
+    customers: { create: vi.fn(async () => ({ id: `cus_${activeMode}_1`, livemode: activeMode === "live" })) },
     checkout: { sessions: {
-      create: vi.fn(async () => ({ id: "cs_test_1", url: "https://checkout.stripe.com/test-session", livemode: false })),
+      create: vi.fn(async () => ({ id: `cs_${activeMode}_1`, url: `https://checkout.stripe.com/${activeMode}-session`, livemode: activeMode === "live" })),
       retrieve: vi.fn(async () => ({ id: "cs_test_1", status: "open", url: "https://checkout.stripe.com/test-session", livemode: false })),
       expire: vi.fn(async () => ({ id: "cs_test_1", status: "expired" })),
     } },
@@ -67,7 +82,8 @@ export function billingFixture() {
       sessions: { create: vi.fn(async () => ({ url: "https://billing.stripe.com/test-portal" })) },
     },
   };
-  const service = new BillingService(store, () => sdk as unknown as Stripe, () => clock);
+  const service = new BillingService(store, () => sdk as unknown as Stripe, () => clock, () => activeMode,
+    async id => { activations.push(id); });
   const state = (id = 1) => states.get(id)!;
   function subscribed(id = 1, changes: Partial<BillingState> = {}) {
     states.set(id, { ...initialBillingState(), customerId: `cus_test_${id}`, subscriptionId: `sub_test_${id}`, plan: "starter",
@@ -75,9 +91,10 @@ export function billingFixture() {
       paidPeriodEnd: "2026-11-01T00:00:00Z", setupPaid: true, ...changes });
   }
   function event(type: string, id: string, at = clock, object: object = { id: "in_test", customer: "cus_test_1", subscription: "sub_test_1" }) {
-    return { id, type, created: Math.floor(at.getTime() / 1000), livemode: false, data: { object } } as unknown as Stripe.Event;
+    return { id, type, created: Math.floor(at.getTime() / 1000), livemode: activeMode === "live", data: { object } } as unknown as Stripe.Event;
   }
-  return { service, sdk, store, states, state, subscribed, notices, calls, events, event,
+  return { service, sdk, store, states, state, subscribed, notices, calls, events, event, products, activations,
+    setMode: (mode: "test" | "live") => { activeMode = mode; },
     setNow: (date: string) => { clock = new Date(date); },
     setSubscription: (data: Partial<SubscriptionData>) => { subscription = { ...subscription, ...data }; },
   };

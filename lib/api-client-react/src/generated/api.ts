@@ -37,6 +37,7 @@ import type {
   BillingAccount,
   BillingAvailability,
   BillingPlanInput,
+  BillingReadiness,
   BillingRedirect,
   BillingSnapshot,
   BusinessCallUsage,
@@ -4160,6 +4161,71 @@ export function useGetAdminBilling<TData = Awaited<ReturnType<typeof getAdminBil
 
 
 
+
+export const getCheckAdminBillingReadinessUrl = () => {
+
+
+
+
+  return `/api/admin/billing/readiness-check`
+}
+
+export const checkAdminBillingReadiness = async ( options?: Parameters<typeof customFetch>[1]): Promise<BillingReadiness> => {
+
+  return customFetch<BillingReadiness>(getCheckAdminBillingReadinessUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckAdminBillingReadinessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminBillingReadiness>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkAdminBillingReadiness>>, TError,void, TContext> => {
+
+const mutationKey = ['checkAdminBillingReadiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkAdminBillingReadiness>>, void> = () => {
+
+
+          return  checkAdminBillingReadiness(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckAdminBillingReadinessMutationResult = NonNullable<Awaited<ReturnType<typeof checkAdminBillingReadiness>>>
+
+    export type CheckAdminBillingReadinessMutationError = ErrorType<unknown>
+
+    export const useCheckAdminBillingReadiness = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminBillingReadiness>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkAdminBillingReadiness>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCheckAdminBillingReadinessMutationOptions(options));
+    }
 
 export const getSetStartupEligibilityUrl = (businessId: number,) => {
 

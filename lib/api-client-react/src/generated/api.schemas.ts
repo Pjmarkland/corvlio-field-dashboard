@@ -248,8 +248,54 @@ export interface PendingRetellRelease {
   createdAt: string;
 }
 
+export type BillingAvailabilityMode = typeof BillingAvailabilityMode[keyof typeof BillingAvailabilityMode];
+
+
+export const BillingAvailabilityMode = {
+  off: 'off',
+  test: 'test',
+  live: 'live',
+} as const;
+
 export interface BillingAvailability {
   enabled: boolean;
+  mode: BillingAvailabilityMode;
+}
+
+export type BillingReadinessMode = typeof BillingReadinessMode[keyof typeof BillingReadinessMode];
+
+
+export const BillingReadinessMode = {
+  off: 'off',
+  test: 'test',
+  live: 'live',
+} as const;
+
+export type BillingReadinessSecretKeyMode = typeof BillingReadinessSecretKeyMode[keyof typeof BillingReadinessSecretKeyMode];
+
+
+export const BillingReadinessSecretKeyMode = {
+  live: 'live',
+  test: 'test',
+  unknown: 'unknown',
+  missing: 'missing',
+} as const;
+
+export interface BillingReadiness {
+  enabled: boolean;
+  mode: BillingReadinessMode;
+  reason: string;
+  liveModeOptIn: boolean;
+  runningInProduction: boolean;
+  secretKeyPresent: boolean;
+  secretKeyMode: BillingReadinessSecretKeyMode;
+  webhookSecretPresent: boolean;
+  webhookSecretValid: boolean;
+  publicApiBaseValid: boolean;
+  /** @nullable */
+  webhookUrl: string | null;
+  /** @nullable */
+  webhookReachable: boolean | null;
 }
 
 export interface AccountDeletionEligibility {
@@ -695,6 +741,15 @@ export interface AppReviewDemoLinkInput {
   allowUnverifiedEmail?: boolean;
 }
 
+export type BusinessProfileBillingMode = typeof BusinessProfileBillingMode[keyof typeof BusinessProfileBillingMode];
+
+
+export const BusinessProfileBillingMode = {
+  manual: 'manual',
+  square: 'square',
+  stripe: 'stripe',
+} as const;
+
 /**
  * @nullable
  */
@@ -708,6 +763,7 @@ export const BusinessProfileAiPromisePolicy = {
 
 export interface BusinessProfile {
   isInternal?: boolean;
+  billingMode: BusinessProfileBillingMode;
   /** @nullable */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;

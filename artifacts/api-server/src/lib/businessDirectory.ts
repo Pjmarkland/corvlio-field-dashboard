@@ -5,6 +5,7 @@ import {
   type NewBusiness,
 } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { billingGate } from "../billing/policy";
 
 export const WEBSITE_ENRICHMENT_FIELDS = [
   "businessType",
@@ -91,7 +92,10 @@ export async function findBusinessByClerkUserId(
 }
 
 export async function createBusiness(input: NewBusiness): Promise<DatabaseBusiness> {
-  const [business] = await db.insert(businessesTable).values(input).returning();
+  const billingMode = input.isInternal || input.isSample
+    ? "manual"
+    : input.billingMode === "square" ? "square" : billingGate().enabled ? "stripe" : "manual";
+  const [business] = await db.insert(businessesTable).values({ ...input, billingMode }).returning();
   if (!business) throw new Error("Business creation did not return a record");
   return business;
 }

@@ -100,6 +100,7 @@ export const getBusinessProfileResponseEmergencyEscalationPhoneMax = 16;
 
 export const GetBusinessProfileResponse = zod.object({
   "isInternal": zod.boolean().optional(),
+  "billingMode": zod.enum(['manual', 'square', 'stripe']),
   "ownerPhone": zod.string().nullish(),
   "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
@@ -216,6 +217,7 @@ export const updateBusinessProfileResponseEmergencyEscalationPhoneMax = 16;
 
 export const UpdateBusinessProfileResponse = zod.object({
   "isInternal": zod.boolean().optional(),
+  "billingMode": zod.enum(['manual', 'square', 'stripe']),
   "ownerPhone": zod.string().nullish(),
   "leadAlertsEnabled": zod.boolean().optional(),
   "businessHours": zod.string().nullish(),
@@ -1467,7 +1469,8 @@ export const RetryAdminLeadEmailsResponse = zod.object({
 
 
 export const GetBillingAvailabilityResponse = zod.object({
-  "enabled": zod.boolean()
+  "enabled": zod.boolean(),
+  "mode": zod.enum(['off', 'test', 'live'])
 })
 
 
@@ -1678,6 +1681,22 @@ export const GetAdminBillingResponseItem = zod.object({
 }))
 })
 export const GetAdminBillingResponse = zod.array(GetAdminBillingResponseItem)
+
+
+export const CheckAdminBillingReadinessResponse = zod.object({
+  "enabled": zod.boolean(),
+  "mode": zod.enum(['off', 'test', 'live']),
+  "reason": zod.string(),
+  "liveModeOptIn": zod.boolean(),
+  "runningInProduction": zod.boolean(),
+  "secretKeyPresent": zod.boolean(),
+  "secretKeyMode": zod.enum(['live', 'test', 'unknown', 'missing']),
+  "webhookSecretPresent": zod.boolean(),
+  "webhookSecretValid": zod.boolean(),
+  "publicApiBaseValid": zod.boolean(),
+  "webhookUrl": zod.string().nullable(),
+  "webhookReachable": zod.boolean().nullable()
+})
 
 
 export const SetStartupEligibilityParams = zod.object({

@@ -20,20 +20,24 @@ export default function BillingPage() {
 }
 
 function WebBillingPage() {
-  const { enabled, disabled } = useBillingAvailability();
+  const { enabled, mode } = useBillingAvailability();
   const profile=useGetBusinessProfile({query:{queryKey:getGetBusinessProfileQueryKey(),retry:false}});
   if(!profile.isSuccess)return null;
   if(profile.data?.isInternal)return <Redirect to="/dashboard" />;
-  if (disabled) return <main className="mx-auto min-h-screen max-w-3xl bg-background px-4 py-8 text-foreground">
+  if (profile.data?.billingMode !== 'stripe') return <main className="mx-auto min-h-screen max-w-3xl bg-background px-4 py-8 text-foreground">
     <Link href="/dashboard" className="inline-flex min-h-11 items-center font-semibold underline">Back to dashboard</Link>
     <h1 className="my-5 text-2xl font-bold">Billing</h1>
     <OwnerInvoicePanel />
   </main>;
-  if (!enabled) return null;
-  return <BillingContent />;
+  if (!enabled) return <main className="mx-auto min-h-screen max-w-3xl bg-background px-4 py-8 text-foreground">
+    <Link href="/dashboard" className="inline-flex min-h-11 items-center font-semibold underline">Back to dashboard</Link>
+    <h1 className="my-5 text-2xl font-bold">Billing</h1>
+    <p>Stripe billing is temporarily unavailable. No emailed invoice has been created for this Stripe account. Contact support before making a payment.</p>
+  </main>;
+  return <BillingContent mode={mode === 'live' ? 'live' : 'test'} />;
 }
 
-function BillingContent() {
+function BillingContent({ mode }: { mode: 'off' | 'test' | 'live' }) {
   const client = useQueryClient();
   const polls = useRef(MAX_POLLS);
   const [pollTick, setPollTick] = useState(0);
@@ -87,7 +91,7 @@ function BillingContent() {
 
   return <Shell>
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <span data-testid="badge-test-mode" className="rounded-full bg-muted px-3 py-1 text-xs font-bold uppercase tracking-wide">Test mode</span>
+      <span data-testid={`badge-${mode === 'live' ? 'live' : 'test'}-mode`} className="rounded-full bg-muted px-3 py-1 text-xs font-bold uppercase tracking-wide">{mode === 'live' ? 'Live mode' : 'Test mode'}</span>
       <span data-testid="text-calls-never-interrupted" className="text-sm text-muted-foreground">Calls are never interrupted by billing changes.</span>
     </div>
     {error ? <p role="alert" data-testid="billing-action-error" className="mb-4 rounded-xl border border-destructive/40 p-3 text-sm">{error}</p> : null}

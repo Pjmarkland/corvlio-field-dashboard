@@ -9,6 +9,8 @@ export interface BillingTransaction {
   claimEvent(id: string, type: string, detail: string, at: Date, actor?: string): Promise<boolean>;
   notice(input: BillingNotice): Promise<void>;
   countCalls(start: string, end: string): Promise<number>;
+  prepareStripeBilling(planId: string): Promise<void>;
+  markStripeFirstInvoicePaid(planId: string, paidAt: Date): Promise<boolean>;
 }
 export interface BillingStore {
   transact<T>(businessId: number, work: (tx: BillingTransaction) => Promise<T>): Promise<T>;
@@ -28,8 +30,10 @@ export const billingStore: BillingStore = {
     if (new Set(rows.map(r => r.businessId)).size > 1) throw new Error("Conflicting Stripe tenancy");
     return rows[0]?.businessId ?? null;
   },
-  async business(id) { return (await db.select().from(businessesTable).where(and(eq(businessesTable.id, id),eq(businessesTable.isInternal,false))).limit(1))[0] ?? null; },
-  async businesses() { return db.select().from(businessesTable).where(eq(businessesTable.isInternal,false)); },
+  async business(id) { return (await db.select().from(businessesTable)
+    .where(and(eq(businessesTable.id, id), eq(businessesTable.isInternal, false), eq(businessesTable.isSample, false))).limit(1))[0] ?? null; },
+  async businesses() { return db.select().from(businessesTable)
+    .where(and(eq(businessesTable.isInternal, false), eq(businessesTable.isSample, false))); },
   async timeline(id) {
     return (await db.select().from(billingEventsTable).where(eq(billingEventsTable.businessId, id))
       .orderBy(desc(billingEventsTable.createdAt)).limit(50)).map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
@@ -55,6 +59,43 @@ export const billingStore: BillingStore = {
             id: `${businessId}:${notice.key}:${notice.audience}`, businessId, audience: notice.audience,
             title: notice.title, body: notice.body, delivery: { email: false, push: false }, nextAttemptAt: new Date(),
           }).onConflictDoNothing();
+        },
+        async prepareStripeBilling(planId) {
+          const locked = await tx.execute(sql`
+            SELECT billing_mode, is_internal, is_sample
+            FROM businesses WHERE id = ${businessId} FOR UPDATE
+          `);
+          const current = locked.rows[0] as {
+            billing_mode: string; is_internal: boolean; is_sample: boolean;
+          } | undefined;
+          if (!current || current.is_internal || current.is_sample)
+            throw new BillingError("This business is unavailable for Stripe billing.", 404);
+          if (current.billing_mode === "square")
+            throw new BillingError("This business is assigned to another billing provider.");
+          if (current.billing_mode === "manual")
+            throw new BillingError("This business is assigned to emailed invoices; automatic conversion to Stripe is disabled.");
+          if (current.billing_mode !== "stripe") {
+            throw new BillingError("This business has an unsupported billing mode.");
+          }
+          await tx.update(businessesTable).set({ chosenPlan: planId })
+            .where(eq(businessesTable.id, businessId));
+        },
+        async markStripeFirstInvoicePaid(planId, paidAt) {
+          const locked = await tx.execute(sql`
+            SELECT billing_mode, first_invoice_paid_at, is_internal, is_sample
+            FROM businesses WHERE id = ${businessId} FOR UPDATE
+          `);
+          const current = locked.rows[0] as {
+            billing_mode: string; first_invoice_paid_at: Date | null; is_internal: boolean; is_sample: boolean;
+          } | undefined;
+          if (!current || current.is_internal || current.is_sample || current.billing_mode !== "stripe")
+            throw new BillingError("The paid Stripe subscription is not assigned to this business.", 409);
+          if (current.first_invoice_paid_at) return false;
+          await tx.update(businessesTable).set({
+            firstInvoicePaidAt: paidAt,
+            chosenPlan: planId,
+          }).where(eq(businessesTable.id, businessId));
+          return true;
         },
         async countCalls(start, end) {
           const result = await tx.execute(sql`

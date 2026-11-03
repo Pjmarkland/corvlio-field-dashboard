@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
-  avail: { enabled: false, settled: true, disabled: true },
+  avail: { enabled: false, settled: true, disabled: true } as { enabled: boolean; settled: boolean; disabled: boolean; mode?: 'off' | 'test' | 'live' },
+  businessMode: 'stripe' as 'manual' | 'square' | 'stripe',
   snapshot: vi.fn(), cancel: vi.fn(), checkout: vi.fn(),
   data: null as unknown,
   native: false,
@@ -17,7 +18,7 @@ vi.mock('wouter', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetBusinessProfileQueryKey:()=>['profile'],
-  useGetBusinessProfile:()=>({isSuccess:true,data:{isInternal:false}}),
+  useGetBusinessProfile:()=>({isSuccess:true,data:{isInternal:false,billingMode:m.businessMode}}),
   getGetOwnerBillingQueryKey: () => ['b'],
   useGetOwnerBilling: () => { m.snapshot(); return { data: m.data, isLoading: false, isError: false, refetch: vi.fn(), dataUpdatedAt: 0 }; },
   useCreateBillingCheckout: () => ({ mutate: m.checkout, isPending: false }),
@@ -32,11 +33,26 @@ const account = { plan: 'starter', status: 'active', subscriptionId: 'sub', peri
 beforeEach(() => {
   vi.clearAllMocks();
   m.native = false;
+  m.businessMode = 'stripe';
   m.data = { account, usage: { count: 63, limit: 100, start: '2025-06-01T00:00:00Z', end: '2025-07-01T00:00:00Z' }, plans: [{ id: 'starter', label: 'Starter', monthlyCents: 5000, setupCents: 0, callLimit: 100 }], policy: { cancellationNoticeDays: 30 }, timeline: [] };
 });
 describe('billing page', () => {
   it('shows existing website invoices while Stripe is disabled, without requesting Stripe billing',()=>{
+    m.businessMode = 'manual';
     m.avail={enabled:false,settled:true,disabled:true};
+    render(<BillingPage />);
+    expect(screen.getByTestId('manual-invoices')).toBeTruthy();
+    expect(m.snapshot).not.toHaveBeenCalled();
+    expect(m.checkout).not.toHaveBeenCalled();
+  });
+  it('labels live mode clearly before showing Stripe billing actions', () => {
+    m.avail = { enabled: true, settled: true, disabled: false, mode: 'live' };
+    render(<BillingPage />);
+    expect(screen.getByTestId('badge-live-mode').textContent).toBe('Live mode');
+  });
+  it('keeps manually invoiced businesses on the invoice page when Stripe is enabled globally', () => {
+    m.businessMode = 'manual';
+    m.avail = { enabled: true, settled: true, disabled: false, mode: 'live' };
     render(<BillingPage />);
     expect(screen.getByTestId('manual-invoices')).toBeTruthy();
     expect(m.snapshot).not.toHaveBeenCalled();
@@ -84,6 +100,7 @@ describe('billing page', () => {
     expect(screen.getByTestId('text-next-charge').textContent).toContain('renewal before cancellation');
   });
   it('flag off exposes only existing manual invoices, never Stripe billing UI or a snapshot', () => {
+    m.businessMode = 'manual';
     m.avail = { enabled: false, settled: true, disabled: true };
     render(<BillingPage />);
     expect(screen.getByTestId('manual-invoices')).toBeTruthy();

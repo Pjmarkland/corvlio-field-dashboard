@@ -16,7 +16,7 @@ const data = (o = {}) => ({ businessId: 1, businessName: 'B', plan: 'professiona
 const set = (d: unknown, extra = {}) => { h.state = { data: d, isLoading: false, isError: false, refetch: vi.fn(), ...extra }; };
 
 describe('OwnerInvoicePanel', () => {
-  beforeEach(() => { h.profile = { isLoading: false, isSuccess: true, data: { isInternal: false } }; h.native = false; });
+  beforeEach(() => { h.profile = { isLoading: false, isSuccess: true, data: { isInternal: false, billingMode: 'manual' } }; h.native = false; });
   it('requested', () => { set(data({ status: 'requested', invoices: [] })); render(<OwnerInvoicePanel />); expect(screen.getByTestId('status-invoice').textContent).toBe('Awaiting approval'); });
   it('awaiting payment on web shows invoice details', () => {
     set(data()); render(<OwnerInvoicePanel />);
@@ -43,7 +43,7 @@ describe('OwnerInvoicePanel', () => {
     expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(false);
   });
   it('internal business hides panel and disables invoice query', () => {
-    h.profile = { isLoading: false, isSuccess: true, data: { isInternal: true } }; set(undefined, { isError: true });
+    h.profile = { isLoading: false, isSuccess: true, data: { isInternal: true, billingMode: 'manual' } }; set(undefined, { isError: true });
     const { container } = render(<OwnerInvoicePanel />);
     expect(container.innerHTML).toBe('');
     expect((h.opts as { query: { enabled: boolean } }).query.enabled).toBe(false);

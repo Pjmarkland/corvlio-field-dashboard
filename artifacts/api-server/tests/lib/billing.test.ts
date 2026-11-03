@@ -14,8 +14,8 @@ describe("test-only billing policy", () => {
   it.each([{}, { BILLING_ENABLED: "true" }, { BILLING_ENABLED: "false", STRIPE_SECRET_KEY: "sk_test_dummy" }])("is off without required test configuration", env => {
     expect(billingGate(env).enabled).toBe(false);
   });
-  it("refuses live keys even with the flag off", () => {
-    expect(billingGate({ STRIPE_SECRET_KEY: "sk_live_dummy" }).reason).toBe("live_key_refused");
+  it("refuses live keys unless the separate live-mode flag is enabled", () => {
+    expect(billingGate({ BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_live_dummy" }).reason).toBe("live_mode_flag_off");
   });
   it("never enables in production", () => {
     expect(billingGate({ NODE_ENV: "production", BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_dummy",
@@ -24,6 +24,15 @@ describe("test-only billing policy", () => {
   it("accepts only an explicitly enabled test environment", () => {
     expect(billingGate({ NODE_ENV: "test", BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_dummy",
       STRIPE_WEBHOOK_SECRET: "whsec_dummy", PUBLIC_API_BASE_URL: "https://example.test" }).enabled).toBe(true);
+  });
+  it("requires explicit production opt-in, live credentials and a configured production domain", () => {
+    const base = { NODE_ENV: "production", BILLING_ENABLED: "true", STRIPE_LIVE_MODE_ENABLED: "true",
+      STRIPE_SECRET_KEY: "sk_live_dummy", STRIPE_WEBHOOK_SECRET: "whsec_live_dummy",
+      PUBLIC_API_BASE_URL: "https://billing.example.test/api", REPLIT_DOMAINS: "billing.example.test" };
+    expect(billingGate(base)).toMatchObject({ enabled: true, mode: "live" });
+    expect(billingGate({ ...base, NODE_ENV: "test" }).reason).toBe("live_mode_requires_production");
+    expect(billingGate({ ...base, REPLIT_DOMAINS: "other.example.test" }).reason).toBe("invalid_production_base");
+    expect(billingGate({ ...base, BILLING_ENABLED: "false" }).reason).toBe("flag_off");
   });
   it("counts five business days, not five calendar days", () => {
     expect(addBusinessDays(new Date("2026-10-09T10:00:00Z")).toISOString()).toBe("2026-10-16T10:00:00.000Z");
@@ -109,6 +118,14 @@ describe("Stripe events and notices (SDK mocked; no network)", () => {
     }));
     expect(f.state().paidPeriodEnd).toBe("2026-11-01T00:00:00.000Z");
   });
+  it("records the first paid invoice and calls the existing provisioning path only once", async () => {
+    const f = billingFixture(); f.subscribed(1, { setupPaid: false });
+    const event = f.event("invoice.paid", "evt_first_paid");
+    await f.service.webhook(event);
+    await f.service.webhook(event);
+    expect(f.state().setupPaid).toBe(true);
+    expect(f.activations).toEqual([1]);
+  });
   it("stores subscription updates and deletion without automatic offboarding", async () => {
     const f = billingFixture(); f.subscribed();
     const sub = await f.sdk.subscriptions.retrieve();
@@ -125,7 +142,7 @@ describe("Stripe events and notices (SDK mocked; no network)", () => {
   });
   it("refuses live events and ignores unmapped Stripe customers", async () => {
     const f = billingFixture(); f.subscribed();
-    await expect(f.service.webhook({ ...f.event("invoice.paid", "evt_live"), livemode: true })).rejects.toThrow("Live");
+    await expect(f.service.webhook({ ...f.event("invoice.paid", "evt_live"), livemode: true })).rejects.toThrow("mode");
     expect(await f.service.webhook(f.event("invoice.paid", "evt_other", undefined, { id: "in_other", customer: "cus_other", subscription: "sub_other" }))).toEqual({ ignored: true });
     expect(f.events.size).toBe(0);
   });
@@ -150,13 +167,32 @@ describe("usage, Checkout, policy actions and isolation", () => {
   it("builds monthly and separate one-time setup line items and idempotent lookup-key Prices", async () => {
     const f = billingFixture();
     await f.service.checkout(1, "starter"); await f.service.checkout(1, "starter");
+    expect(f.sdk.products.create).toHaveBeenCalledTimes(1);
     expect(f.sdk.prices.create).toHaveBeenCalledTimes(2);
+    const priceProducts = f.sdk.prices.create.mock.calls.map(call => (call[0] as { product: string }).product);
+    expect(new Set(priceProducts).size).toBe(1);
     expect(f.sdk.customers.create).toHaveBeenCalledTimes(1);
     const params = f.sdk.checkout.sessions.create.mock.calls[0]![0] as unknown as { line_items: object[]; success_url: string };
     expect(params.line_items).toHaveLength(2); expect(params.success_url).toBe("https://billing.example.test/billing?checkout=success");
     expect(f.sdk.checkout.sessions.create.mock.calls[0]![0]).toMatchObject({
       mode: "subscription", allowed_payment_method_types: ["card"],
     });
+  });
+  it("uses only live-mode Stripe catalog objects and Checkout in explicit live mode", async () => {
+    const f = billingFixture(); f.setMode("live");
+    const result = await f.service.checkout(1, "starter");
+    expect(result.url).toContain("live-session");
+    expect(f.sdk.products.create).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: { corvlio_catalog: "corvlio_v1", corvlio_plan: "starter" },
+    }), expect.objectContaining({ idempotencyKey: expect.stringContaining("corvlio_live_product") }));
+    expect(f.sdk.prices.create.mock.calls.every(call => (call[0] as { lookup_key: string }).lookup_key.startsWith("corvlio_live_"))).toBe(true);
+  });
+  it("accepts live webhooks only while the service is in live mode", async () => {
+    const f = billingFixture(); f.setMode("live"); f.subscribed();
+    await f.service.webhook(f.event("invoice.payment_failed", "evt_live"));
+    expect(f.state().status).toBe("past_due");
+    const testEvent = { ...f.event("invoice.payment_failed", "evt_test_mode"), livemode: false } as unknown as import("stripe").default.Event;
+    await expect(f.service.webhook(testEvent)).rejects.toThrow("mode");
   });
   it("does not charge a paid setup fee again or create duplicate active subscriptions", async () => {
     const f = billingFixture(); f.subscribed();

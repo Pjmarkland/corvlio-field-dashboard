@@ -8,6 +8,7 @@ export function useBillingAvailability() {
   const native = Capacitor.isNativePlatform();
   const query = useGetBillingAvailability({ query: { enabled: !native && Boolean(isSignedIn), queryKey: getGetBillingAvailabilityQueryKey(), retry: false, staleTime: 60_000 } });
   const enabled = !native && Boolean(isSignedIn) && query.data?.enabled === true;
+  const mode = !native ? query.data?.mode ?? 'off' : 'off';
   const settled = native || (isSignedIn ? !query.isLoading : false);
-  return { enabled, settled, disabled: settled && !enabled };
+  return { enabled, settled, disabled: settled && !enabled, mode };
 }

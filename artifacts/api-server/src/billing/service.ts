@@ -26,7 +26,7 @@ function applySubscription(state: BillingState, sub: SubscriptionData, created: 
   if (created < state.subscriptionEventCreated) return;
   const item = sub.items.data[0];
   const plan = item?.price.metadata?.corvlio_plan ?? sub.metadata?.corvlio_plan
-    ?? /corvlio_test_(startup|starter|professional|managed)_monthly_/.exec(item?.price.lookup_key ?? "")?.[1];
+    ?? /corvlio_(?:test|live)_(startup|starter|professional|managed)_monthly_/.exec(item?.price.lookup_key ?? "")?.[1];
   if (plan) { planFor(plan); state.plan = plan as PlanId; }
   state.subscriptionId = sub.id;
   state.customerId = idOf(sub.customer);
@@ -42,9 +42,15 @@ function applySubscription(state: BillingState, sub: SubscriptionData, created: 
 
 /** No suspension, provisioning guard, call gate or per-call charge exists here. */
 export class BillingService {
-  constructor(private store: BillingStore, private stripe: () => Stripe, private now = () => new Date()) {}
+  constructor(
+    private store: BillingStore,
+    private stripe: () => Stripe,
+    private now = () => new Date(),
+    private mode: () => "test" | "live" = () => "test",
+    private activateFirstPaidBusiness: (businessId: number) => Promise<void> = async () => {},
+  ) {}
   async webhook(event: Stripe.Event) {
-    if (event.livemode) throw new BillingError("Live Stripe events are refused", 401);
+    if (event.livemode !== (this.mode() === "live")) throw new BillingError("Stripe event mode does not match the active billing mode", 401);
     if (await this.store.hasEvent(event.id)) return { replay: true };
     const kinds = ["checkout.session.completed", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted"];
     if (!kinds.includes(event.type)) return { ignored: true };
@@ -56,27 +62,37 @@ export class BillingService {
     if (!businessId) return { ignored: true };
     const sub = event.type.startsWith("customer.subscription.") ? data as unknown as SubscriptionData
       : subscriptionId ? await this.stripe().subscriptions.retrieve(subscriptionId) as unknown as SubscriptionData : null;
-    return this.store.transact(businessId, async tx => {
-      if (!await tx.claimEvent(event.id, event.type, "Signature-verified Stripe test event", new Date(event.created * 1000))) return { replay: true };
+    const outcome = await this.store.transact(businessId, async tx => {
+      if (!await tx.claimEvent(event.id, event.type, "Signature-verified Stripe event", new Date(event.created * 1000)))
+        return { response: { replay: true }, firstPayment: false };
       const s = tx.state;
       if (s.subscriptionId && sub && sub.id !== s.subscriptionId && s.status !== "canceled" && s.status !== "not_subscribed")
-        return { ignored: true };
+        return { response: { ignored: true }, firstPayment: false };
       if (sub) applySubscription(s, sub, event.created);
       if (event.type === "checkout.session.completed") {
         if (!sub) throw new BillingError("Subscription missing from completed Checkout", 400);
         if (s.pendingCheckout?.id === data.id) s.pendingCheckout = null;
       } else if (event.type === "invoice.paid") {
+        let firstPayment = false;
         if (event.created >= s.lastPaidEventCreated) {
           s.lastPaidEventCreated = event.created;
           const invoiceEnd = Math.max(0, ...(data.lines?.data ?? []).map(line => line.period?.end ?? 0));
           const previousPaidEnd = Date.parse(s.paidPeriodEnd ?? "") / 1000 || 0;
           s.paidPeriodEnd = iso(Math.max(previousPaidEnd, invoiceEnd || (Date.parse(s.periodEnd ?? "") / 1000 || 0)));
+          if (!s.setupPaid) {
+            if (!s.plan) throw new BillingError("Paid subscription is missing a Corvlio plan", 409);
+            firstPayment = await tx.markStripeFirstInvoicePaid(s.plan, new Date(event.created * 1000));
+          }
           s.setupPaid = true;
           if (!s.failureInvoiceId || s.failureInvoiceId === data.id) {
             s.pastDueSince = null; s.graceEndsAt = null; s.failureInvoiceId = null; s.needsAdminReview = false;
             if (s.status !== "canceled") s.status = "active";
           }
+          if (!s.lastEvent || event.created >= s.lastEvent.created) s.lastEvent = { id: event.id, type: event.type, created: event.created };
+          return { response: { processed: true }, firstPayment };
         }
+        if (!s.lastEvent || event.created >= s.lastEvent.created) s.lastEvent = { id: event.id, type: event.type, created: event.created };
+        return { response: { processed: true }, firstPayment: false };
       } else if (event.type === "invoice.payment_failed" && event.created >= s.lastPaidEventCreated && s.status !== "canceled") {
         s.status = "past_due";
         const firstFailure = !s.pastDueSince;
@@ -93,8 +109,10 @@ export class BillingService {
         if (event.created >= s.subscriptionEventCreated) s.status = "canceled";
       }
       if (!s.lastEvent || event.created >= s.lastEvent.created) s.lastEvent = { id: event.id, type: event.type, created: event.created };
-      return { processed: true };
+      return { response: { processed: true }, firstPayment: false };
     });
+    if (outcome.firstPayment) await this.activateFirstPaidBusiness(businessId);
+    return outcome.response;
   }
   async refresh(businessId: number) {
     return this.store.transact(businessId, async tx => {
@@ -127,7 +145,9 @@ export class BillingService {
       const s = tx.state;
       if (planId === "startup" && (!s.startupEligible || s.plan !== "startup")) throw new BillingError("Startup requires admin assignment", 403);
       if (s.subscriptionId && s.status !== "canceled") throw new BillingError("Use Upgrade for your existing subscription");
-      const stripe = this.stripe(), prices = await ensurePlanPrices(stripe, planId);
+      const mode = this.mode();
+      await tx.prepareStripeBilling(planId);
+      const stripe = this.stripe(), prices = await ensurePlanPrices(stripe, planId, mode);
       const needsSetup = !s.setupPaid || !config.policy.setupFeeOncePerBusiness;
       // Do not reuse a pre-card-only session with dynamically enabled methods.
       const fingerprint = `${prices.monthly}:${needsSetup ? prices.setup : "no_setup"}:card_only`;
@@ -145,8 +165,8 @@ export class BillingService {
         const customer = await stripe.customers.create({
           name: business.businessName, ...(business.ownerEmail ? { email: business.ownerEmail } : {}),
           metadata: { business_id: String(businessId) },
-        }, { idempotencyKey: `corvlio_test_customer_${businessId}` });
-        if (customer.livemode) throw new BillingError("Live customer refused", 401);
+        }, { idempotencyKey: `corvlio_${mode}_customer_v1_${businessId}` });
+        if (customer.livemode !== (mode === "live")) throw new BillingError("Stripe customer mode mismatch", 401);
         s.customerId = customer.id;
       }
       const session = await stripe.checkout.sessions.create({
@@ -159,8 +179,8 @@ export class BillingService {
         success_url: billingUrl() + "?checkout=success", cancel_url: billingUrl() + "?checkout=cancel",
       // Reuse the same pending session on accidental repeated clicks; new monthly
       // bucket permits a fresh expired session without inventing a second customer.
-      }, { idempotencyKey: `corvlio_test_checkout_card_only_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}` });
-      if (session.livemode || !session.url) throw new BillingError("No test Checkout URL returned", 502);
+      }, { idempotencyKey: `corvlio_${mode}_checkout_card_only_v2_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}` });
+      if (session.livemode !== (mode === "live") || !session.url) throw new BillingError("Stripe Checkout URL mode mismatch", 502);
       s.pendingCheckout = { id: session.id, plan: planId, fingerprint };
       return { url: session.url };
     });
@@ -169,15 +189,17 @@ export class BillingService {
     return this.store.transact(businessId, async tx => {
       if (!tx.state.customerId) throw new BillingError("No Stripe customer yet");
       const stripe = this.stripe();
+      const mode = this.mode();
+      const metadataKey = `corvlio_${mode}_card_only`;
       // Card-only portal cannot bypass this app's written-notice cancellation
       // policy or its admin-only Startup assignment.
       const configs = await stripe.billingPortal.configurations.list({ limit: 100 });
-      const existing = configs.data.find(c => c.active && c.metadata?.corvlio_test_card_only === "true");
+      const existing = configs.data.find(c => c.active && c.metadata?.[metadataKey] === "true");
       const portalConfig = existing ?? await stripe.billingPortal.configurations.create({
-        metadata: { corvlio_test_card_only: "true" },
+        metadata: { [metadataKey]: "true" },
         features: { payment_method_update: { enabled: true }, invoice_history: { enabled: true },
           subscription_cancel: { enabled: false }, subscription_update: { enabled: false } },
-      }, { idempotencyKey: "corvlio_test_card_only_portal" });
+      }, { idempotencyKey: `corvlio_${mode}_card_only_portal_v1` });
       if (portalConfig.features.subscription_cancel.enabled || portalConfig.features.subscription_update.enabled)
         throw new BillingError("Unsafe portal configuration refused", 503);
       const session = await stripe.billingPortal.sessions.create({

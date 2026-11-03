@@ -4,12 +4,13 @@ import Stripe from "stripe";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   nativeSummary: vi.fn(),
-  enabled: true, signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
+  enabled: true, mode: "test" as "test" | "live" | "off", signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
   resume: vi.fn(), checkout: vi.fn(), upgrade: vi.fn(), portal: vi.fn(), eligibility: vi.fn(), businesses: vi.fn(),
 }));
 vi.mock("../../src/billing/nativeSummary", () => ({ readNativeBillingSummary: m.nativeSummary }));
 vi.mock("../../src/billing/stripeClient", () => ({
-  billingEnabled: () => m.enabled, getBillingStripe: () => ({ webhooks: { constructEvent: m.signature } }),
+  billingEnabled: () => m.enabled, configuredBillingMode: () => m.mode,
+  getBillingStripe: () => ({ webhooks: { constructEvent: m.signature } }),
 }));
 vi.mock("../../src/billing/runtime", () => ({ billingService: {
   webhook: m.process, snapshot: m.snapshot, cancel: m.cancel, resume: m.resume,
@@ -39,13 +40,17 @@ beforeAll(async () => {
 });
 afterAll(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 beforeEach(() => {
-  vi.clearAllMocks(); m.enabled = true;
+  vi.clearAllMocks(); m.enabled = true; m.mode = "test";
   m.snapshot.mockImplementation(async id => ({ businessId: id }));
   m.cancel.mockResolvedValue({ cancelAt: "2026-11-09T10:00:00Z" });
   m.process.mockResolvedValue({ processed: true });
   m.businesses.mockResolvedValue([{ id: 1 }, { id: 2 }]);
   m.signature.mockImplementation((...args: Parameters<typeof signing.webhooks.constructEvent>) => signing.webhooks.constructEvent(...args));
+  vi.stubEnv("BILLING_ENABLED", "false");
+  vi.stubEnv("STRIPE_LIVE_MODE_ENABLED", "false");
+  vi.stubEnv("STRIPE_SECRET_KEY", "");
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_offline_local");
+  vi.stubEnv("PUBLIC_API_BASE_URL", "http://127.0.0.1:9999/api");
 });
 afterAll(() => vi.unstubAllEnvs());
 const ownerHeaders = { "x-test-owner": "owner-a", "content-type": "application/json" };
@@ -85,7 +90,7 @@ describe("native read-only summary and unchanged payment gate", () => {
 describe("billing authorization and feature flag", () => {
   it("flag off exposes only availability, no billing data or SDK calls", async () => {
     m.enabled = false;
-    expect(await (await fetch(`${base}/billing/availability`)).json()).toEqual({ enabled: false });
+    expect(await (await fetch(`${base}/billing/availability`)).json()).toEqual({ enabled: false, mode: "off" });
     for (const path of ["/billing", "/admin/billing"]) expect((await fetch(base + path, { headers: ownerHeaders })).status).toBe(404);
     expect((await fetch(`${base}/billing/cancel`, { method: "POST", headers: ownerHeaders })).status).toBe(404);
     expect(m.snapshot).not.toHaveBeenCalled(); expect(m.cancel).not.toHaveBeenCalled(); expect(m.signature).not.toHaveBeenCalled();
@@ -118,6 +123,17 @@ describe("billing authorization and feature flag", () => {
     expect((await fetch(`${base}/billing/checkout`, { method: "POST", headers: ownerHeaders, body: '{"plan":"startup","eligible":true}' })).status).toBe(400);
     expect(m.checkout).not.toHaveBeenCalled();
   });
+  it("keeps readiness admin-only and available while billing is off", async () => {
+    m.enabled = false;
+    expect((await fetch(`${base}/admin/billing/readiness-check`, { method: "POST", headers: ownerHeaders })).status).toBe(404);
+    const response = await fetch(`${base}/admin/billing/readiness-check`, {
+      method: "POST", headers: { "x-test-admin": "yes" },
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ enabled: false, mode: "off", secretKeyPresent: false, webhookReachable: null });
+    expect(body).not.toHaveProperty("secretKey");
+  });
 });
 describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {
   const payload = JSON.stringify({ id: "evt_local", type: "invoice.paid", livemode: false, created: 1791626400, data: { object: { id: "in_local" } } });
@@ -138,9 +154,15 @@ describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {
   it("returns 401 when signed bytes are changed", async () => {
     expect((await send(payload + " ", sign())).status).toBe(401); expect(m.process).not.toHaveBeenCalled();
   });
-  it("refuses even correctly signed live events", async () => {
+  it("refuses correctly signed live events while test mode is active", async () => {
     const live = payload.replace('"livemode":false', '"livemode":true');
     expect((await send(live, sign(live))).status).toBe(401); expect(m.process).not.toHaveBeenCalled();
+  });
+  it("accepts correctly signed live events only when live mode is active", async () => {
+    m.mode = "live";
+    const live = payload.replace('"livemode":false', '"livemode":true');
+    expect((await send(live, sign(live))).status).toBe(200);
+    expect(m.process).toHaveBeenCalledTimes(1);
   });
   it("returns retryable 503 when persistence fails", async () => {
     m.process.mockRejectedValueOnce(new Error("offline mocked DB failure"));

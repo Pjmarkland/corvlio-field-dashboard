@@ -17,13 +17,13 @@
 - [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.
 - [Private lead notes](private-lead-notes.md) — owner-written notes are internal business data, not caller intake or provider context.
 - [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
-- [Billing policy boundary](billing-policy-boundary.md) — approved flag-only billing overrides differ from the agreement; development/test only, no live rollout.
+- [Billing policy boundary](billing-policy-boundary.md) — preserve the agreed billing rules and keep authorized live Stripe behind a separate default-off gate.
 - [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
-- [Native reviewer boundaries](native-reviewer-boundaries.md) — exclude native payment surfaces; keep manually seeded App Store review data isolated from real customers.
+- [Native reviewer boundaries](native-reviewer-boundaries.md) — keep native billing price-free, launch the portal externally only on tap, and isolate review data.
 - [Account deletion boundaries](account-deletion-boundaries.md) — preserve Retell for manual release; paid-support refusal needs Apple policy review before submission.
 - [Lead alert latency](lead-alert-latency.md) — database-cost reductions may slow retry sweeps, never creation-triggered alerts for new leads.
 - [Production DB diagnostics](production-db-diagnostics.md) — unavailable read replicas do not establish primary database health, suspension, or schema state.
-- [Manual invoice boundaries](manual-invoice-boundaries.md) — keep Stripe disabled, preserve existing accounts, and review uncertain Gmail sends instead of risking duplicates.
+- [Manual invoice boundaries](manual-invoice-boundaries.md) — manual invoicing remains available for existing accounts; never convert them to Stripe automatically.
 - [Gmail configuration boundary](gmail-configuration-boundary.md) — Google Cloud activation belongs to the owner; historical lead failures require explicit batch approval before replay.
 - [Internal business policy](internal-business-policy.md) — Corvlio's own sales account is non-billed but captures real leads; development verification must not release queued messages.
 - [Native client setup boundary](native-client-setup-scope.md) — the native app is for Corvlio clients; keep plan assignment and activation in the web admin.

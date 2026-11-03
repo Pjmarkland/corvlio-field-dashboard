@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BusinessProfileAiPromisePolicy } from './businessProfileAiPromisePolicy';
+import type { BusinessProfileBillingMode } from './businessProfileBillingMode';
 
 export interface BusinessProfile {
   isInternal?: boolean;
+  billingMode: BusinessProfileBillingMode;
   /** @nullable */
   ownerPhone?: string | null;
   leadAlertsEnabled?: boolean;

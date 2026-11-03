@@ -1,7 +1,7 @@
-# Corvlio development/test billing
+# Corvlio Stripe billing
 
-**Billing remains OFF. Nothing has been published, no Stripe resources have been
-created, and no live Retell or production data has been changed.**
+**Billing remains OFF by default. No credentials or flags were changed, no Stripe
+resources were created, nothing was published, and no production data was changed.**
 
 ## Settings and safety
 
@@ -18,9 +18,17 @@ Startup requires admin approval of a business under 18 months old, then an
 admin-assigned Startup plan. Its six-month Starter review date is recorded and
 shown to admins; it never changes the subscription automatically.
 
-- `BILLING_ENABLED` defaults off. Missing/invalid test credentials or public base
-  disable billing. `sk_live_` keys are refused with a key-free log.
-- `NODE_ENV=production` disables billing even if someone supplies a test key.
+- `BILLING_ENABLED` defaults off. Test billing is limited to non-production
+  runtimes and requires test credentials plus an HTTPS public API base.
+- Live billing additionally requires `STRIPE_LIVE_MODE_ENABLED=true`, production
+  runtime, an `sk_live_` key, a `whsec_` webhook secret, and a public HTTPS base
+  whose hostname is in `REPLIT_DOMAINS`. The live-mode flag is not set here.
+- The four plan prices are locked in `config.json`. Checkout lazily creates one
+  Stripe Product per plan, then separate monthly and one-time setup Prices.
+- New businesses use emailed invoices while Stripe is off. When Stripe is enabled,
+  new businesses are assigned to Stripe billing; existing manual accounts remain
+  on emailed invoices. Checkout refuses all manual-mode businesses until an
+  explicit migration path is approved, preventing accidental duplicate charges.
 - Calls, lead capture, Retell configuration and numbers never depend on billing.
 - Hosted Checkout and a card/invoice-only hosted Customer Portal are used.
   Portal cancellation and plan changes are disabled to prevent policy bypass.
@@ -51,6 +59,10 @@ shown to admins; it never changes the subscription automatically.
 `billing_accounts`, `billing_events`, and `billing_notices`, plus unique customer
 and subscription indexes. It has been applied to **development only**. There is
 no startup DDL, production migration, replacement database or data backfill.
+The Drizzle business schema now also accepts `billing_mode='stripe'`; no database
+push was run for this change. Production schema changes must go through the normal
+Publish migration flow before live billing is enabled. Do not apply production DDL
+manually.
 Stripe card numbers, CVCs, raw webhook payloads and signed Checkout URLs are not
 stored in these tables.
 
@@ -68,57 +80,38 @@ through billing status/flags and the event timeline. Transport is at-least-once:
 an abrupt process failure after provider acceptance but before progress commit
 can repeat a delivery; logical notice creation remains deduplicated.
 
-## Future test configuration — do not add live keys
+## Mode setup and readiness
 
-No credentials were requested or changed. The following **new development
-secrets** are absent and required before a real Stripe test:
+No credentials, flags, Stripe resources or webhooks were changed or created by this
+work. Before live billing is enabled, the owner must configure these workspace
+settings through the Secrets/environment UI:
 
-- `STRIPE_SECRET_KEY`: a Stripe test/sandbox secret starting `sk_test_`.
-- `STRIPE_WEBHOOK_SECRET`: the signing secret for this specific test endpoint,
-  starting `whsec_`.
+- Secret `STRIPE_SECRET_KEY`: live Stripe secret beginning `sk_live_`.
+- Secret `STRIPE_WEBHOOK_SECRET`: signing secret for the production webhook.
+- Non-secret `PUBLIC_API_BASE_URL`: production HTTPS API base; a trailing `/api`
+  is supported.
+- Non-secret `BILLING_ENABLED=true`.
+- Non-secret `STRIPE_LIVE_MODE_ENABLED=true` (separate, default-off opt-in).
 
-Development **non-secret settings**:
+The admin Billing page has a readiness check that reports only secret presence
+and key mode, validates the base URL, and probes the webhook endpoint with an
+unsigned request. The probe only targets a hostname listed in `REPLIT_DOMAINS`;
+it never calls Stripe or returns secret values. A reachable webhook responds with
+the expected unauthorized status to that unsigned probe.
 
-- `PUBLIC_API_BASE_URL`: an HTTPS development base, e.g.
-  `https://your-development-host`. A trailing `/api` is supported. Return URLs
-  preserve a configured path prefix and lead back to `/billing`.
-- `BILLING_ENABLED=true`: explicitly opt in only after test configuration.
-
-No publishable Stripe key is needed for server-created hosted redirects. Existing
-Gmail, APNs, Clerk and admin secrets are reused unchanged. Production is disabled.
-
-The root Stripe SDK and `stripe-replit-sync` prerequisites are installed. No native
-Stripe connection was connected and no managed sync, webhook registration,
-backfill or Stripe resource initialization was run: this delivery intentionally
-supports the requested offline/mocked build. Managed connection/sync setup is not
-claimed as completed and must not initialize live billing implicitly.
-
-### Stripe Dashboard webhook steps (future, test mode only)
-
-1. Select the intended **test/sandbox** account in Stripe Dashboard.
-2. Open **Workbench → Webhooks** (or the account's Webhooks page), and add an
-   endpoint/event destination for **your account**, not connected accounts.
-3. Use `https://your-development-host/api/billing/webhook`. If the configured
-   development base includes an artifact prefix, preserve it. Never use a
-   production endpoint for this implementation.
-4. Select these exact event types:
+After the production schema is applied through Publish, configure the endpoint
+in Stripe Dashboard for **your account**, not connected accounts. The URL is
+shown by the readiness check and ends in `/api/billing/webhook`. Select these
+exact event types:
    - `checkout.session.completed`
    - `invoice.paid`
    - `invoice.payment_failed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-5. Reveal that endpoint's signing secret and add it through development Secrets
-   as `STRIPE_WEBHOOK_SECRET`; do not paste it into chat or source.
-6. Configure the test secret and HTTPS base, then explicitly enable the flag and
-   restart the API and dashboard. Do not publish or redeploy.
-7. Complete a real hosted **test** Checkout. Synthetic Dashboard test events
-   with unrelated sample customers are intentionally ignored by tenant binding.
-8. Replay a real mapped event; confirm its event ID and logical notice are not
-   duplicated. Exercise failed invoice retries, paid recovery, cancel/resume,
-   and owner A/B isolation using test customers only.
 
-The application lazily creates test Prices via lookup keys on an authorized
-Checkout/Upgrade. No customer-facing card form or live API action is needed here.
+The readiness check is informational only; it does not enable billing. The app
+must be explicitly restarted after configuration changes. Test mode remains
+available only with explicit test credentials outside production.
 
 ## Agreement differences requiring the user's review
 

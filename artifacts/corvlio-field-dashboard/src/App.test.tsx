@@ -95,6 +95,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 
 const sampleProfile = {
+  isInternal: false,
+  billingMode: 'manual',
   businessName: 'Harbor Electric',
   agentName: null,
   businessType: 'Electrical',
@@ -359,7 +361,7 @@ describe('native AppShell billing boundaries', () => {
 
   it('does not request owner invoices or show the web-only welcome card in native', () => {
     mockNativeState.value = true;
-    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false }, isLoading: false, isSuccess: true });
+    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false, billingMode: 'manual' }, isLoading: false, isSuccess: true });
     mockGetOwnerInvoices.mockReturnValue({
       data: {
         plan: null,
@@ -378,7 +380,7 @@ describe('native AppShell billing boundaries', () => {
 
   it('keeps the owner-invoice query enabled on web', () => {
     mockNativeState.value = false;
-    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false }, isLoading: false, isSuccess: true });
+    mockGetBusinessProfile.mockReturnValue({ data: { isInternal: false, billingMode: 'manual' }, isLoading: false, isSuccess: true });
     mockGetOwnerInvoices.mockReturnValue({ data: undefined });
     renderShell();
     expect(mockGetOwnerInvoices.mock.calls.at(-1)?.[0].query.enabled).toBe(true);
