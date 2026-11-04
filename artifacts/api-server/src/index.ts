@@ -9,6 +9,7 @@ import { closeApnsSession } from "./lib/apnsAdapter";
 import { refreshBusinessPhoneCache } from "./lib/businessDirectory";
 import { logger } from "./lib/logger";
 import { startLeadNotificationPoller, stopLeadNotificationPoller } from "./lib/notificationService";
+import { startUsageAlertWorker, stopUsageAlertWorker } from "./lib/usageAlertWorker";
 
 const rawPort = process.env["PORT"];
 
@@ -48,6 +49,7 @@ const server = app.listen(port, (err) => {
     startCallMediaRetentionWorker();
     startRetellPendingCallWorker();
     startInvoiceWorker();
+    startUsageAlertWorker();
   } else {
     logger.info("Development background delivery/provisioning paused; explicit test flows use mocked providers");
   }
@@ -63,6 +65,7 @@ async function shutdown(signal: string) {
   await stopCallMediaRetentionWorker();
   await stopRetellPendingCallWorker();
   await stopInvoiceWorker();
+  await stopUsageAlertWorker();
   closeApnsSession();
   server.close((error) => {
     if (error) {

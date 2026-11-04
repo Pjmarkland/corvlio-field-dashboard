@@ -25,6 +25,7 @@ export const retellCallRecordsTable = pgTable(
   (table) => [
     uniqueIndex("retell_call_records_retell_call_id_unique").on(table.retellCallId),
     index("retell_call_records_business_started_idx").on(table.businessId, table.callStartedAt),
+    index("retell_call_records_started_idx").on(table.callStartedAt),
   ],
 );
 

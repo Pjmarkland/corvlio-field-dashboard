@@ -1520,6 +1520,8 @@ export interface AdminBusinessSummary {
   averageResponseTimeMs: number | null;
   pushEnabledDeviceCount: number;
   pushPlatforms: NotificationPlatform[];
+  firstClientChecklistCompletedCount: number;
+  firstClientChecklistTotalCount: number;
   /** @nullable */
   agreementsAcceptedAt: string | null;
   /** @nullable */
@@ -1645,12 +1647,106 @@ export interface AdminBusinessFallbackRouting {
   defaultPhoneNumber: string;
 }
 
+export type AdminFirstClientChecklistItemKey = typeof AdminFirstClientChecklistItemKey[keyof typeof AdminFirstClientChecklistItemKey];
+
+
+export const AdminFirstClientChecklistItemKey = {
+  business_details_reviewed: 'business_details_reviewed',
+  plan_assigned: 'plan_assigned',
+  payment_confirmed: 'payment_confirmed',
+  phone_line_provisioned: 'phone_line_provisioned',
+  test_call_done: 'test_call_done',
+  call_forwarding_verified: 'call_forwarding_verified',
+  first_week_check_in_done: 'first_week_check_in_done',
+} as const;
+
+export interface AdminFirstClientChecklistItem {
+  key: AdminFirstClientChecklistItemKey;
+  label: string;
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+}
+
 export interface AdminBusinessDetail {
   business: AdminBusinessSummary;
   fallbackRouting: AdminBusinessFallbackRouting;
   onboarding: AdminOnboardingAnswers;
   leads: AdminLeadActivity[];
   calls: AdminCallRecord[];
+  firstClientChecklist: AdminFirstClientChecklistItem[];
+}
+
+export interface AdminFirstClientChecklistUpdateInput {
+  completed: boolean;
+}
+
+export interface AdminUsageAlertSettings {
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyTotalCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyTotalCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyPerBusinessCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyPerBusinessCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyProvisionedNumbers: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyProvisionedNumbers: number;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export interface AdminUsageAlertSettingsInput {
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyTotalCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyTotalCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyPerBusinessCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyPerBusinessCallMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  dailyProvisionedNumbers: number;
+  /**
+     * @minimum 1
+     * @maximum 1000000
+     */
+  monthlyProvisionedNumbers: number;
 }
 
 export type LaunchHealthStatusStatus = typeof LaunchHealthStatusStatus[keyof typeof LaunchHealthStatusStatus];

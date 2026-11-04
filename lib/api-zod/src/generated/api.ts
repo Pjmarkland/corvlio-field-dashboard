@@ -1214,12 +1214,116 @@ export const GetAdminOverviewResponse = zod.object({
   "averageResponseTimeMs": zod.number().nullable(),
   "pushEnabledDeviceCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemPushEnabledDeviceCountMultipleOf),
   "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
+  "firstClientChecklistCompletedCount": zod.int(),
+  "firstClientChecklistTotalCount": zod.int(),
   "agreementsAcceptedAt": zod.coerce.date().nullable(),
   "agreementsAcceptedVersion": zod.string().nullable(),
   "hasNoLeads": zod.boolean(),
   "hasUncontactedOver24Hours": zod.boolean(),
   "oldestUncontactedAt": zod.coerce.date().nullable()
 }))
+})
+
+
+/**
+ * @summary Get founder usage alert thresholds
+ */
+export const getAdminUsageAlertSettingsResponseDailyTotalCallMinutesMax = 1000000;
+
+export const getAdminUsageAlertSettingsResponseMonthlyTotalCallMinutesMax = 1000000;
+
+export const getAdminUsageAlertSettingsResponseDailyPerBusinessCallMinutesMax = 1000000;
+
+export const getAdminUsageAlertSettingsResponseMonthlyPerBusinessCallMinutesMax = 1000000;
+
+export const getAdminUsageAlertSettingsResponseDailyProvisionedNumbersMax = 1000000;
+
+export const getAdminUsageAlertSettingsResponseMonthlyProvisionedNumbersMax = 1000000;
+
+
+
+export const GetAdminUsageAlertSettingsResponse = zod.object({
+  "dailyTotalCallMinutes": zod.int().min(1).max(getAdminUsageAlertSettingsResponseDailyTotalCallMinutesMax),
+  "monthlyTotalCallMinutes": zod.int().min(1).max(getAdminUsageAlertSettingsResponseMonthlyTotalCallMinutesMax),
+  "dailyPerBusinessCallMinutes": zod.int().min(1).max(getAdminUsageAlertSettingsResponseDailyPerBusinessCallMinutesMax),
+  "monthlyPerBusinessCallMinutes": zod.int().min(1).max(getAdminUsageAlertSettingsResponseMonthlyPerBusinessCallMinutesMax),
+  "dailyProvisionedNumbers": zod.int().min(1).max(getAdminUsageAlertSettingsResponseDailyProvisionedNumbersMax),
+  "monthlyProvisionedNumbers": zod.int().min(1).max(getAdminUsageAlertSettingsResponseMonthlyProvisionedNumbersMax),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Update founder usage alert thresholds
+ */
+export const updateAdminUsageAlertSettingsBodyDailyTotalCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsBodyMonthlyTotalCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsBodyDailyPerBusinessCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsBodyMonthlyPerBusinessCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsBodyDailyProvisionedNumbersMax = 1000000;
+
+export const updateAdminUsageAlertSettingsBodyMonthlyProvisionedNumbersMax = 1000000;
+
+
+
+export const UpdateAdminUsageAlertSettingsBody = zod.object({
+  "dailyTotalCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyDailyTotalCallMinutesMax),
+  "monthlyTotalCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyMonthlyTotalCallMinutesMax),
+  "dailyPerBusinessCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyDailyPerBusinessCallMinutesMax),
+  "monthlyPerBusinessCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyMonthlyPerBusinessCallMinutesMax),
+  "dailyProvisionedNumbers": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyDailyProvisionedNumbersMax),
+  "monthlyProvisionedNumbers": zod.int().min(1).max(updateAdminUsageAlertSettingsBodyMonthlyProvisionedNumbersMax)
+})
+
+export const updateAdminUsageAlertSettingsResponseDailyTotalCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsResponseMonthlyTotalCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsResponseDailyPerBusinessCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsResponseMonthlyPerBusinessCallMinutesMax = 1000000;
+
+export const updateAdminUsageAlertSettingsResponseDailyProvisionedNumbersMax = 1000000;
+
+export const updateAdminUsageAlertSettingsResponseMonthlyProvisionedNumbersMax = 1000000;
+
+
+
+export const UpdateAdminUsageAlertSettingsResponse = zod.object({
+  "dailyTotalCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseDailyTotalCallMinutesMax),
+  "monthlyTotalCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseMonthlyTotalCallMinutesMax),
+  "dailyPerBusinessCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseDailyPerBusinessCallMinutesMax),
+  "monthlyPerBusinessCallMinutes": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseMonthlyPerBusinessCallMinutesMax),
+  "dailyProvisionedNumbers": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseDailyProvisionedNumbersMax),
+  "monthlyProvisionedNumbers": zod.int().min(1).max(updateAdminUsageAlertSettingsResponseMonthlyProvisionedNumbersMax),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Complete or reopen a first-client checklist item
+ */
+
+
+
+export const UpdateAdminFirstClientChecklistItemParams = zod.object({
+  "businessId": zod.coerce.number().int().min(1),
+  "itemKey": zod.enum(['business_details_reviewed', 'plan_assigned', 'payment_confirmed', 'phone_line_provisioned', 'test_call_done', 'call_forwarding_verified', 'first_week_check_in_done'])
+})
+
+export const UpdateAdminFirstClientChecklistItemBody = zod.object({
+  "completed": zod.boolean()
+})
+
+export const UpdateAdminFirstClientChecklistItemResponse = zod.object({
+  "key": zod.enum(['business_details_reviewed', 'plan_assigned', 'payment_confirmed', 'phone_line_provisioned', 'test_call_done', 'call_forwarding_verified', 'first_week_check_in_done']),
+  "label": zod.string(),
+  "completed": zod.boolean(),
+  "completedAt": zod.coerce.date().nullable()
 })
 
 
@@ -1445,6 +1549,8 @@ export const GetAdminBusinessResponse = zod.object({
   "averageResponseTimeMs": zod.number().nullable(),
   "pushEnabledDeviceCount": zod.number().multipleOf(getAdminBusinessResponseBusinessPushEnabledDeviceCountMultipleOf),
   "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
+  "firstClientChecklistCompletedCount": zod.int(),
+  "firstClientChecklistTotalCount": zod.int(),
   "agreementsAcceptedAt": zod.coerce.date().nullable(),
   "agreementsAcceptedVersion": zod.string().nullable(),
   "hasNoLeads": zod.boolean(),
@@ -1504,6 +1610,12 @@ export const GetAdminBusinessResponse = zod.object({
   "durationMs": zod.number().multipleOf(getAdminBusinessResponseCallsItemDurationMsMultipleOf).nullable(),
   "outcome": zod.string().nullable(),
   "recordedAt": zod.coerce.date()
+})),
+  "firstClientChecklist": zod.array(zod.object({
+  "key": zod.enum(['business_details_reviewed', 'plan_assigned', 'payment_confirmed', 'phone_line_provisioned', 'test_call_done', 'call_forwarding_verified', 'first_week_check_in_done']),
+  "label": zod.string(),
+  "completed": zod.boolean(),
+  "completedAt": zod.coerce.date().nullable()
 }))
 })
 

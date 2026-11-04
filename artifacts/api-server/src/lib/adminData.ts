@@ -21,6 +21,11 @@ import { numberActivity } from "./numberActivity";
 import { addBusinessDays, config as billingConfig } from "../billing/policy";
 import { recordOperationalFailure } from "./operationalFailures";
 import { runNotificationOutboxNow } from "./notificationService";
+import {
+  FIRST_CLIENT_CHECKLIST_ITEMS,
+  getFirstClientChecklistItems,
+  getFirstClientChecklistProgress,
+} from "./firstClientChecklist";
 
 const ONBOARDING_FIELDS = [
   { key: "businessName", label: "Business name" },
@@ -329,13 +334,26 @@ async function summarizeBusinesses(
 
 export async function getAdminOverview() {
   const data = await loadWorkspaceData();
-  const businesses = await summarizeBusinesses(
+  const summaries = await summarizeBusinesses(
     data.businesses,
     data.leadsByBusiness,
     data.devicesByBusiness,
     Date.now(),
     data.billingByBusiness,
   );
+  const checklistProgress = await getFirstClientChecklistProgress(data.businesses
+    .filter((business) => !business.isInternal && !business.isSample)
+    .map((business) => business.id));
+  const businessById = new Map(data.businesses.map((business) => [business.id, business]));
+  const businesses = summaries.map((summary) => {
+    const business = businessById.get(summary.id);
+    const eligible = Boolean(business && !business.isInternal && !business.isSample);
+    return {
+      ...summary,
+      firstClientChecklistCompletedCount: eligible ? checklistProgress.get(summary.id) ?? 0 : 0,
+      firstClientChecklistTotalCount: eligible ? FIRST_CLIENT_CHECKLIST_ITEMS.length : 0,
+    };
+  });
   const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
   const uncontacted = data.leads.filter((lead) => !isContactedStatus(lead.status));
 
@@ -362,7 +380,7 @@ export async function getAdminBusiness(businessId: number) {
     .limit(1);
   if (!business) return undefined;
 
-  const [leads, callRecords, pushDevices, defaultPhoneNumber] = await Promise.all([
+  const [leads, callRecords, pushDevices, defaultPhoneNumber, firstClientChecklist] = await Promise.all([
     db
       .select()
       .from(leadsTable)
@@ -385,19 +403,26 @@ export async function getAdminBusiness(businessId: number) {
         isNull(notificationDevicesTable.invalidatedAt),
       )),
     getDefaultFallbackPhoneNumber(),
+    business.isInternal || business.isSample
+      ? Promise.resolve([])
+      : getFirstClientChecklistItems(businessId),
   ]);
   const profile = await loadOwnerProfile(business.clerkUserId);
   const [attempt] = await db.select().from(provisioningAttemptsTable)
     .where(eq(provisioningAttemptsTable.businessId, businessId));
-  const businessSummary = summarizeBusiness(
-    business,
-    leads,
-    pushDevices,
-    profile,
-    Date.now(),
-    callRecords,
-    attempt?.purchasedAt ?? business.createdAt,
-  );
+  const businessSummary = {
+    ...summarizeBusiness(
+      business,
+      leads,
+      pushDevices,
+      profile,
+      Date.now(),
+      callRecords,
+      attempt?.purchasedAt ?? business.createdAt,
+    ),
+    firstClientChecklistCompletedCount: firstClientChecklist.filter((item) => item.completed).length,
+    firstClientChecklistTotalCount: firstClientChecklist.length,
+  };
 
   return GetAdminBusinessResponse.parse({
     business: businessSummary,
@@ -435,6 +460,7 @@ export async function getAdminBusiness(businessId: number) {
     },
     leads: leads.map((lead) => toActivityLead(lead, business)),
     calls: callRecords,
+    firstClientChecklist,
   });
 }
 

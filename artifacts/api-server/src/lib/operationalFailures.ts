@@ -20,7 +20,8 @@ export type OperationalFailureSource =
   | "support_request_email"
   | "billing_review"
   | "twilio_delivery"
-  | "gmail_delivery";
+  | "gmail_delivery"
+  | "usage_alert";
 
 export type OperationalFailureInput = {
   eventKey: string;
@@ -45,6 +46,7 @@ const FAILURE_SUMMARY_FALLBACK: Record<OperationalFailureSource, string> = {
   billing_review: "Billing account needs admin review",
   twilio_delivery: "Twilio message delivery needs attention",
   gmail_delivery: "Gmail delivery needs attention",
+  usage_alert: "Usage alert threshold reached",
 };
 
 const FAILURE_SUMMARY_ALLOWLIST: Record<OperationalFailureSource, Record<string, string>> = {
@@ -92,6 +94,16 @@ const FAILURE_SUMMARY_ALLOWLIST: Record<OperationalFailureSource, Record<string,
   gmail_delivery: {
     "Manual invoice email delivery failed": "Manual invoice email delivery failed",
   },
+  usage_alert: {
+    "Total Retell call minutes reached the daily threshold": "Total Retell call minutes reached the daily threshold",
+    "Total Retell call minutes reached the monthly threshold": "Total Retell call minutes reached the monthly threshold",
+    "A business reached its daily call-minute threshold": "A business reached its daily call-minute threshold",
+    "A business reached its monthly call-minute threshold": "A business reached its monthly call-minute threshold",
+    "Provisioned phone numbers reached the daily threshold": "Provisioned phone numbers reached the daily threshold",
+    "Provisioned phone numbers reached the monthly threshold": "Provisioned phone numbers reached the monthly threshold",
+    "A business reached 80% of its plan call limit": "A business reached 80% of its plan call limit",
+    "A business reached its plan call limit": "A business reached its plan call limit",
+  },
 };
 
 const FAILURE_DETAILS: Record<OperationalFailureSource, string> = {
@@ -105,6 +117,7 @@ const FAILURE_DETAILS: Record<OperationalFailureSource, string> = {
   billing_review: "Billing requires admin review. No automatic suspension or plan change was made.",
   twilio_delivery: "A Twilio text message was not delivered. Review provider status and SMS configuration.",
   gmail_delivery: "A Corvlio billing email could not be delivered. Review Gmail delivery settings.",
+  usage_alert: "A usage threshold was reached. This alert does not block calls, change a plan, or provision or release phone numbers.",
 };
 
 export function allowlistedOperationalFailureSummary(

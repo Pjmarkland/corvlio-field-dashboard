@@ -23,6 +23,20 @@ vi.mock('@capacitor/core', async importOriginal => ({ ...await importOriginal<ob
 vi.mock('@workspace/api-client-react', async importOriginal => ({
   ...await importOriginal<object>(),
   useGetAdminOverview: (options: unknown) => { state.overview(options); return state.query; },
+  useGetAdminUsageAlertSettings: () => ({
+    data: {
+      dailyTotalCallMinutes: 500,
+      monthlyTotalCallMinutes: 8000,
+      dailyPerBusinessCallMinutes: 120,
+      monthlyPerBusinessCallMinutes: 1500,
+      dailyProvisionedNumbers: 3,
+      monthlyProvisionedNumbers: 20,
+      updatedAt: null,
+    },
+    isLoading: false,
+    isError: false,
+  }),
+  useUpdateAdminUsageAlertSettings: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useGetBusinessProfile: () => ({ data: { isInternal: true, billingMode: 'manual' }, isSuccess: true }),
   useGetOwnerInvoices: () => ({ data: undefined }),
 }));

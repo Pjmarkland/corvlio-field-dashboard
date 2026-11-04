@@ -8,6 +8,7 @@
 import type { AdminBusinessFallbackRouting } from './adminBusinessFallbackRouting';
 import type { AdminBusinessSummary } from './adminBusinessSummary';
 import type { AdminCallRecord } from './adminCallRecord';
+import type { AdminFirstClientChecklistItem } from './adminFirstClientChecklistItem';
 import type { AdminLeadActivity } from './adminLeadActivity';
 import type { AdminOnboardingAnswers } from './adminOnboardingAnswers';
 
@@ -17,4 +18,5 @@ export interface AdminBusinessDetail {
   onboarding: AdminOnboardingAnswers;
   leads: AdminLeadActivity[];
   calls: AdminCallRecord[];
+  firstClientChecklist: AdminFirstClientChecklistItem[];
 }

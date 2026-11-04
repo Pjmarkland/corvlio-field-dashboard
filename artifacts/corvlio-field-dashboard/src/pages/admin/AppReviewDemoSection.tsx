@@ -111,6 +111,7 @@ export default function AppReviewDemoSection() {
 
         <div className="mt-4 grid gap-2 rounded-xl bg-[#f1f4ee] p-3 text-xs leading-relaxed text-[#536258]">
           <p><strong>Reset scope:</strong> creates or refreshes the clearly labeled sample business profile and eight recent fictional leads. It refuses to change the business if it finds calls, billing or provisioning records, notifications, or leads not tagged as demo data. It never buys a phone or creates a Clerk user.</p>
+          <p><strong>Fictional caller numbers:</strong> all sample leads use numbers in the reserved fictional 202-555-0100–0199 range. No live caller numbers are used.</p>
           <p><strong>Reviewer account:</strong> create a separate Clerk account and sign in once. By default, enter its exact verified email. The admin override below allows an exact existing email match even if it is unverified. Linking is refused if the demo is already linked to a different account or this account already owns another business.</p>
         </div>
 

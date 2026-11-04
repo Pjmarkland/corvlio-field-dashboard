@@ -5,6 +5,7 @@ import { useParams } from 'wouter';
 import { getGetAdminBusinessQueryKey, getGetAdminOverviewQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers, type AdminBusinessSummary } from '@workspace/api-client-react';
 
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, BackLink, SectionHeading, formatAdminDate, formatAdminDuration, formatAdminResponse } from './AdminShared';
+import FirstClientChecklistSection from './FirstClientChecklistSection';
 
 const ANSWER_FIELDS: Array<{ key: keyof AdminOnboardingAnswers; label: string }> = [
   { key: 'businessName', label: 'Business name' },
@@ -267,6 +268,9 @@ export default function AdminBusinessPage() {
       {managedReportsMutation.isError ? <p role="alert" className="text-xs text-[#a3432d]">The report setting could not be saved.</p> : null}
     </section>
     <BusinessFallbackPhoneSettings businessId={businessId} detail={data} />
+    {!business.isInternal && !business.isSample
+      ? <FirstClientChecklistSection businessId={businessId} items={data.firstClientChecklist} />
+      : null}
     <section className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <AdminMetric label="Onboarding" value={`${business.onboardingCompletenessPercent}%`} detail={`${business.completedOnboardingFieldCount} of ${business.onboardingFieldCount} fields`} tone={business.onboardingCompletenessPercent === 100 ? 'moss' : 'neutral'} icon={FileText} />
       <AdminMetric label="Total leads" value={business.totalLeadCount} detail={`${business.contactedLeadCount} contacted`} icon={UserRound} />

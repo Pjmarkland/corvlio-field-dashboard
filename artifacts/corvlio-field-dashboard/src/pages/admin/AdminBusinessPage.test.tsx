@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   query: {} as Record<string, unknown>,
   mutate: vi.fn(),
   fallbackMutate: vi.fn(),
+  checklistMutate: vi.fn(),
   invalidate: vi.fn(),
   setQueryData: vi.fn(),
 }));
@@ -29,9 +30,11 @@ vi.mock('./AdminShared', () => ({
 }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetAdminBusinessQueryKey: (id: number) => ['admin-business', id],
+  getGetAdminOverviewQueryKey: () => ['admin-overview'],
   useGetAdminBusiness: () => h.query,
   useUpdateAdminManagedReports: () => ({ mutate: h.mutate, isPending: false, isError: false }),
   useUpdateAdminBusinessFallbackPhone: () => ({ mutate: h.fallbackMutate, isPending: false }),
+  useUpdateAdminFirstClientChecklistItem: () => ({ mutate: h.checklistMutate, isPending: false, isError: false }),
 }));
 
 import AdminBusinessPage from './AdminBusinessPage';
@@ -73,6 +76,7 @@ function setBusiness(enabled: boolean, isInternal = false) {
       onboarding: { websiteEnrichmentSources: {}, websiteEnrichmentAttemptedAt: null, agreementsAcceptedAt: null, agreementsAcceptedVersion: null },
       leads: [],
       calls: [],
+      firstClientChecklist: [],
     },
     isLoading: false,
     isError: false,

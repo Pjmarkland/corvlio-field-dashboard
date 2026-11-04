@@ -12,6 +12,12 @@ import {
   ResolveAdminSystemAlertParams,
   ResolveAdminSystemAlertResponse,
   GetAdminHealthCheckResponse,
+  GetAdminUsageAlertSettingsResponse,
+  UpdateAdminUsageAlertSettingsBody,
+  UpdateAdminUsageAlertSettingsResponse,
+  UpdateAdminFirstClientChecklistItemParams,
+  UpdateAdminFirstClientChecklistItemBody,
+  UpdateAdminFirstClientChecklistItemResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter } from "express";
 import {
@@ -21,6 +27,8 @@ import {
 } from "../lib/adminData";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { getAdminCallQuality } from "../lib/callQuality";
+import { getUsageAlertSettings, saveUsageAlertSettings } from "../lib/usageAlertSettings";
+import { isFirstClientChecklistKey, updateFirstClientChecklistItem } from "../lib/firstClientChecklist";
 import { z } from "zod";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { businessAdminEventsTable, businessesTable, db, leadInfoFlagsTable, leadsTable, pool, supportRequestsTable } from "@workspace/db";
@@ -461,6 +469,44 @@ router.get("/admin/overview", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/admin/usage-alert-settings", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(GetAdminUsageAlertSettingsResponse.parse(await getUsageAlertSettings()));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Usage alert settings request failed",
+    );
+    res.status(503).json({ error: "Unable to load usage alert settings" });
+  }
+});
+
+router.patch("/admin/usage-alert-settings", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const body = UpdateAdminUsageAlertSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "One or more thresholds are outside the supported range" });
+    return;
+  }
+  const actorUserId = getAuth(req).userId;
+  if (!actorUserId) {
+    res.sendStatus(401);
+    return;
+  }
+  try {
+    res.json(UpdateAdminUsageAlertSettingsResponse.parse(
+      await saveUsageAlertSettings(body.data, actorUserId),
+    ));
+  } catch (error) {
+    req.log.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Usage alert settings update failed",
+    );
+    res.status(503).json({ error: "Unable to save usage alert settings" });
+  }
+});
+
 router.get("/admin/businesses/:businessId", async (req, res): Promise<void> => {
   const params = GetAdminBusinessParams.safeParse(req.params);
   if (!params.success) {
@@ -484,6 +530,43 @@ router.get("/admin/businesses/:businessId", async (req, res): Promise<void> => {
       "Admin business detail request failed",
     );
     res.status(502).json({ error: "Unable to load business details" });
+  }
+});
+
+router.patch("/admin/businesses/:businessId/first-client-checklist/:itemKey", async (req, res): Promise<void> => {
+  const params = UpdateAdminFirstClientChecklistItemParams.safeParse(req.params);
+  const body = UpdateAdminFirstClientChecklistItemBody.safeParse(req.body);
+  if (!params.success || !body.success || !isFirstClientChecklistKey(params.data.itemKey)) {
+    res.status(400).json({ error: "Invalid checklist item or completion state" });
+    return;
+  }
+  const actorUserId = getAuth(req).userId;
+  if (!actorUserId) {
+    res.sendStatus(401);
+    return;
+  }
+  try {
+    const item = await updateFirstClientChecklistItem({
+      businessId: params.data.businessId,
+      itemKey: params.data.itemKey,
+      completed: body.data.completed,
+      actorUserId,
+    });
+    if (!item) {
+      res.sendStatus(404);
+      return;
+    }
+    res.json(UpdateAdminFirstClientChecklistItemResponse.parse(item));
+  } catch (error) {
+    req.log.error(
+      {
+        businessId: params.data.businessId,
+        itemKey: params.data.itemKey,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "First-client checklist update failed",
+    );
+    res.status(503).json({ error: "Unable to save checklist item" });
   }
 });
 

@@ -15,11 +15,11 @@ Publishing a shared draft can immediately affect numbers routed to `latest_publi
 
 **How to apply:** Inventory and, with explicit approval, pin live routes to the current numeric version before publishing a reviewed production candidate. Prepare the production app and both webhook paths separately; keep the old agent, KB, and Make pipeline available for rollback.
 
-Per-business fallback numbers returned by the app's inbound webhook are not outage failover by themselves. When the app API is unavailable, it cannot supply that data; actual outage forwarding must be configured independently at the Retell phone-number or carrier level.
+Per-business fallback numbers returned by the app's inbound webhook are not outage failover by themselves. Retell's `fallback_number` is invoked after about 40 seconds of inbound concurrency saturation; separate Backup mode diverts calls only while enabled. Neither setting proves automatic app-server-down failover.
 
-**Why:** Webhook-derived values exist only when the webhook can reach the app, so presenting the database setting as an active server-outage route would be misleading.
+**Why:** Webhook-derived values exist only when the webhook can reach the app, while Retell documents concurrency fallback and Backup mode as distinct behaviors rather than app-health failover.
 
-**How to apply:** Keep app fallback data and live phone-number routing separate. Do not claim outage forwarding is active until the independent provider route has been configured and verified.
+**How to apply:** Keep app fallback data, concurrency handling, manual Backup mode, and live phone-number routing distinct. Do not claim outage forwarding is active until the independent provider route has been configured and verified.
 
 Permission to enable owner demo calls in production is not permission to publish
 shared Retell drafts or change live phone-number routing.

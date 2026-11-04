@@ -13,16 +13,18 @@
 - Owners can download their own data as CSV or JSON, submit support requests in Settings, and test call forwarding from the forwarding help flow.
 - An admin support inbox shows saved requests, urgency, and email-delivery status.
 
-The repository's existing post-merge setup applied these schema changes to the **development** database. Production schema changes are not applied until the owner reviews and confirms them through Publish. This app was not published.
+The additive schema changes were applied to the **development** database with `drizzle-kit push`. Production schema changes are not applied; the owner must review and confirm them through Publish. This app was not published.
 
 ## Development verification
 
-- API tests: **761 passed, 8 skipped** across 75 files.
-- Dashboard tests: **230 passed** across 38 files.
+- API tests: **766 passed, 8 skipped** across 77 files.
+- Dashboard tests: **232 passed** across 40 files.
 - Workspace library, API server, and dashboard typechecks: **passed**.
 - `GET /api/health/launch`: **200**, reporting the development database available.
-- The signed-out preview rendered the sign-in page. Protected owner and admin screens were not visually inspected because the preview browser has no authenticated session.
-- The browser console showed three CSP-blocked inline scripts and Clerk's development-key warning. The security policy was not loosened; verify authentication with the production Clerk configuration before App Store review.
+- An unauthenticated request to `/api/admin/usage-alert-settings` returned **404**, confirming the admin route remains protected.
+- The signed-out preview rendered the sign-in page. Protected owner and admin screens were not visually inspected because the preview browser has no authenticated session; the new admin sections are covered by component tests.
+- The preview still reports three CSP-blocked development-injected scripts and Clerk's development-key warning. The CSP was not loosened. The native production bundle contains one external module script and **zero inline script tags**; its generated `index.html` matches the iOS-synced copy.
+- Capacitor web assets were rebuilt and synced to iOS and Android. Xcode and CocoaPods are unavailable in this Linux workspace, so no signed archive, physical-device build, or TestFlight run was produced.
 
 ## Owner steps: verify PostgreSQL backup and restore
 
@@ -91,6 +93,22 @@ Apple requires a complete review path and working access for account-based featu
 7. Before submitting, verify the reviewer account again from a clean sign-in. Do not reset or unlink the demo while review is in progress.
 
 **Review status:** Preparation controls exist in the founder dashboard, but reviewer access and the submitted native build have not been tested. App Review approval cannot be guaranteed.
+
+## Current launch-readiness batch
+
+- **Preview CSP:** The three CSP errors were traced to development-only scripts injected into the Replit preview: Cartographer, the development Tailwind loader, and Replit theme tokens. The existing restrictive CSP was not weakened. The production native-target bundle is rebuilt and checked separately; the browser preview can still report blocked development injections without indicating an app-bundle inline script.
+- **First-client checklist:** Admins can track seven timestamped setup steps per real client. Completion history is appended to the existing business-admin audit log, and the admin list shows completed/total progress. Internal and App Review sample businesses are excluded.
+- **Founder usage alerts:** Admin-configurable UTC daily/monthly thresholds cover total Retell call minutes, per-business call minutes, and purchased phone numbers. Finite plan call limits also emit founder alerts at the existing 80%/100% thresholds for the current billing period. Alerts do not block calls, change plans, add per-call charges, or provision/release numbers; usage counts are not a dollar-cost estimate.
+- **App Store and call-fallback guidance:** See [App Store review readiness](./app-store-review-readiness.md) for the reviewer account, Sign in with Apple decision, privacy worksheet, review notes, and conservative external-billing recommendation. See [Inbound-call fallback runbook](./call-fallback-runbook.md) for Retell and Twilio checks. No production Clerk or telephony configuration was inspected or changed.
+
+### Owner actions still required
+
+1. Verify production Clerk sign-in methods and apply the Sign in with Apple decision to the Release build.
+2. Create and link the dedicated reviewer account, then verify access from the submitted iOS build. Enter credentials only in App Store Connect's secure review fields.
+3. Complete the App Store privacy label and publish the privacy policy; verify provider retention, recording, tracking, and account-deletion disclosures.
+4. Decide whether to hide the external billing link in iOS until its App Review treatment is confirmed.
+5. Inventory each production inbound number and run a safe provider-level fallback test; current caller behavior during a full API outage is unverified.
+6. Build/sign and test the iOS archive on a Mac and supported physical device. No Xcode archive or App Store submission was performed.
 
 ## References
 

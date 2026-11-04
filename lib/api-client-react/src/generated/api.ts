@@ -34,6 +34,8 @@ import type {
   AdminEmailHealth,
   AdminFallbackPhoneSettings,
   AdminFallbackPhoneSettingsUpdate,
+  AdminFirstClientChecklistItem,
+  AdminFirstClientChecklistUpdateInput,
   AdminFlaggedLeadsResponse,
   AdminHealthCheck,
   AdminOverview,
@@ -43,6 +45,8 @@ import type {
   AdminSmsMessagesResponse,
   AdminSupportRequests,
   AdminSystemAlertsResponse,
+  AdminUsageAlertSettings,
+  AdminUsageAlertSettingsInput,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
   AppReviewDemoStatus,
@@ -3172,6 +3176,228 @@ export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOv
 
 
 
+
+export const getGetAdminUsageAlertSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/usage-alert-settings`
+}
+
+/**
+ * @summary Get founder usage alert thresholds
+ */
+export const getAdminUsageAlertSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminUsageAlertSettings> => {
+
+  return customFetch<AdminUsageAlertSettings>(getGetAdminUsageAlertSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminUsageAlertSettingsQueryKey = () => {
+    return [
+    `/api/admin/usage-alert-settings`
+    ] as const;
+    }
+
+
+export const getGetAdminUsageAlertSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUsageAlertSettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminUsageAlertSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminUsageAlertSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUsageAlertSettings>>> = ({ signal }) => getAdminUsageAlertSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUsageAlertSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminUsageAlertSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUsageAlertSettings>>>
+export type GetAdminUsageAlertSettingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get founder usage alert thresholds
+ */
+
+export function useGetAdminUsageAlertSettings<TData = Awaited<ReturnType<typeof getAdminUsageAlertSettings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminUsageAlertSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminUsageAlertSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminUsageAlertSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/usage-alert-settings`
+}
+
+/**
+ * @summary Update founder usage alert thresholds
+ */
+export const updateAdminUsageAlertSettings = async (adminUsageAlertSettingsInput: AdminUsageAlertSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminUsageAlertSettings> => {
+
+  return customFetch<AdminUsageAlertSettings>(getUpdateAdminUsageAlertSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminUsageAlertSettingsInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminUsageAlertSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>, TError,{data: BodyType<AdminUsageAlertSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>, TError,{data: BodyType<AdminUsageAlertSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateAdminUsageAlertSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>, {data: BodyType<AdminUsageAlertSettingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminUsageAlertSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminUsageAlertSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>>
+    export type UpdateAdminUsageAlertSettingsMutationBody = BodyType<AdminUsageAlertSettingsInput>
+    export type UpdateAdminUsageAlertSettingsMutationError = ErrorType<void>
+
+    /**
+ * @summary Update founder usage alert thresholds
+ */
+export const useUpdateAdminUsageAlertSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>, TError,{data: BodyType<AdminUsageAlertSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminUsageAlertSettings>>,
+        TError,
+        {data: BodyType<AdminUsageAlertSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminUsageAlertSettingsMutationOptions(options));
+    }
+
+export const getUpdateAdminFirstClientChecklistItemUrl = (businessId: number,
+    itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done',) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}/first-client-checklist/${itemKey}`
+}
+
+/**
+ * @summary Complete or reopen a first-client checklist item
+ */
+export const updateAdminFirstClientChecklistItem = async (businessId: number,
+    itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done',
+    adminFirstClientChecklistUpdateInput: AdminFirstClientChecklistUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminFirstClientChecklistItem> => {
+
+  return customFetch<AdminFirstClientChecklistItem>(getUpdateAdminFirstClientChecklistItemUrl(businessId,itemKey),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminFirstClientChecklistUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminFirstClientChecklistItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>, TError,{businessId: number;itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done';data: BodyType<AdminFirstClientChecklistUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>, TError,{businessId: number;itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done';data: BodyType<AdminFirstClientChecklistUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateAdminFirstClientChecklistItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>, {businessId: number;itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done';data: BodyType<AdminFirstClientChecklistUpdateInput>}> = (props) => {
+          const {businessId,itemKey,data} = props ?? {};
+
+          return  updateAdminFirstClientChecklistItem(businessId,itemKey,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminFirstClientChecklistItemMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>>
+    export type UpdateAdminFirstClientChecklistItemMutationBody = BodyType<AdminFirstClientChecklistUpdateInput>
+    export type UpdateAdminFirstClientChecklistItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Complete or reopen a first-client checklist item
+ */
+export const useUpdateAdminFirstClientChecklistItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>, TError,{businessId: number;itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done';data: BodyType<AdminFirstClientChecklistUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminFirstClientChecklistItem>>,
+        TError,
+        {businessId: number;itemKey: 'business_details_reviewed' | 'plan_assigned' | 'payment_confirmed' | 'phone_line_provisioned' | 'test_call_done' | 'call_forwarding_verified' | 'first_week_check_in_done';data: BodyType<AdminFirstClientChecklistUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminFirstClientChecklistItemMutationOptions(options));
+    }
 
 export const getGetAdminInternalBusinessesUrl = () => {
 

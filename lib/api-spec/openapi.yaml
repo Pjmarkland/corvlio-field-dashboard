@@ -977,6 +977,84 @@ paths:
                 $ref: "#/components/schemas/AdminOverview"
         "404":
           description: Not found or administrator access is unavailable
+  /admin/usage-alert-settings:
+    get:
+      operationId: getAdminUsageAlertSettings
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Get founder usage alert thresholds
+      responses:
+        "200":
+          description: Current usage alert thresholds
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsageAlertSettings"
+        "404": {description: Not found or administrator access is unavailable}
+    patch:
+      operationId: updateAdminUsageAlertSettings
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Update founder usage alert thresholds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUsageAlertSettingsInput"
+      responses:
+        "200":
+          description: Saved usage alert thresholds
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsageAlertSettings"
+        "400": {description: One or more thresholds are outside the supported range}
+        "404": {description: Not found or administrator access is unavailable}
+        "503": {description: Usage alert thresholds could not be saved}
+  /admin/businesses/{businessId}/first-client-checklist/{itemKey}:
+    patch:
+      operationId: updateAdminFirstClientChecklistItem
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Complete or reopen a first-client checklist item
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: itemKey
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - business_details_reviewed
+              - plan_assigned
+              - payment_confirmed
+              - phone_line_provisioned
+              - test_call_done
+              - call_forwarding_verified
+              - first_week_check_in_done
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminFirstClientChecklistUpdateInput"
+      responses:
+        "200":
+          description: Updated checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFirstClientChecklistItem"
+        "400": {description: "Invalid business, item, or completion state"}
+        "404": {description: Business not found or not eligible for client checklist}
+        "503": {description: Checklist item could not be saved}
   /admin/internal-businesses:
     get:
       operationId: getAdminInternalBusinesses
@@ -3007,6 +3085,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NotificationPlatform"
+        firstClientChecklistCompletedCount:
+          type: integer
+        firstClientChecklistTotalCount:
+          type: integer
         agreementsAcceptedAt:
           type: [string, "null"]
           format: date-time
@@ -3042,6 +3124,8 @@ components:
         - averageResponseTimeMs
         - pushEnabledDeviceCount
         - pushPlatforms
+        - firstClientChecklistCompletedCount
+        - firstClientChecklistTotalCount
         - agreementsAcceptedAt
         - agreementsAcceptedVersion
         - hasNoLeads
@@ -3209,7 +3293,78 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminCallRecord"
-      required: [business, fallbackRouting, onboarding, leads, calls]
+        firstClientChecklist:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFirstClientChecklistItem"
+      required: [business, fallbackRouting, onboarding, leads, calls, firstClientChecklist]
+    AdminFirstClientChecklistItem:
+      type: object
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          enum:
+            - business_details_reviewed
+            - plan_assigned
+            - payment_confirmed
+            - phone_line_provisioned
+            - test_call_done
+            - call_forwarding_verified
+            - first_week_check_in_done
+        label:
+          type: string
+        completed:
+          type: boolean
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+      required: [key, label, completed, completedAt]
+    AdminFirstClientChecklistUpdateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        completed:
+          type: boolean
+      required: [completed]
+    AdminUsageAlertSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        dailyTotalCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyTotalCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        dailyPerBusinessCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyPerBusinessCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        dailyProvisionedNumbers: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyProvisionedNumbers: {type: integer, minimum: 1, maximum: 1000000}
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - dailyTotalCallMinutes
+        - monthlyTotalCallMinutes
+        - dailyPerBusinessCallMinutes
+        - monthlyPerBusinessCallMinutes
+        - dailyProvisionedNumbers
+        - monthlyProvisionedNumbers
+        - updatedAt
+    AdminUsageAlertSettingsInput:
+      type: object
+      additionalProperties: false
+      properties:
+        dailyTotalCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyTotalCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        dailyPerBusinessCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyPerBusinessCallMinutes: {type: integer, minimum: 1, maximum: 1000000}
+        dailyProvisionedNumbers: {type: integer, minimum: 1, maximum: 1000000}
+        monthlyProvisionedNumbers: {type: integer, minimum: 1, maximum: 1000000}
+      required:
+        - dailyTotalCallMinutes
+        - monthlyTotalCallMinutes
+        - dailyPerBusinessCallMinutes
+        - monthlyPerBusinessCallMinutes
+        - dailyProvisionedNumbers
+        - monthlyProvisionedNumbers
     LaunchHealthStatus:
       type: object
       additionalProperties: false

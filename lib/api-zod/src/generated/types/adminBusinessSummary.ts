@@ -47,6 +47,8 @@ export interface AdminBusinessSummary {
   averageResponseTimeMs: number | null;
   pushEnabledDeviceCount: number;
   pushPlatforms: NotificationPlatform[];
+  firstClientChecklistCompletedCount: number;
+  firstClientChecklistTotalCount: number;
   /** @nullable */
   agreementsAcceptedAt: Date | null;
   /** @nullable */

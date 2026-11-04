@@ -51,6 +51,7 @@ describe("AppReviewDemoSection", () => {
     view();
     expect(screen.getByTestId("text-app-review-demo-status").textContent).toBe("8 fictional leads ready");
     expect(screen.getByTestId("text-app-review-demo-owner").textContent).toBe("No reviewer account linked");
+    expect(screen.getByText(/reserved fictional 202-555-0100–0199 range/i)).toBeTruthy();
     expect((screen.getByTestId("button-link-app-review-demo") as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByTestId("checkbox-allow-unverified-app-review-email") as HTMLInputElement).checked).toBe(false);
   });
