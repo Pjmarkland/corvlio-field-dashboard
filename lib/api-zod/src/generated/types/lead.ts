@@ -17,10 +17,6 @@ export interface Lead {
   callbackNumber?: string | null;
   /** @nullable */
   availability?: string | null;
-  /** @nullable */
-  transcript?: string | null;
-  /** @nullable */
-  summary?: string | null;
   id: string;
   name: string;
   phone: string;

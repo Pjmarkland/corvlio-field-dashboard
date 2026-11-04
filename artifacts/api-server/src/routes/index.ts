@@ -19,13 +19,13 @@ import invoicingRouter from "./invoicing";
 import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
 
 const router: IRouter = Router();
+router.use(healthRouter);
 router.use(accountDeletionGuard);
 router.use(accountRouter);
 router.use(ownerSmsRouter);
 router.use(pendingReleasesRouter);
 router.use(invoicingRouter);
 
-router.use(healthRouter);
 router.use(billingRouter);
 router.use(adminEmailHealthRouter);
 router.use(adminRouter);

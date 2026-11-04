@@ -83,11 +83,11 @@ export const ClaimWelcomeResponse = zod.object({
 
 
 /**
- * Returns server health status
+ * Checks API and database availability without exposing internal error details
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
+  "status": zod.enum(['ok', 'unavailable'])
 })
 
 
@@ -680,9 +680,36 @@ export const ReadLeadAlertsResponse = zod.void()
 
 
 /**
- * Returns normalized lead rows for the signed-in business owner.
- * @summary List Google Sheet leads
+ * Returns a bounded page without transcripts or summaries; open a lead for its private details.
+ * @summary List a page of leads for the signed-in business owner
  */
+export const getLeadsQueryPageDefault = 1;
+
+export const getLeadsQueryPageSizeDefault = 25;
+export const getLeadsQueryPageSizeMax = 100;
+
+
+
+export const GetLeadsQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(1).default(getLeadsQueryPageDefault),
+  "pageSize": zod.coerce.number().int().min(1).max(getLeadsQueryPageSizeMax).default(getLeadsQueryPageSizeDefault)
+})
+
+
+export const getLeadsResponsePageSizeMax = 100;
+
+export const getLeadsResponseSummaryTotalLeadsMin = 0;
+
+export const getLeadsResponseSummaryPendingLeadsMin = 0;
+
+export const getLeadsResponseSummaryContactedLeadsMin = 0;
+
+export const getLeadsResponseSummaryThisWeekLeadsMin = 0;
+
+export const getLeadsResponseSummaryAverageReplyMinutesMin = 0;
+
+
+
 export const GetLeadsResponse = zod.object({
   "isSample": zod.boolean().optional(),
   "provisioningState": zod.string().optional(),
@@ -690,13 +717,21 @@ export const GetLeadsResponse = zod.object({
   "businessName": zod.string().nullable(),
   "retellPhoneNumber": zod.string().nullable(),
   "timeZone": zod.string().nullable(),
+  "page": zod.int().min(1),
+  "pageSize": zod.int().min(1).max(getLeadsResponsePageSizeMax),
+  "hasMore": zod.boolean(),
+  "summary": zod.object({
+  "totalLeads": zod.int().min(getLeadsResponseSummaryTotalLeadsMin),
+  "pendingLeads": zod.int().min(getLeadsResponseSummaryPendingLeadsMin),
+  "contactedLeads": zod.int().min(getLeadsResponseSummaryContactedLeadsMin),
+  "thisWeekLeads": zod.int().min(getLeadsResponseSummaryThisWeekLeadsMin),
+  "averageReplyMinutes": zod.int().min(getLeadsResponseSummaryAverageReplyMinutesMin).nullable()
+}),
   "leads": zod.array(zod.object({
   "tradeIntakeAnswers": zod.string().nullish(),
   "callerId": zod.string().nullish(),
   "callbackNumber": zod.string().nullish(),
   "availability": zod.string().nullish(),
-  "transcript": zod.string().nullish(),
-  "summary": zod.string().nullish(),
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),
@@ -730,8 +765,6 @@ export const GetLeadDetailResponse = zod.object({
   "callerId": zod.string().nullish(),
   "callbackNumber": zod.string().nullish(),
   "availability": zod.string().nullish(),
-  "transcript": zod.string().nullish(),
-  "summary": zod.string().nullish(),
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),
@@ -742,6 +775,8 @@ export const GetLeadDetailResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
 }).and(zod.object({
+  "transcript": zod.string().nullish(),
+  "summary": zod.string().nullish(),
   "callStartedAt": zod.coerce.date().nullable(),
   "durationMs": zod.number().min(getLeadDetailResponseTwoDurationMsMin).multipleOf(getLeadDetailResponseTwoDurationMsMultipleOf).nullable(),
   "capturedUrgency": zod.string().nullable(),
@@ -815,8 +850,6 @@ export const UpdateLeadNotesResponse = zod.object({
   "callerId": zod.string().nullish(),
   "callbackNumber": zod.string().nullish(),
   "availability": zod.string().nullish(),
-  "transcript": zod.string().nullish(),
-  "summary": zod.string().nullish(),
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),
@@ -827,6 +860,8 @@ export const UpdateLeadNotesResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
 }).and(zod.object({
+  "transcript": zod.string().nullish(),
+  "summary": zod.string().nullish(),
   "callStartedAt": zod.coerce.date().nullable(),
   "durationMs": zod.number().min(updateLeadNotesResponseTwoDurationMsMin).multipleOf(updateLeadNotesResponseTwoDurationMsMultipleOf).nullable(),
   "capturedUrgency": zod.string().nullable(),

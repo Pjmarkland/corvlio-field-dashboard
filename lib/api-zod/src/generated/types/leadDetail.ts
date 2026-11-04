@@ -9,6 +9,10 @@ import type { Lead } from './lead';
 
 export type LeadDetail = Lead & ({
   /** @nullable */
+  transcript?: string | null;
+  /** @nullable */
+  summary?: string | null;
+  /** @nullable */
   callStartedAt: Date | null;
   /**
      * @minimum 0

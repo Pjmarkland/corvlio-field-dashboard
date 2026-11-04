@@ -6,7 +6,7 @@ import { Redirect } from 'wouter';
 /** Read-only gate: setup pages must never mount for an already configured owner. */
 export function BusinessSetupGuard({ children, allowConfigured = false }: { children: ReactNode; allowConfigured?: boolean }) {
   const { isLoaded, isSignedIn, user } = useUser();
-  const { data, isPending, isFetching, isError, refetch } = useGetLeads({
+  const { data, isPending, isFetching, isError, refetch } = useGetLeads(undefined, {
     query: {
       // Do not reuse another account's cached setup decision during an auth change.
       queryKey: [...getGetLeadsQueryKey(), 'setup-entry', user?.id],

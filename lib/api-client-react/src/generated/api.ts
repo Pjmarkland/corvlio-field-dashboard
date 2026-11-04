@@ -60,6 +60,7 @@ import type {
   EmailTestRequest,
   EmailTestResult,
   GetAdminInvoices200,
+  GetLeadsParams,
   HealthStatus,
   InternalBusinessAgentUpdate,
   InternalBusinessDirectory,
@@ -565,7 +566,7 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
+ * Checks API and database availability without exposing internal error details
  * @summary Health check
  */
 export const healthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<HealthStatus> => {
@@ -590,7 +591,7 @@ export const getHealthCheckQueryKey = () => {
     }
 
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<HealthStatus>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -609,14 +610,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
-export type HealthCheckQueryError = ErrorType<unknown>
+export type HealthCheckQueryError = ErrorType<HealthStatus>
 
 
 /**
  * @summary Health check
  */
 
-export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<HealthStatus>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -1599,21 +1600,28 @@ export const useReadLeadAlerts = <TError = ErrorType<void>,
       return useMutation(getReadLeadAlertsMutationOptions(options));
     }
 
-export const getGetLeadsUrl = () => {
+export const getGetLeadsUrl = (params?: GetLeadsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/leads`
+  return stringifiedParams.length > 0 ? `/api/leads?${stringifiedParams}` : `/api/leads`
 }
 
 /**
- * Returns normalized lead rows for the signed-in business owner.
- * @summary List Google Sheet leads
+ * Returns a bounded page without transcripts or summaries; open a lead for its private details.
+ * @summary List a page of leads for the signed-in business owner
  */
-export const getLeads = async ( options?: Parameters<typeof customFetch>[1]): Promise<LeadWorkspace> => {
+export const getLeads = async (params?: GetLeadsParams, options?: Parameters<typeof customFetch>[1]): Promise<LeadWorkspace> => {
 
-  return customFetch<LeadWorkspace>(getGetLeadsUrl(),
+  return customFetch<LeadWorkspace>(getGetLeadsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1626,23 +1634,23 @@ export const getLeads = async ( options?: Parameters<typeof customFetch>[1]): Pr
 
 
 
-export const getGetLeadsQueryKey = () => {
+export const getGetLeadsQueryKey = (params?: GetLeadsParams,) => {
     return [
-    `/api/leads`
+    `/api/leads`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetLeadsQueryOptions = <TData = Awaited<ReturnType<typeof getLeads>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetLeadsQueryOptions = <TData = Awaited<ReturnType<typeof getLeads>>, TError = ErrorType<void>>(params?: GetLeadsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetLeadsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetLeadsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeads>>> = ({ signal }) => getLeads({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeads>>> = ({ signal }) => getLeads(params, { signal, ...requestOptions });
 
 
 
@@ -1656,15 +1664,15 @@ export type GetLeadsQueryError = ErrorType<void>
 
 
 /**
- * @summary List Google Sheet leads
+ * @summary List a page of leads for the signed-in business owner
  */
 
 export function useGetLeads<TData = Awaited<ReturnType<typeof getLeads>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetLeadsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetLeadsQueryOptions(options)
+  const queryOptions = getGetLeadsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

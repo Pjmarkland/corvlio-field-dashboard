@@ -6,12 +6,38 @@ import {
   UpdateLeadStatusResponse,
 } from "@workspace/api-zod";
 import { db, leadsTable } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { databaseErrorFields } from "@workspace/db/errors";
 
 const router: IRouter = Router();
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+const EMPTY_LEAD_SUMMARY = {
+  totalLeads: 0,
+  pendingLeads: 0,
+  contactedLeads: 0,
+  thisWeekLeads: 0,
+  averageReplyMinutes: null,
+};
+
+function parsePaginationInteger(value: unknown, fallback: number, max: number): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed <= max ? parsed : null;
+}
+
+function safeTimeZone(value: string | null | undefined): string {
+  if (!value) return "America/New_York";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return value;
+  } catch {
+    return "America/New_York";
+  }
+}
 
 function normalizeUrgency(value: string | null): "urgent" | "normal" | "low" {
   const normalized = (value ?? "").trim().toLowerCase();
@@ -43,6 +69,13 @@ router.get("/leads", async (req, res): Promise<void> => {
     return;
   }
 
+  const page = parsePaginationInteger(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+  const pageSize = parsePaginationInteger(req.query.pageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  if (page === null || pageSize === null || !Number.isSafeInteger((page - 1) * pageSize)) {
+    res.status(400).json({ error: "Invalid pagination parameters" });
+    return;
+  }
+
   try {
     const business = await findBusinessByClerkUserId(userId);
     if (!business) {
@@ -51,16 +84,58 @@ router.get("/leads", async (req, res): Promise<void> => {
         businessName: null,
         retellPhoneNumber: null,
         timeZone: "America/New_York",
+        page,
+        pageSize,
+        hasMore: false,
+        summary: EMPTY_LEAD_SUMMARY,
         leads: [],
       }));
       return;
     }
 
-    const leads = await db
-      .select()
-      .from(leadsTable)
-      .where(eq(leadsTable.businessId, business.id))
-      .orderBy(desc(leadsTable.createdAt));
+    const timeZone = safeTimeZone(business.timeZone);
+    const leadFilter = eq(leadsTable.businessId, business.id);
+    const [rows, [aggregate]] = await Promise.all([
+      db
+        .select({
+          id: leadsTable.id,
+          callerName: leadsTable.callerName,
+          phoneNumber: leadsTable.phoneNumber,
+          issueReason: leadsTable.issueReason,
+          address: leadsTable.address,
+          urgencyLevel: leadsTable.urgencyLevel,
+          status: leadsTable.status,
+          createdAt: leadsTable.createdAt,
+          contactedAt: leadsTable.contactedAt,
+          callerId: leadsTable.callerId,
+          callbackNumber: leadsTable.callbackNumber,
+          availability: leadsTable.availability,
+          tradeIntakeAnswers: leadsTable.tradeIntakeAnswers,
+        })
+        .from(leadsTable)
+        .where(leadFilter)
+        .orderBy(desc(leadsTable.createdAt), desc(leadsTable.id))
+        .limit(pageSize + 1)
+        .offset((page - 1) * pageSize),
+      db.select({
+        totalLeads: count(),
+        contactedLeads: sql<string>`COUNT(*) FILTER (
+          WHERE LOWER(TRIM(${leadsTable.status})) IN ('contacted', 'complete', 'completed', 'done')
+        )`,
+        thisWeekLeads: sql<string>`COUNT(*) FILTER (
+          WHERE ${leadsTable.createdAt} >=
+            date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE ${timeZone}) AT TIME ZONE ${timeZone}
+        )`,
+        averageReplyMinutes: sql<string | null>`AVG(
+          EXTRACT(EPOCH FROM (${leadsTable.contactedAt} - ${leadsTable.createdAt})) / 60
+        ) FILTER (
+          WHERE ${leadsTable.contactedAt} IS NOT NULL
+            AND ${leadsTable.contactedAt} >= ${leadsTable.createdAt}
+        )`,
+      }).from(leadsTable).where(leadFilter),
+    ]);
+    const hasMore = rows.length > pageSize;
+    const leads = rows.slice(0, pageSize);
 
     res.json(GetLeadsResponse.parse({
       configured: true,
@@ -68,7 +143,19 @@ router.get("/leads", async (req, res): Promise<void> => {
       provisioningState: business.isSample ? "sample" : business.retellPhoneNumber ? "ready" : business.provisioningState,
       businessName: business.businessName,
       retellPhoneNumber: business.retellPhoneNumber,
-      timeZone: business.timeZone ?? "America/New_York",
+      timeZone,
+      page,
+      pageSize,
+      hasMore,
+      summary: {
+        totalLeads: Number(aggregate.totalLeads),
+        contactedLeads: Number(aggregate.contactedLeads),
+        pendingLeads: Number(aggregate.totalLeads) - Number(aggregate.contactedLeads),
+        thisWeekLeads: Number(aggregate.thisWeekLeads),
+        averageReplyMinutes: aggregate.averageReplyMinutes === null
+          ? null
+          : Math.max(0, Math.round(Number(aggregate.averageReplyMinutes))),
+      },
       leads: leads.map((lead) => ({
         id: String(lead.id),
         name: lead.callerName ?? "",
@@ -82,8 +169,6 @@ router.get("/leads", async (req, res): Promise<void> => {
         callerId: lead.callerId,
         callbackNumber: lead.callbackNumber,
         availability: lead.availability,
-        transcript: lead.transcript,
-        summary: lead.summary,
         tradeIntakeAnswers: lead.tradeIntakeAnswers,
       })),
     }));

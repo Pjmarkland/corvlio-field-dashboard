@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Lead } from './lead';
+import type { LeadWorkspaceSummary } from './leadWorkspaceSummary';
 
 export interface LeadWorkspace {
   isSample?: boolean;
@@ -17,5 +18,14 @@ export interface LeadWorkspace {
   retellPhoneNumber: string | null;
   /** @nullable */
   timeZone: string | null;
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  pageSize: number;
+  hasMore: boolean;
+  summary: LeadWorkspaceSummary;
   leads: Lead[];
 }

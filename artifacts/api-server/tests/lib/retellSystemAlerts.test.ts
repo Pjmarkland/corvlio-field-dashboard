@@ -103,17 +103,29 @@ describe("Retell system alert notification throttling", () => {
     vi.restoreAllMocks();
   });
 
-  it("stores a single aggregated issue and only queues one notification inside 15 minutes", async () => {
-    await recordRetellSystemAlert({ ...alertInput, details: "Database lookup failed\nBearer secret-value" });
+  it("stores allowlisted alert text without phone numbers or email addresses", async () => {
+    await recordRetellSystemAlert({
+      ...alertInput,
+      summary: "Caller +1 (415) 555-0199 asked for a reply at caller@example.test",
+      details: "Database lookup failed for +1 (415) 555-0199; caller@example.test",
+    });
     const firstNotificationTime = new Date();
     await flushDelivery();
 
     expect(mocks.builder.onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({
       target: mocks.alertTable.issueKey,
     }));
-    expect(mocks.builder.values.mock.calls[0]?.[0]?.details).toBe("Database lookup failed Bearer [redacted]");
+    const stored = mocks.builder.values.mock.calls[0]?.[0];
+    expect(stored).toMatchObject({
+      category: "pre_call_timeout",
+      summary: "Retell pre-call lookup timed out; fallback response used",
+      details: "The pre-call lookup exceeded its response window and used a generic fallback.",
+    });
+    expect(JSON.stringify(stored)).not.toMatch(/\+1 \(415\) 555-0199|caller@example\.test/);
     expect(mocks.recordOperationalFailure).toHaveBeenCalledTimes(1);
     expect(mocks.queueFounderPushNotification).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(mocks.recordOperationalFailure.mock.calls)).not.toMatch(/\+1 \(415\) 555-0199|caller@example\.test/);
+    expect(JSON.stringify(mocks.queueFounderPushNotification.mock.calls)).not.toMatch(/\+1 \(415\) 555-0199|caller@example\.test/);
 
     mocks.returningAt = firstNotificationTime;
     mocks.returningNotify = false;

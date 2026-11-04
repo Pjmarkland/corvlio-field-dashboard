@@ -9,6 +9,8 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { retellMalformedJsonAlertHandler } from "./lib/retellWebhookAlerts";
 import { billingWebhook } from "./billing/webhook";
+import { corsOptions, rejectUnexpectedOrigin } from "./lib/corsPolicy";
+import { publicWebhookRateLimit } from "./middlewares/publicWebhookRateLimit";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -16,10 +18,11 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
+app.set("trust proxy", 1);
 // Stripe must receive its unmodified Buffer before the global JSON parser.
-app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingWebhook);
+app.post("/api/billing/webhook", publicWebhookRateLimit, express.raw({ type: "application/json" }), billingWebhook);
 // Raw bytes are mandatory for Clerk/Svix signature verification; before JSON/auth.
-app.post("/api/webhooks/clerk", express.raw({ type: "application/json", limit: "256kb" }), clerkDeletionWebhook);
+app.post("/api/webhooks/clerk", publicWebhookRateLimit, express.raw({ type: "application/json", limit: "256kb" }), clerkDeletionWebhook);
 
 app.use(
   pinoHttp({
@@ -40,8 +43,10 @@ app.use(
     },
   }),
 );
+app.use(cors(corsOptions));
+app.use(rejectUnexpectedOrigin);
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-app.use(cors({ credentials: true, origin: true }));
+app.use("/api/webhooks/retell", publicWebhookRateLimit);
 app.use(
   express.json({
     verify: (req, _res, buffer) => {

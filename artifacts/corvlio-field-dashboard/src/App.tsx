@@ -1,15 +1,15 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import {
   getGetBusinessProfileQueryKey,
   getGetLeadsQueryKey,
   getGetLeadDetailQueryKey,
+  getLeads,
   useGetBusinessProfile,
   useGetBusinessCallUsage,
   useGetBusinessMonthlyResultsReport,
   useGetOwnerInvoices,
   getGetOwnerInvoicesQueryKey,
-  useGetLeads,
   useGetNotificationStatus,
   useUpdateBusinessProfile,
   type BusinessProfile,
@@ -113,11 +113,17 @@ type Lead = {
   callerId?: string | null;
   callbackNumber?: string | null;
   availability?: string | null;
-  transcript?: string | null;
-  summary?: string | null;
   tradeIntakeAnswers?: string | null;
 };
 type StatusHandler = (id: string, status: LeadStatus) => void;
+const LEAD_PAGE_SIZE = 25;
+const EMPTY_LEAD_SUMMARY: LeadWorkspace['summary'] = {
+  totalLeads: 0,
+  pendingLeads: 0,
+  contactedLeads: 0,
+  thisWeekLeads: 0,
+  averageReplyMinutes: null,
+};
 
 const queryClient = new QueryClient();
 const SETTINGS_KEY = 'corvlio-settings-v1';
@@ -227,36 +233,6 @@ function initials(name: string) {
 
 function statusLabel(status: LeadStatus) {
   return status === 'contacted' ? 'Contacted' : 'Needs response';
-}
-
-function dateOrdinalInTimeZone(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return Math.floor(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)) / 86_400_000);
-}
-
-function leadMetrics(leads: Lead[], timeZone: string) {
-  const todayOrdinal = dateOrdinalInTimeZone(new Date(), timeZone);
-  const todayDay = new Date(todayOrdinal * 86_400_000).getUTCDay();
-  const weekStartOrdinal = todayOrdinal - ((todayDay + 6) % 7);
-  const thisWeek = leads.filter((lead) => {
-    const ordinal = dateOrdinalInTimeZone(new Date(lead.createdAt), timeZone);
-    return ordinal >= weekStartOrdinal && ordinal <= todayOrdinal;
-  }).length;
-  const replyDurations = leads.flatMap((lead) => {
-    if (!lead.contactedAt) return [];
-    const duration = Date.parse(lead.contactedAt) - Date.parse(lead.createdAt);
-    return Number.isFinite(duration) && duration >= 0 ? [duration] : [];
-  });
-  const avgReplyMinutes = replyDurations.length
-    ? Math.round(replyDurations.reduce((total, duration) => total + duration, 0) / replyDurations.length / 60_000)
-    : null;
-  return { thisWeek, avgReplyMinutes };
 }
 
 function formatReplyTime(minutes: number | null) {
@@ -448,20 +424,49 @@ export function BusinessWelcomeCard({
   );
 }
 
-function HomePage({ leads, timeZone, onStatus, savingLeadId }: { leads: Lead[]; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+function HomePage({ leads, summary, hasMore, onLoadMore, isLoadingMore, onStatus, savingLeadId }: {
+  leads: Lead[];
+  summary: LeadWorkspace['summary'];
+  hasMore: boolean;
+  onLoadMore: () => void;
+  isLoadingMore: boolean;
+  onStatus: StatusHandler;
+  savingLeadId: string | null;
+}) {
   const orderedLeads = sortLeadsForDashboard(leads);
   const pending = orderedLeads.filter((lead) => lead.status === 'pending');
-  const metrics = leadMetrics(leads, timeZone);
-  return <><CallUsageLine /><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pending.length ? `${pending.length} new call${pending.length === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pending.length}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pending.length}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">{formatReplyTime(metrics.avgReplyMinutes)}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{metrics.thisWeek}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>) : <EmptyToday hasPreviousCalls={leads.length > 0} />}</div>{orderedLeads.some((lead) => lead.status === 'contacted') ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{orderedLeads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <Link key={lead.id} href={`/leads/${lead.id}`} state={leadFromState()} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{displayName(lead.name)}</p><p className="truncate text-xs text-muted-foreground">{displayIssue(lead.issue)}</p></div><Check size={16} className="text-[#49a979]" /></Link>)}</div></div> : null}</>;
+  const pendingCount = summary.pendingLeads;
+  return <><CallUsageLine /><PageHeading eyebrow={todayLabel()} title="Today’s leads" description={pendingCount ? `${pendingCount} new call${pendingCount === 1 ? '' : 's'} waiting for a response.` : 'You’re all caught up. Nice work out there.'} action={<div className="hidden rounded-xl border border-border bg-card px-3 py-2 text-right sm:block"><p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Open</p><p className="text-xl font-800">{pendingCount}</p></div>} /><div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3"><div className="rounded-2xl bg-sidebar p-3 text-sidebar-foreground sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-sidebar-foreground/55">New calls</p><p className="mt-1 text-2xl font-800 text-primary">{pendingCount}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Avg reply</p><p className="mt-1 text-2xl font-800">{formatReplyTime(summary.averageReplyMinutes)}</p></div><div className="rounded-2xl border border-border bg-card p-3 sm:p-4"><p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">This week</p><p className="mt-1 text-2xl font-800">{summary.thisWeekLeads}</p></div></div><div className="space-y-3">{pending.length ? pending.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 70}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>) : pendingCount > 0 && hasMore ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">Some older leads still need a response. Load more to view them.</p> : <EmptyToday hasPreviousCalls={summary.totalLeads > 0} />}</div><LoadMoreLeadsButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={onLoadMore} testId="button-load-more-dashboard" />{orderedLeads.some((lead) => lead.status === 'contacted') ? <div className="mt-9"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Recently contacted</h2><Link href="/completed" className="text-xs font-semibold text-primary" data-testid="link-recent-completed">View all</Link></div><div className="space-y-2">{orderedLeads.filter((lead) => lead.status === 'contacted').slice(0, 2).map((lead) => <Link key={lead.id} href={`/leads/${lead.id}`} state={leadFromState()} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3" data-testid={`row-recent-${lead.id}`}><div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-[10px] font-bold text-secondary-foreground">{initials(lead.name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{displayName(lead.name)}</p><p className="truncate text-xs text-muted-foreground">{displayIssue(lead.issue)}</p></div><Check size={16} className="text-[#49a979]" /></Link>)}</div></div> : null}</>;
 }
 
 function EmptyToday({ hasPreviousCalls }: { hasPreviousCalls: boolean }) {
   return <div className="grid-paper rounded-2xl border border-dashed border-border px-6 py-14 text-center" data-testid="empty-leads-state"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><CheckCircle2 size={26} /></div><h2 className="text-lg font-bold">{hasPreviousCalls ? 'Nothing waiting for a reply' : 'No calls yet'}</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{hasPreviousCalls ? 'You’ve reached everyone who called. New leads will appear here automatically.' : 'New leads will appear here automatically once your business starts receiving calls.'}</p></div>;
 }
 
-function CompletedPage({ leads, onStatus, savingLeadId }: { leads: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
+export function LoadMoreLeadsButton({ hasMore, isLoading, onLoadMore, testId }: {
+  hasMore: boolean;
+  isLoading: boolean;
+  onLoadMore: () => void;
+  testId: string;
+}) {
+  if (!hasMore) return null;
+  return <div className="mt-6 flex justify-center"><button type="button" onClick={onLoadMore} disabled={isLoading} data-testid={testId} className="min-h-11 rounded-xl border border-border bg-card px-5 text-sm font-semibold text-primary disabled:opacity-60">{isLoading ? 'Loading more leads…' : 'Load more leads'}</button></div>;
+}
+
+export function CompletedPage({ leads, summary, hasMore, onLoadMore, isLoadingMore, onStatus, savingLeadId }: {
+  leads: Lead[];
+  summary: LeadWorkspace['summary'];
+  hasMore: boolean;
+  onLoadMore: () => void;
+  isLoadingMore: boolean;
+  onStatus: StatusHandler;
+  savingLeadId: string | null;
+}) {
   const completed = sortLeadsForDashboard(leads).filter((lead) => lead.status === 'contacted');
-  return <><PageHeading eyebrow="History" title="Completed calls" description="A quick record of the people you’ve already reached." /><div className="mb-5 flex items-center gap-2 rounded-xl bg-secondary/65 px-4 py-3 text-sm text-secondary-foreground"><CheckCircle2 size={17} /><span><strong>{completed.length}</strong> contacted lead{completed.length === 1 ? '' : 's'} in your history</span></div>{completed.length ? <div className="space-y-3">{completed.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 60}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>)}</div> : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground"><Phone size={28} /></div><h2 className="text-xl font-800 tracking-[-0.03em]">Your call history starts here</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">When you call or text a new lead, they’ll move here automatically. Nothing gets lost between jobs.</p><Link href="/dashboard" data-testid="link-empty-go-today" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">See today’s leads <ArrowUpRight size={16} /></Link></div>}</>;
+  const emptyState = summary.contactedLeads > 0 && hasMore
+    ? <p role="status" className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">Some completed leads are on later pages. Load more to view them.</p>
+    : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground"><Phone size={28} /></div><h2 className="text-xl font-800 tracking-[-0.03em]">Your call history starts here</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">When you call or text a new lead, they’ll move here automatically. Nothing gets lost between jobs.</p><Link href="/dashboard" data-testid="link-empty-go-today" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">See today’s leads <ArrowUpRight size={16} /></Link></div>;
+  return <><PageHeading eyebrow="History" title="Completed calls" description="A quick record of the people you’ve already reached." /><div className="mb-5 flex items-center gap-2 rounded-xl bg-secondary/65 px-4 py-3 text-sm text-secondary-foreground"><CheckCircle2 size={17} /><span><strong>{summary.contactedLeads}</strong> contacted lead{summary.contactedLeads === 1 ? '' : 's'} in your history</span></div>{completed.length ? <div className="space-y-3">{completed.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 60}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>)}</div> : emptyState}<LoadMoreLeadsButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={onLoadMore} testId="button-load-more-completed" /></>;
 }
 
 export function DetailPage({ onStatus, savingLeadId }: { leads?: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
@@ -469,10 +474,8 @@ export function DetailPage({ onStatus, savingLeadId }: { leads?: Lead[]; onStatu
   return <LeadDetailView leadId={params.id ?? ''} onStatus={onStatus} savingLeadId={savingLeadId} />;
 }
 
-function StatsPage({ leads, timeZone }: { leads: Lead[]; timeZone: string }) {
-  const contacted = leads.filter((lead) => lead.status === 'contacted').length;
-  const metrics = leadMetrics(leads, timeZone);
-  return <><PageHeading eyebrow="Live leads" title="Field stats" description="Real activity calculated from this business’s leads." /><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/55">Total leads</span><Phone size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em] text-primary">{leads.length}</p><p className="mt-2 text-xs text-sidebar-foreground/55">From your leads database</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Contacted</span><CheckCircle2 size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{contacted}</p><p className="mt-2 text-xs text-muted-foreground">{leads.length - contacted} still need a response</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">This week</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{metrics.thisWeek}</p><p className="mt-2 text-xs text-muted-foreground">Received since Monday in {timeZone}</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Avg reply</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{formatReplyTime(metrics.avgReplyMinutes)}</p><p className="mt-2 text-xs text-muted-foreground">{metrics.avgReplyMinutes == null ? 'Available after the first timed reply' : 'Arrival to Contacted At, timed rows only'}</p></div></div><ManagedMonthlyResultsReport /></>;
+function StatsPage({ summary, timeZone }: { summary: LeadWorkspace['summary']; timeZone: string }) {
+  return <><PageHeading eyebrow="Live leads" title="Field stats" description="Real activity calculated from this business’s leads." /><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/55">Total leads</span><Phone size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em] text-primary">{summary.totalLeads}</p><p className="mt-2 text-xs text-sidebar-foreground/55">From your leads database</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Contacted</span><CheckCircle2 size={18} className="text-primary" /></div><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{summary.contactedLeads}</p><p className="mt-2 text-xs text-muted-foreground">{summary.pendingLeads} still need a response</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">This week</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{summary.thisWeekLeads}</p><p className="mt-2 text-xs text-muted-foreground">Received since Monday in {timeZone}</p></div><div className="rounded-2xl border border-border bg-card p-5 sm:p-6"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Avg reply</p><p className="mt-7 text-5xl font-800 tracking-[-0.07em]">{formatReplyTime(summary.averageReplyMinutes)}</p><p className="mt-2 text-xs text-muted-foreground">{summary.averageReplyMinutes == null ? 'Available after the first timed reply' : 'Arrival to Contacted At, timed rows only'}</p></div></div><ManagedMonthlyResultsReport /></>;
 }
 
 function Metric({ label, value, color }: { label: string; value: number; color: string }) {
@@ -716,11 +719,24 @@ function NotFound() {
   return <div className="grid min-h-[60vh] place-items-center text-center"><div><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted"><X size={26} /></div><h1 className="text-2xl font-800">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">That field note wandered off.</p><Link href="/dashboard" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground" data-testid="link-not-found-home">Back to today</Link></div></div>;
 }
 
-function Router({ refreshLeads, leads, businessName, retellPhoneNumber, onboardingConfirmation, timeZone: savedTimeZone, onStatus, savingLeadId }: { refreshLeads: () => Promise<unknown>; leads: Lead[]; businessName: string; retellPhoneNumber: string | null; onboardingConfirmation: OnboardingConfirmation | null; timeZone: string; onStatus: StatusHandler; savingLeadId: string | null }) {
+function Router({ refreshLeads, leads, summary, hasMore, onLoadMore, isLoadingMore, businessName, retellPhoneNumber, onboardingConfirmation, timeZone: savedTimeZone, onStatus, savingLeadId }: {
+  refreshLeads: () => Promise<unknown>;
+  leads: Lead[];
+  summary: LeadWorkspace['summary'];
+  hasMore: boolean;
+  onLoadMore: () => void;
+  isLoadingMore: boolean;
+  businessName: string;
+  retellPhoneNumber: string | null;
+  onboardingConfirmation: OnboardingConfirmation | null;
+  timeZone: string;
+  onStatus: StatusHandler;
+  savingLeadId: string | null;
+}) {
   // Analytics can use this device's zone without saving it as a business fact.
   const timeZone = savedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [location] = useLocation();
-  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><OwnerInvoicePanel /><HomePage leads={leads} timeZone={timeZone} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route><Route path="/stats" component={() => <StatsPage leads={leads} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><OwnerInvoicePanel /><HomePage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route><Route path="/stats" component={() => <StatsPage summary={summary} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
 }
 
 export function UnconfiguredAccountScreen({
@@ -817,7 +833,25 @@ export function SignUpPage() {
 
 function LeadDataRouter() {
   const [routeLocation] = useLocation();
-  const { data, isLoading, isError, refetch } = useGetLeads({ query: { queryKey: getGetLeadsQueryKey(), refetchInterval: () => leadsRefreshInterval(routeLocation, document.visibilityState), refetchIntervalInBackground: false } });
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: getGetLeadsQueryKey(),
+    queryFn: ({ pageParam, signal }) => getLeads(
+      { page: pageParam, pageSize: LEAD_PAGE_SIZE },
+      { signal },
+    ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.page + 1 : undefined,
+    refetchInterval: () => leadsRefreshInterval(routeLocation, document.visibilityState),
+    refetchIntervalInBackground: false,
+  });
   const { user } = useUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -833,10 +867,12 @@ function LeadDataRouter() {
       setOnboardingConfirmation(null);
     }
   }, [onboardingConfirmation, user?.id]);
+  const workspace = data?.pages[0];
+  const summary = workspace?.summary ?? EMPTY_LEAD_SUMMARY;
   const leads = useMemo(
-    () => (data?.leads ?? []).map(preferLeadCallback)
+    () => (data?.pages.flatMap((page) => page.leads) ?? []).map(preferLeadCallback)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-    [data?.leads],
+    [data?.pages],
   );
   const onStatus: StatusHandler = (id, status) => {
     if (savingLeadIdRef.current) return;
@@ -844,14 +880,18 @@ function LeadDataRouter() {
     setSavingLeadId(id);
     void updateStatus.mutateAsync({ leadId: id, data: { status } })
       .then((result) => {
-        queryClient.setQueryData<LeadWorkspace>(getGetLeadsQueryKey(), (current) => current
+        queryClient.setQueryData<InfiniteData<LeadWorkspace, number>>(getGetLeadsQueryKey(), (current) => current
           ? {
               ...current,
-              leads: current.leads.map((lead) => lead.id === result.leadId
-                ? { ...lead, status: result.status, contactedAt: result.contactedAt }
-                : lead),
+              pages: current.pages.map((page) => ({
+                ...page,
+                leads: page.leads.map((lead) => lead.id === result.leadId
+                  ? { ...lead, status: result.status, contactedAt: result.contactedAt }
+                  : lead),
+              })),
             }
           : current);
+        void queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey(), exact: true });
         void queryClient.invalidateQueries({ queryKey: getGetLeadDetailQueryKey(id) });
         toast({
           title: status === 'contacted' ? 'Lead marked contacted' : 'Lead reopened',
@@ -874,15 +914,28 @@ function LeadDataRouter() {
   if (isLoading) {
     return <AppShell leads={[]}><div className="grid min-h-[55vh] place-items-center text-center"><div><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-secondary border-t-primary" /><h1 className="text-xl font-800">Loading today’s leads</h1><p className="mt-2 text-sm text-muted-foreground">Syncing the latest leads from your Corvlio database.</p></div></div></AppShell>;
   }
-  if (isError) {
+  if (isError && !data) {
     return <AppShell leads={[]}><div className="grid min-h-[55vh] place-items-center text-center"><div className="max-w-sm"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><X size={26} /></div><h1 className="text-2xl font-800">Couldn’t load leads</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Corvlio couldn’t load your leads from the database. Try again in a moment.</p><button type="button" onClick={() => void refetch()} className="mt-5 min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">Try again</button></div></div></AppShell>;
   }
 
-  if (!data?.configured) {
+  if (!workspace?.configured) {
     return <Redirect to="/onboarding" />;
   }
 
-  return <Router refreshLeads={() => refetch()} leads={leads as Lead[]} businessName={data.businessName ?? 'Configured business'} retellPhoneNumber={data.retellPhoneNumber} onboardingConfirmation={onboardingConfirmation} timeZone={data.timeZone ?? 'America/New_York'} onStatus={onStatus} savingLeadId={savingLeadId} />;
+  return <Router
+    refreshLeads={() => refetch()}
+    leads={leads as Lead[]}
+    summary={summary}
+    hasMore={Boolean(hasNextPage)}
+    onLoadMore={() => { void fetchNextPage(); }}
+    isLoadingMore={isFetchingNextPage}
+    businessName={workspace.businessName ?? 'Configured business'}
+    retellPhoneNumber={workspace.retellPhoneNumber}
+    onboardingConfirmation={onboardingConfirmation}
+    timeZone={workspace.timeZone ?? 'America/New_York'}
+    onStatus={onStatus}
+    savingLeadId={savingLeadId}
+  />;
 }
 
 function WelcomeRoute() {

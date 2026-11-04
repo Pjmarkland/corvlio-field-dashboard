@@ -15,6 +15,43 @@ import { logger } from "./logger";
 
 export type RetellWebhookEndpoint = "pre-call" | "post-call";
 const ALERT_WINDOW_MS = 15 * 60_000;
+const RETELL_ALERT_COPY: Partial<Record<string, (endpoint: RetellWebhookEndpoint) => { summary: string; details: string }>> = {
+  invalid_signature: (endpoint) => ({
+    summary: `Retell ${endpoint} webhook rejected: invalid signature`,
+    details: "A webhook signature check failed. Confirm the provider URL and signing configuration.",
+  }),
+  malformed_payload: (endpoint) => ({
+    summary: `Retell ${endpoint} webhook rejected: malformed payload`,
+    details: "A webhook payload could not be parsed or validated.",
+  }),
+  unmatched_business: (endpoint) => ({
+    summary: `Retell ${endpoint} event could not be matched to a business`,
+    details: "The event did not match a configured business number. Review webhook routing.",
+  }),
+  pre_call_timeout: () => ({
+    summary: "Retell pre-call lookup timed out; fallback response used",
+    details: "The pre-call lookup exceeded its response window and used a generic fallback.",
+  }),
+  pre_call_error: () => ({
+    summary: "Retell pre-call lookup failed; fallback response used",
+    details: "The pre-call lookup failed and used a generic fallback.",
+  }),
+  post_call_processing_error: () => ({
+    summary: "Retell post-call processing failed",
+    details: "A post-call event could not be processed. Review webhook health and server status.",
+  }),
+};
+
+function allowlistedRetellAlertText(endpoint: RetellWebhookEndpoint, category: string) {
+  const copy = RETELL_ALERT_COPY[category];
+  return {
+    category: copy ? category : "webhook_error",
+    ...(copy?.(endpoint) ?? {
+      summary: `Retell ${endpoint} webhook needs attention`,
+      details: "A Retell webhook event needs review.",
+    }),
+  };
+}
 
 export type RetellSystemAlertInput = {
   issueKey: string;
@@ -26,15 +63,6 @@ export type RetellSystemAlertInput = {
   businessId?: number | null;
   businessName?: string | null;
 };
-
-function safeDetails(value: string): string {
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
-    .replace(/\b(api[_-]?key|access_token|refresh_token|client_secret|password)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim()
-    .slice(0, 500) || "No error details were provided.";
-}
 
 function notificationEventKey(issueKey: string, notifiedAt: Date): string {
   return `retell-system-alert:${issueKey}:${notifiedAt.getTime()}`.slice(0, 240);
@@ -81,16 +109,22 @@ async function notifyOwner(input: RetellSystemAlertInput, eventKey: string): Pro
  */
 export async function recordRetellSystemAlert(input: RetellSystemAlertInput): Promise<void> {
   const issueKey = input.issueKey.trim().slice(0, 180);
-  const details = safeDetails(input.details);
+  const safeCopy = allowlistedRetellAlertText(input.endpoint, input.category);
+  const safeInput = {
+    ...input,
+    category: safeCopy.category,
+    summary: safeCopy.summary,
+    details: safeCopy.details,
+  };
   try {
     const [record] = await db
       .insert(retellSystemAlertsTable)
       .values({
         issueKey,
         endpoint: input.endpoint,
-        category: input.category.slice(0, 80),
-        summary: input.summary.slice(0, 200),
-        details,
+        category: safeInput.category,
+        summary: safeInput.summary,
+        details: safeInput.details,
         businessId: input.businessId ?? null,
         businessName: input.businessName?.slice(0, 200) ?? null,
         firstSeenAt: new Date(),
@@ -100,9 +134,9 @@ export async function recordRetellSystemAlert(input: RetellSystemAlertInput): Pr
       .onConflictDoUpdate({
         target: retellSystemAlertsTable.issueKey,
         set: {
-          category: input.category.slice(0, 80),
-          summary: input.summary.slice(0, 200),
-          details,
+          category: safeInput.category,
+          summary: safeInput.summary,
+          details: safeInput.details,
           businessId: input.businessId ?? null,
           businessName: input.businessName?.slice(0, 200) ?? null,
           lastSeenAt: new Date(),
@@ -122,7 +156,7 @@ export async function recordRetellSystemAlert(input: RetellSystemAlertInput): Pr
         shouldNotify: sql<boolean>`${retellSystemAlertsTable.lastNotifiedAt} = CURRENT_TIMESTAMP`,
       });
     if (record?.shouldNotify && record.lastNotifiedAt) {
-      void notifyOwner({ ...input, details }, notificationEventKey(issueKey, record.lastNotifiedAt));
+      void notifyOwner(safeInput, notificationEventKey(issueKey, record.lastNotifiedAt));
     }
   } catch (error) {
     logger.error(
@@ -151,12 +185,13 @@ export async function recordRetellWebhookSuccess(endpoint: RetellWebhookEndpoint
 }
 
 function serializeAlert(alert: typeof retellSystemAlertsTable.$inferSelect) {
+  const safeCopy = allowlistedRetellAlertText(alert.endpoint, alert.category);
   return {
     id: alert.id,
     endpoint: alert.endpoint,
-    category: alert.category,
-    summary: alert.summary,
-    details: alert.details,
+    category: safeCopy.category,
+    summary: safeCopy.summary,
+    details: safeCopy.details,
     businessId: alert.businessId,
     businessName: alert.businessName,
     firstSeenAt: alert.firstSeenAt.toISOString(),

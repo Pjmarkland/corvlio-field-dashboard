@@ -639,8 +639,16 @@ export interface BillingSnapshot {
   timeline: BillingSnapshotTimelineItem[];
 }
 
+export type HealthStatusStatus = typeof HealthStatusStatus[keyof typeof HealthStatusStatus];
+
+
+export const HealthStatusStatus = {
+  ok: 'ok',
+  unavailable: 'unavailable',
+} as const;
+
 export interface HealthStatus {
-  status: string;
+  status: HealthStatusStatus;
 }
 
 export interface CallQualityRow {
@@ -698,10 +706,6 @@ export interface Lead {
   callbackNumber?: string | null;
   /** @nullable */
   availability?: string | null;
-  /** @nullable */
-  transcript?: string | null;
-  /** @nullable */
-  summary?: string | null;
   id: string;
   name: string;
   phone: string;
@@ -715,6 +719,10 @@ export interface Lead {
 }
 
 export type LeadDetail = Lead & ({
+  /** @nullable */
+  transcript?: string | null;
+  /** @nullable */
+  summary?: string | null;
   /** @nullable */
   callStartedAt: string | null;
   /**
@@ -777,6 +785,22 @@ export interface LeadStatusResult {
   contactedAt: string | null;
 }
 
+export interface LeadWorkspaceSummary {
+  /** @minimum 0 */
+  totalLeads: number;
+  /** @minimum 0 */
+  pendingLeads: number;
+  /** @minimum 0 */
+  contactedLeads: number;
+  /** @minimum 0 */
+  thisWeekLeads: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  averageReplyMinutes: number | null;
+}
+
 export interface LeadWorkspace {
   isSample?: boolean;
   provisioningState?: string;
@@ -787,6 +811,15 @@ export interface LeadWorkspace {
   retellPhoneNumber: string | null;
   /** @nullable */
   timeZone: string | null;
+  /** @minimum 1 */
+  page: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  pageSize: number;
+  hasMore: boolean;
+  summary: LeadWorkspaceSummary;
   leads: Lead[];
 }
 
@@ -1808,6 +1841,18 @@ export interface AdminHealthCheck {
 export type CreateOwnerDemoCall200 = {
   callId: string;
   message: string;
+};
+
+export type GetLeadsParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
 };
 
 export type GetAdminInvoices200 = {

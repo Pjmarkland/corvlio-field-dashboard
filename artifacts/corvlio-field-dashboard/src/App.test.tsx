@@ -87,7 +87,7 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport } from './App';
+import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
@@ -121,6 +121,44 @@ const sampleProfile = {
   aiPromisePolicy: null,
   retellPhoneNumber: '+14155550123',
 };
+
+describe('paginated lead list controls', () => {
+  it('loads another page and disables the button while loading', () => {
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <LoadMoreLeadsButton hasMore isLoading={false} onLoadMore={onLoadMore} testId="load-more-test" />,
+    );
+    fireEvent.click(screen.getByTestId('load-more-test'));
+    expect(onLoadMore).toHaveBeenCalledOnce();
+
+    rerender(
+      <LoadMoreLeadsButton hasMore isLoading onLoadMore={onLoadMore} testId="load-more-test" />,
+    );
+    expect((screen.getByRole('button', { name: 'Loading more leads…' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('does not claim the call history is empty when older pages contain completed leads', () => {
+    const location = memoryLocation({ path: '/completed' });
+    const onLoadMore = vi.fn();
+    render(
+      <TestRouter hook={location.hook}>
+        <CompletedPage
+          leads={[]}
+          summary={{ totalLeads: 30, pendingLeads: 29, contactedLeads: 1, thisWeekLeads: 0, averageReplyMinutes: null }}
+          hasMore
+          onLoadMore={onLoadMore}
+          isLoadingMore={false}
+          onStatus={vi.fn()}
+          savingLeadId={null}
+        />
+      </TestRouter>,
+    );
+    expect(screen.getByRole('status').textContent).toContain('Some completed leads are on later pages');
+    expect(screen.queryByText('Your call history starts here')).toBeNull();
+    fireEvent.click(screen.getByTestId('button-load-more-completed'));
+    expect(onLoadMore).toHaveBeenCalledOnce();
+  });
+});
 
 function renderProfileEditor() {
   localStorage.removeItem('corvlio-theme');

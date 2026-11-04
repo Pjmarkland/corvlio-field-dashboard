@@ -384,7 +384,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         founderPush: {
           eventKey,
           title: "Unmatched Retell call",
-          body: `Call to ${phoneNumber} at ${occurredAt.toISOString()} could not be matched to a business.`,
+          body: "A call could not be matched to a configured business. Review webhook routing.",
           deepLink: "/dashboard",
         },
       });

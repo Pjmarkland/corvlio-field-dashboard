@@ -66,7 +66,7 @@ describe('existing-owner setup routing', () => {
     flow('/onboarding');
     expect(screen.getByRole('status').textContent).toContain('Checking your business');
     expect(setupMounted).not.toHaveBeenCalled();
-    expect(useGetLeads.mock.calls.at(-1)?.[0].query.enabled).toBeFalsy();
+    expect(useGetLeads.mock.calls.at(-1)?.[1]?.query?.enabled).toBeFalsy();
   });
 
   it('does not display setup or welcome on a failed lookup and offers retry', () => {
@@ -85,7 +85,7 @@ describe('existing-owner setup routing', () => {
     });
     flow('/onboarding');
     expect(screen.getByTestId('setup-form')).toBeTruthy();
-    expect(useGetLeads.mock.calls.at(-1)?.[0].query.queryKey).toEqual(['/api/leads', 'setup-entry', 'existing-owner']);
+    expect(useGetLeads.mock.calls.at(-1)?.[1]?.query?.queryKey).toEqual(['/api/leads', 'setup-entry', 'existing-owner']);
   });
 
   it('sends signed-out setup visitors to sign-in without looking up a business', async () => {
@@ -93,6 +93,6 @@ describe('existing-owner setup routing', () => {
     flow('/onboarding');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy());
     expect(setupMounted).not.toHaveBeenCalled();
-    expect(useGetLeads.mock.calls.at(-1)?.[0].query.enabled).toBe(false);
+    expect(useGetLeads.mock.calls.at(-1)?.[1]?.query?.enabled).toBe(false);
   });
 });
