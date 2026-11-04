@@ -54,31 +54,6 @@ function firstHeaderValue(value: string | string[] | undefined): string | undefi
   return Array.isArray(value) ? value.join(', ') : value;
 }
 
-function mergeNativeClientCookie(
-  existingCookie: string | undefined,
-  clientValue: string,
-): string {
-  const cookies = stripNativeClientCookie(existingCookie)
-    .split(';')
-    .map((cookie) => cookie.trim())
-    .filter(Boolean);
-
-  cookies.push(`__client=${clientValue}`);
-  return cookies.join('; ');
-}
-
-function stripNativeClientCookie(existingCookie: string | undefined): string {
-  return (existingCookie ?? '')
-    .split(';')
-    .map((cookie) => cookie.trim())
-    .filter(Boolean)
-    .filter((cookie) => {
-      const separator = cookie.indexOf('=');
-      return cookie.slice(0, separator < 0 ? undefined : separator).trim() !== '__client';
-    })
-    .join('; ');
-}
-
 function getNativeClientCookieValue(
   setCookieHeaders: string | string[] | undefined,
 ): string | undefined {
@@ -247,24 +222,15 @@ export function clerkProxyMiddleware(): RequestHandler {
           if (req.headers.authorization !== undefined) {
             proxyReq.setHeader('Authorization', req.headers.authorization);
           }
-          const incomingCookie = Array.isArray(req.headers.cookie)
-            ? req.headers.cookie.join('; ')
-            : req.headers.cookie;
           const nativeClientValue = firstHeaderValue(
             req.headers['x-native-clerk-client'],
           )?.trim();
           if (nativeClientValue && isValidNativeClerkClientCookie(nativeClientValue)) {
-            proxyReq.setHeader(
-              'Cookie',
-              mergeNativeClientCookie(incomingCookie, nativeClientValue),
-            );
+            // This value has passed the strict length and character allowlist;
+            // do not forward any other WebView-supplied Cookie values to Clerk.
+            proxyReq.setHeader('Cookie', `__client=${nativeClientValue}`);
           } else {
-            const filteredCookie = stripNativeClientCookie(incomingCookie);
-            if (filteredCookie) {
-              proxyReq.setHeader('Cookie', filteredCookie);
-            } else {
-              proxyReq.removeHeader('Cookie');
-            }
+            proxyReq.removeHeader('Cookie');
           }
         }
         proxyReq.removeHeader('X-Native-Clerk-Client');

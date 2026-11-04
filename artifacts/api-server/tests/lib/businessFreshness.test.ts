@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { logger } from "../../src/lib/logger";
 const fixture = vi.hoisted(() => ({ rows: [] as Array<Record<string, unknown>>, select: vi.fn() }));
 vi.mock("@workspace/db", () => ({ db: { select: fixture.select }, businessesTable: { retellPhoneNumber: "phone" } }));
 import { findBusinessByPhoneNumber } from "../../src/lib/businessDirectory";
@@ -17,7 +18,7 @@ describe("fresh business routing", () => {
   });
   it("refuses and logs ambiguous duplicate phone mappings", async () => {
     fixture.rows = [{ id: 1 }, { id: 2 }];
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(logger, "error").mockImplementation(() => {});
     await expect(findBusinessByPhoneNumber("+15551234567")).rejects.toThrow("Duplicate assigned phone");
     expect(log).toHaveBeenCalled();
   });

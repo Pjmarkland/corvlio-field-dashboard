@@ -103,7 +103,7 @@ describe("native Clerk proxy cookie validation", () => {
     const cookieHeader = proxyReq.setHeader.mock.calls.find(
       ([name]) => name.toLowerCase() === "cookie",
     )?.[1];
-    expect(cookieHeader).toBe("theme=dark; __client=client_valid-123");
+    expect(cookieHeader).toBe("__client=client_valid-123");
     expect(proxyReq.removeHeader).toHaveBeenCalledWith("X-Native-Clerk-Client");
   });
 });

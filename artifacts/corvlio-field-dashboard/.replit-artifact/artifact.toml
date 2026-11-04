@@ -16,12 +16,12 @@ run = "pnpm --filter @workspace/corvlio-field-dashboard run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/corvlio-field-dashboard", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/corvlio-field-dashboard/dist/public"
+[services.production.run]
+args = ["node", "artifacts/corvlio-field-dashboard/server.mjs"]
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run.env]
+PORT = "22182"
+NODE_ENV = "production"
 
 [services.env]
 PORT = "22182"

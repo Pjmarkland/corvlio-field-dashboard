@@ -2,11 +2,16 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
-import { extname, resolve, sep } from "node:path";
+import { dirname, extname, resolve, sep } from "node:path";
 
-const publicDirectory = resolve(
-  fileURLToPath(new URL("./dist/public", import.meta.url)),
-);
+let publicDirectory;
+try {
+  publicDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "dist/public");
+} catch {
+  // Vitest's transformed module URL is not a file URL; tests pass an explicit
+  // temporary public directory to createDashboardServer.
+  publicDirectory = resolve(process.cwd(), "dist/public");
+}
 
 export const dashboardCsp = [
   "default-src 'self'",
