@@ -2,6 +2,7 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { dashboardMetaCsp } from './security-policy.mjs';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -30,6 +31,22 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   plugins: [
+    {
+      name: 'corvlio-security-policy-meta',
+      transformIndexHtml: {
+        order: 'pre',
+        handler() {
+          return [{
+            tag: 'meta',
+            attrs: {
+              'http-equiv': 'Content-Security-Policy',
+              content: dashboardMetaCsp,
+            },
+            injectTo: 'head-prepend',
+          }];
+        },
+      },
+    },
     react(),
     tailwindcss({ optimize: false }),
     runtimeErrorOverlay(),

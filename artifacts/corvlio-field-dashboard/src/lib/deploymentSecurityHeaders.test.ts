@@ -45,6 +45,15 @@ describe("dashboard production security headers", () => {
       expect(response.headers.get("content-security-policy")).toContain(
         "frame-ancestors 'none'",
       );
+      expect(response.headers.get("content-security-policy")).toContain(
+        "https://*.clerk.accounts.dev",
+      );
+      expect(response.headers.get("content-security-policy")).toContain(
+        "https://fonts.googleapis.com",
+      );
+      expect(response.headers.get("content-security-policy")).toContain(
+        "https://fonts.gstatic.com",
+      );
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
       expect(response.headers.get("referrer-policy")).toBe(

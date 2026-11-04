@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, resolve, sep } from "node:path";
+import { dashboardCsp } from "./security-policy.mjs";
 
 let publicDirectory;
 try {
@@ -12,23 +13,6 @@ try {
   // temporary public directory to createDashboardServer.
   publicDirectory = resolve(process.cwd(), "dist/public");
 }
-
-export const dashboardCsp = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self' https://*.clerk.accounts.dev https://accounts.google.com",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.clerk.dev https://*.clerk.accounts.dev https://clerk-telemetry.com wss://*.clerk.accounts.dev",
-  "frame-src https://*.clerk.dev https://*.clerk.accounts.dev https://accounts.google.com",
-  "manifest-src 'self'",
-  "worker-src 'self' blob:",
-  "upgrade-insecure-requests",
-].join("; ");
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],

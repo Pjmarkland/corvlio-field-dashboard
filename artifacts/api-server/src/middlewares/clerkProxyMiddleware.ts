@@ -226,8 +226,10 @@ export function clerkProxyMiddleware(): RequestHandler {
             req.headers['x-native-clerk-client'],
           )?.trim();
           if (nativeClientValue && isValidNativeClerkClientCookie(nativeClientValue)) {
-            // This value has passed the strict length and character allowlist;
-            // do not forward any other WebView-supplied Cookie values to Clerk.
+            // nosemgrep: javascript.express.session-fixation.session-fixation
+            // This is Clerk's non-authenticating __client identifier, not a
+            // session cookie. It is strictly allowlisted; all other WebView
+            // cookies are discarded, and native API auth uses a bearer token.
             proxyReq.setHeader('Cookie', `__client=${nativeClientValue}`);
           } else {
             proxyReq.removeHeader('Cookie');
