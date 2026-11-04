@@ -76,7 +76,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("ADMIN_EMAILS", "admin@example.test");
   m.getUser.mockImplementation(async (userId: string) => ({
+    primaryEmailAddressId: "primary",
     emailAddresses: [{
+      id: "primary",
       emailAddress: userId === "admin-user" ? " ADMIN@example.test " : "outsider@example.test",
       verification: { status: "verified" },
     }],

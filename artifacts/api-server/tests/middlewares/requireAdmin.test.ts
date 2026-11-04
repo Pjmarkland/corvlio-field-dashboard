@@ -60,6 +60,7 @@ beforeAll(async () => {
     "/api/admin/businesses/1",
     "/api/admin/businesses/1/fallback-phone",
     "/api/admin/businesses/1/managed-reports",
+    "/api/admin/businesses/42/managed-reports",
     "/api/admin/flagged-leads",
     "/api/admin/lead-information-flags/1/resolve",
     "/api/admin/call-quality",

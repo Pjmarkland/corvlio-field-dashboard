@@ -33,7 +33,7 @@ function mockResponse() {
 }
 
 describe("public webhook rate limiter", () => {
-  it("limits each client and route, then resets after the window", () => {
+  it("limits each client and route, then resets after the window", async () => {
     let now = 10_000;
     const limit = createPublicWebhookRateLimiter({ windowMs: 1_000, maxRequests: 2, now: () => now });
     const next = vi.fn<NextFunction>();
@@ -42,9 +42,9 @@ describe("public webhook rate limiter", () => {
     const second = mockResponse();
     const blocked = mockResponse();
 
-    limit(request, first, next);
-    limit(request, second, next);
-    limit(request, blocked, next);
+    await limit(request, first, next);
+    await limit(request, second, next);
+    await limit(request, blocked, next);
 
     expect(next).toHaveBeenCalledTimes(2);
     expect(blocked.statusCode).toBe(429);
@@ -53,17 +53,17 @@ describe("public webhook rate limiter", () => {
     expect(blocked.headers.get("ratelimit-remaining")).toBe("0");
 
     now += 1_000;
-    limit(request, mockResponse(), next);
+    await limit(request, mockResponse(), next);
     expect(next).toHaveBeenCalledTimes(3);
   });
 
-  it("keeps separate counters for different clients and webhook routes", () => {
+  it("keeps separate counters for different clients and webhook routes", async () => {
     const limit = createPublicWebhookRateLimiter({ maxRequests: 1 });
     const next = vi.fn<NextFunction>();
 
-    limit(mockRequest("203.0.113.10"), mockResponse(), next);
-    limit(mockRequest("203.0.113.11"), mockResponse(), next);
-    limit(mockRequest("203.0.113.10", "/post-call"), mockResponse(), next);
+    await limit(mockRequest("203.0.113.10"), mockResponse(), next);
+    await limit(mockRequest("203.0.113.11"), mockResponse(), next);
+    await limit(mockRequest("203.0.113.10", "/post-call"), mockResponse(), next);
 
     expect(next).toHaveBeenCalledTimes(3);
   });

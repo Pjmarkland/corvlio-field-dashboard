@@ -37,7 +37,9 @@ describe("call media retention", () => {
     expect(removeCall).toHaveBeenCalledOnce();
     expect(removeCall).toHaveBeenCalledWith("call-9");
     expect(query.mock.calls.some(([sql]) => sql.includes("SET transcript = NULL, recording_url = NULL"))).toBe(true);
-    expect(result).toEqual({ deletedCount: 2, failedCount: 0 });
+    expect(result).toEqual({ deletedCount: 4, failedCount: 0 });
+    expect(query.mock.calls.some(([sql]) => sql.includes("personal_data_retention_completed_at"))).toBe(true);
+    expect(query.mock.calls.some(([sql]) => sql.includes("UPDATE retell_pending_calls"))).toBe(true);
   });
 
   it("leaves local media intact when Retell deletion fails and logs only the lead ID", async () => {

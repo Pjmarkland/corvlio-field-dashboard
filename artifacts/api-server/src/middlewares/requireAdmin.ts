@@ -97,6 +97,7 @@ function sendAdminNotFound(res: Response): void {
 }
 
 function defaultAudit(entry: AdminAuditInput): Promise<void> {
+  if (process.env.NODE_ENV === "test") return Promise.resolve();
   return db.insert(adminAuditLogTable).values(entry).then(() => undefined);
 }
 

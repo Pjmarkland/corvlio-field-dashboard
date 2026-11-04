@@ -18,6 +18,10 @@ export type RateLimitConsumer = (
 let callsSinceCleanup = 0;
 const testBuckets = new Map<string, RateLimitResult>();
 
+export function clearRateLimitTestBuckets(): void {
+  testBuckets.clear();
+}
+
 export async function consumeRateLimitBucket(
   key: string,
   windowMs: number,

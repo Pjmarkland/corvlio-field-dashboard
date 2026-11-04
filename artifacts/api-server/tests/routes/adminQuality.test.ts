@@ -4,9 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const m = vi.hoisted(() => ({ quality: vi.fn() }));
 vi.mock("@clerk/express", () => ({
   getAuth: (req: express.Request) => ({ userId: req.get("x-test-user") }),
-  clerkClient: { users: { getUser: async (id: string) => ({ emailAddresses: [{
-    emailAddress: id === "admin" ? "admin@example.test" : "other@example.test", verification: { status: "verified" },
-  }] }) } },
+  clerkClient: { users: { getUser: async (id: string) => ({
+    primaryEmailAddressId: "primary",
+    emailAddresses: [{
+      id: "primary",
+      emailAddress: id === "admin" ? "admin@example.test" : "other@example.test",
+      verification: { status: "verified" },
+    }],
+  }) } },
 }));
 vi.mock("../../src/lib/adminData", () => ({ getAdminActivity: vi.fn(), getAdminBusiness: vi.fn(), getAdminOverview: vi.fn() }));
 vi.mock("../../src/lib/callQuality", () => ({ getAdminCallQuality: m.quality }));

@@ -55,7 +55,8 @@ describe("email health safety boundaries",()=>{
   it("returns the precise API-disabled cause without automatic send retries",async()=>{
     allow();m.send.mockRejectedValue(new Error("Gmail API admin test email failed (403): Gmail API is not enabled for Google Cloud project 1028015564678."));
     const data=await (await post("/test",{requestId})).json();
-    expect(data.success).toBe(false);expect(data.error).toContain("1028015564678");
+    expect(data.success).toBe(false);expect(data.error).toContain("***4678");
+    expect(data.error).not.toContain("1028015564678");
     expect(data.hint).toContain("then press Send test email");
     expect(m.send).toHaveBeenCalledOnce();expect(m.incident).toHaveBeenCalledOnce();
   });

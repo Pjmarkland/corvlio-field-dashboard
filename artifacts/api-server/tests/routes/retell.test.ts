@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   queueFounderPushNotification: vi.fn(),
   recordRetellSystemAlert: vi.fn(),
   recordRetellWebhookSuccess: vi.fn(),
+  claimRetellWebhookEvent: vi.fn(),
+  completeRetellWebhookEvent: vi.fn(),
+  markRetellWebhookEventFailed: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
@@ -57,6 +60,11 @@ vi.mock("../../src/lib/operationalFailures", () => ({
 vi.mock("../../src/lib/retellSystemAlerts", () => ({
   recordRetellSystemAlert: mocks.recordRetellSystemAlert,
   recordRetellWebhookSuccess: mocks.recordRetellWebhookSuccess,
+}));
+vi.mock("../../src/lib/retellWebhookEventStore", () => ({
+  claimRetellWebhookEvent: mocks.claimRetellWebhookEvent,
+  completeRetellWebhookEvent: mocks.completeRetellWebhookEvent,
+  markRetellWebhookEventFailed: mocks.markRetellWebhookEventFailed,
 }));
 
 import retellRouter from "../../src/routes/retell";
@@ -168,6 +176,9 @@ beforeEach(() => {
   mocks.queueFounderPushNotification.mockResolvedValue(true);
   mocks.recordRetellSystemAlert.mockResolvedValue(undefined);
   mocks.recordRetellWebhookSuccess.mockResolvedValue(undefined);
+  mocks.claimRetellWebhookEvent.mockResolvedValue(true);
+  mocks.completeRetellWebhookEvent.mockResolvedValue(undefined);
+  mocks.markRetellWebhookEventFailed.mockResolvedValue(undefined);
   mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness());
   mocks.getDefaultFallbackPhoneNumber.mockResolvedValue("+18634463029");
 });
