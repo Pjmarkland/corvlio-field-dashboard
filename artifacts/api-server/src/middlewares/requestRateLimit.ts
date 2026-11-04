@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import type { Request, RequestHandler } from "express";
 import { lte, sql } from "drizzle-orm";
 import { db, requestRateLimitBucketsTable } from "@workspace/db";
+import { consumeTestRateLimitBucket } from "./testRateLimitStore";
 
 export type RateLimitResult = {
   count: number;
@@ -16,11 +17,6 @@ export type RateLimitConsumer = (
 ) => Promise<RateLimitResult>;
 
 let callsSinceCleanup = 0;
-const testBuckets = new Map<string, RateLimitResult>();
-
-export function clearRateLimitTestBuckets(): void {
-  testBuckets.clear();
-}
 
 export async function consumeRateLimitBucket(
   key: string,
@@ -28,12 +24,7 @@ export async function consumeRateLimitBucket(
   now = Date.now(),
 ): Promise<RateLimitResult> {
   if (process.env.NODE_ENV === "test") {
-    const current = testBuckets.get(key);
-    const bucket = !current || current.resetAt.getTime() <= now
-      ? { count: 1, resetAt: new Date(now + windowMs) }
-      : { count: current.count + 1, resetAt: current.resetAt };
-    testBuckets.set(key, bucket);
-    return bucket;
+    return consumeTestRateLimitBucket(key, windowMs, now);
   }
 
   const resetAt = new Date(now + windowMs);

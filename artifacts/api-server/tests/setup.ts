@@ -1,6 +1,6 @@
 import { afterEach } from "vitest";
-import { clearRateLimitTestBuckets } from "../src/middlewares/requestRateLimit";
+import { clearTestRateLimitBuckets } from "../src/middlewares/testRateLimitStore";
 
 afterEach(() => {
-  clearRateLimitTestBuckets();
+  clearTestRateLimitBuckets();
 });

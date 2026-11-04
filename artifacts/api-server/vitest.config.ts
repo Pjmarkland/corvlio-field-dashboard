@@ -4,6 +4,7 @@ export default {
     globals: true,
     include: ["tests/**/*.test.ts"],
     setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./tests/setup.ts"],
     clearMocks: true,
     restoreMocks: true,
   },
