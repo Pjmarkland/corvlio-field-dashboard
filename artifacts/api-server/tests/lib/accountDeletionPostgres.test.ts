@@ -33,6 +33,7 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
       CREATE TEMP TABLE provisioning_attempts (id int, clerk_user_id text, business_id int, purchased_number text, status text);
       CREATE TEMP TABLE leads (business_id int REFERENCES businesses(id));
       CREATE TEMP TABLE retell_call_records (business_id int REFERENCES businesses(id));
+      CREATE TEMP TABLE retell_pending_calls (business_id int REFERENCES businesses(id));
       CREATE TEMP TABLE owner_demo_calls (business_id int REFERENCES businesses(id));
       CREATE TEMP TABLE operational_failures (event_key text UNIQUE, source text, summary text, details text,
         business_id int REFERENCES businesses(id), business_name text);
@@ -54,7 +55,7 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
       .replace("FUNCTION guard_deleted_account_data", "FUNCTION pg_temp.guard_deleted_account_data");
     await client.query(fn);
     for (const table of ["businesses", "notification_devices", "notification_events", "notification_seen_leads",
-      "notification_poll_state", "provisioning_attempts"]) {
+      "notification_poll_state", "provisioning_attempts", "retell_pending_calls"]) {
       await client.query(`CREATE TRIGGER guard_fixture BEFORE INSERT OR UPDATE ON ${table}
         FOR EACH ROW EXECUTE FUNCTION pg_temp.guard_deleted_account_data()`);
     }
@@ -63,7 +64,7 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
     await client.query(`INSERT INTO businesses VALUES
       (7001,'user_fixture_owner','Fictional HVAC','+12395550101','agent_fixture','ready'),
       (7002,'user_fixture_other','Other fictional company','+12395550102','other_agent','ready')`);
-    for (const table of ["leads", "retell_call_records", "owner_demo_calls", "billing_notices"]) {
+    for (const table of ["leads", "retell_call_records", "retell_pending_calls", "owner_demo_calls", "billing_notices"]) {
       await client.query(`INSERT INTO ${table} (business_id) VALUES (7001),(7002)`);
     }
     await client.query(`INSERT INTO operational_failures (event_key,source,summary,details,business_id)
@@ -93,7 +94,7 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
     expect(await deleteAccount("user_fixture_owner", deps)).toBe("pending");
     expect((await client.query("SELECT * FROM businesses")).rows.map(r => r.id)).toEqual([7002]);
     for (const table of ["leads", "notification_events", "notification_seen_leads", "notification_poll_state",
-      "retell_call_records", "owner_demo_calls", "billing_notices"]) {
+      "retell_call_records", "retell_pending_calls", "owner_demo_calls", "billing_notices"]) {
       expect((await client.query(`SELECT * FROM ${table}`)).rows.map(r => String(r.business_id))).toEqual(["7002"]);
     }
     expect((await client.query("SELECT business_id FROM operational_failures WHERE business_id IS NOT NULL")).rows

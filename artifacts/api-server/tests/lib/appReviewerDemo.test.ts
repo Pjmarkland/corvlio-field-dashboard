@@ -57,6 +57,7 @@ describe("manual App Store reviewer seed safety", () => {
     await expect(seedReviewerDemo(f.client, "reviewer@example.test", "user_reviewer", now)).rejects.toThrow("Real or unrecognized");
     const guard = f.queries.find(q => q.sql.includes("AS unsafe"))!;
     expect(guard.sql).toContain("retell_call_records");
+    expect(guard.sql).toContain("retell_pending_calls");
     expect(guard.sql).toContain("owner_demo_calls");
     expect(guard.sql).toContain("retell_call_id NOT LIKE");
     expect(guard.sql).toContain("recording_url IS NOT NULL");

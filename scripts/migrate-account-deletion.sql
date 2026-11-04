@@ -83,7 +83,7 @@ DO $$
 DECLARE target text;
 BEGIN
   FOREACH target IN ARRAY ARRAY['businesses','notification_devices','notification_events',
-    'notification_seen_leads','notification_poll_state','provisioning_attempts']
+    'notification_seen_leads','notification_poll_state','provisioning_attempts','retell_pending_calls']
   LOOP
     IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgname = 'guard_deleted_account_' || target) THEN
       EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION guard_deleted_account_data()',

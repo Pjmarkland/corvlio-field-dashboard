@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   select: vi.fn(),
   insert: vi.fn(),
+  update: vi.fn(),
   recent: [] as Array<{ retellCallId: string; outcome: string | null }>,
   inserted: true,
 }));
@@ -21,6 +22,10 @@ vi.mock("@workspace/db", () => ({
     outcome: "outcome",
     analysisComplete: "analysis_complete",
     recordedAt: "recorded_at",
+  },
+  retellPendingCallsTable: {
+    retellCallId: "retell_call_id",
+    status: "status",
   },
 }));
 
@@ -39,6 +44,9 @@ describe("blank Retell call persistence", () => {
         }),
       }),
     }));
+    mocks.update.mockImplementation(() => ({
+      set: () => ({ where: async () => undefined }),
+    }));
     mocks.insert.mockImplementation(() => ({
       values: () => ({
         onConflictDoNothing: () => ({
@@ -50,6 +58,7 @@ describe("blank Retell call persistence", () => {
       execute: mocks.execute,
       select: mocks.select,
       insert: mocks.insert,
+      update: mocks.update,
     }));
   });
 

@@ -8,7 +8,12 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { findBusinessByPhoneNumber } from "../lib/businessDirectory";
 import { runNotificationOutboxNow } from "../lib/notificationService";
-import { persistAnalyzedCall, persistBlankCall } from "../lib/retellPersistence";
+import {
+  persistAnalyzedCall,
+  persistBlankCall,
+  persistPendingRetellCall,
+  RETELL_PENDING_CALL_MIN_DURATION_MS,
+} from "../lib/retellPersistence";
 import { sendOwnerLeadSms } from "../lib/ownerSms";
 import { capturedInfo, extractRetellLead } from "../lib/retellLeadData";
 import { dynamicVariables } from "../lib/retellVariables";
@@ -343,7 +348,14 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Retell call object is required" });
     return;
   }
-  if (isPendingCallEnded(body.data.event, call)) {
+  const pendingCallEnded = isPendingCallEnded(body.data.event, call);
+  const providerCallId = firstString(call.call_id);
+  const durationMs = callDurationMs(call.duration_ms);
+  if (pendingCallEnded && (
+    !providerCallId
+    || durationMs === null
+    || durationMs < RETELL_PENDING_CALL_MIN_DURATION_MS
+  )) {
     void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
     return;
@@ -362,13 +374,17 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     processingBusiness = business
       ? { id: business.id, businessName: business.businessName }
       : null;
-    const retellCallId = firstString(call.call_id)
+    const retellCallId = providerCallId
       ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     const startedAt = callStartedAt(call.start_timestamp);
     const occurredAt = startedAt ?? new Date();
-    const durationMs = callDurationMs(call.duration_ms);
 
     if (!business) {
+      if (pendingCallEnded) {
+        void recordRetellWebhookSuccess("post-call");
+        res.sendStatus(204);
+        return;
+      }
       const eventKey = `retell-unmatched:${retellCallId}`;
       const durationText = durationMs === null ? "unknown" : `${Math.round(durationMs / 1000)} sec`;
       await recordPostCallFailure(req, {
@@ -388,6 +404,19 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           deepLink: "/dashboard",
         },
       });
+      res.sendStatus(204);
+      return;
+    }
+
+    if (pendingCallEnded && providerCallId && durationMs !== null) {
+      await persistPendingRetellCall({
+        callId: providerCallId,
+        businessId: business.id,
+        callerNumber: firstString(call.from_number),
+        callStartedAt: occurredAt,
+        durationMs,
+      });
+      void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
     }

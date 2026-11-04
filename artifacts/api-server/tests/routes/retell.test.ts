@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   runNotificationOutboxNow: vi.fn(),
   persistAnalyzedCall: vi.fn(),
   persistBlankCall: vi.fn(),
+  persistPendingRetellCall: vi.fn(),
   recordOperationalFailure: vi.fn(),
   queueFounderPushNotification: vi.fn(),
   recordRetellSystemAlert: vi.fn(),
@@ -46,6 +47,8 @@ vi.mock("../../src/lib/notificationService", () => ({
 vi.mock("../../src/lib/retellPersistence", () => ({
   persistAnalyzedCall: mocks.persistAnalyzedCall,
   persistBlankCall: mocks.persistBlankCall,
+  persistPendingRetellCall: mocks.persistPendingRetellCall,
+  RETELL_PENDING_CALL_MIN_DURATION_MS: 3_000,
 }));
 vi.mock("../../src/lib/operationalFailures", () => ({
   recordOperationalFailure: mocks.recordOperationalFailure,
@@ -158,6 +161,7 @@ beforeEach(() => {
   vi.stubEnv("RETELL_API_KEY", "retell-unit-test-key");
   mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: true });
   mocks.persistBlankCall.mockResolvedValue({ inserted: true, triggerStreakAlert: false, streakStartCallId: null });
+  mocks.persistPendingRetellCall.mockResolvedValue(true);
   mocks.sendLeadNotificationEmail.mockResolvedValue(undefined);
   mocks.runNotificationOutboxNow.mockResolvedValue(undefined);
   mocks.recordOperationalFailure.mockResolvedValue(true);
@@ -230,17 +234,25 @@ describe("Retell webhook safety", () => {
     expect(mocks.logError).toHaveBeenCalledTimes(1);
   }, 10_000);
 
-  it("ignores an early empty call-ended event, then persists the analyzed call and callback", async () => {
+  it("records a durable pending call-ended event, then persists the analyzed call and callback", async () => {
     mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.test" }));
     mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: false });
     const call = { call_id: "call-partial", to_number: "+14155550123", from_number: "+15559990000",
+      start_timestamp: 1_700_000_000_000, duration_ms: 12_000,
       transcript: "user: My pipe is leaking. I'm Sam.",
     };
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
+    expect(mocks.persistPendingRetellCall).toHaveBeenCalledWith({
+      callId: "call-partial",
+      businessId: 1,
+      callerNumber: "+15559990000",
+      callStartedAt: new Date(1_700_000_000_000),
+      durationMs: 12_000,
+    });
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
     expect(mocks.persistBlankCall).not.toHaveBeenCalled();
     expect(mocks.recordOperationalFailure).not.toHaveBeenCalled();
-    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.findBusinessByPhoneNumber).toHaveBeenCalledWith("+14155550123");
     expect((await signedRequest("post-call", JSON.stringify({ event: "call_analyzed", call: {
       ...call, recording_url: "https://recordings.example.test/call-partial.wav",
       call_analysis: { call_summary: "Sam has a leaking pipe.", custom_analysis_data: {
@@ -255,6 +267,15 @@ describe("Retell webhook safety", () => {
         recordingUrl: "https://recordings.example.test/call-partial.wav" }),
       expect.any(Object), true, true,
     ]);
+  });
+  it.each([
+    { duration_ms: 2_999 },
+    { duration_ms: undefined },
+  ])("ignores call-ended events too short or lacking a valid duration", async ({ duration_ms }) => {
+    const call = { call_id: "short-call", to_number: "+14155550123", from_number: "+15559990000", duration_ms };
+    expect((await signedRequest("post-call", JSON.stringify({ event: "call_ended", call }))).status).toBe(204);
+    expect(mocks.persistPendingRetellCall).not.toHaveBeenCalled();
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
   });
   it.each([
     { status: "error", duration_ms: 1500, call_analysis: { call_summary: "Some analysis" } },

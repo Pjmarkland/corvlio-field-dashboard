@@ -211,6 +211,7 @@ function ensureSampleBusinessIsSafe(business: DemoBusinessRow): void {
 async function ensureNoLiveRecords(client: PoolClient, businessId: number): Promise<void> {
   const activity = await client.query<{
       has_calls: boolean;
+      has_pending_calls: boolean;
       has_provisioning_attempt: boolean;
       has_notifications: boolean;
       has_billing_account: boolean;
@@ -220,6 +221,7 @@ async function ensureNoLiveRecords(client: PoolClient, businessId: number): Prom
     }>(
       `SELECT
          EXISTS (SELECT 1 FROM retell_call_records WHERE business_id = $1) AS has_calls,
+         EXISTS (SELECT 1 FROM retell_pending_calls WHERE business_id = $1) AS has_pending_calls,
          EXISTS (SELECT 1 FROM provisioning_attempts WHERE business_id = $1) AS has_provisioning_attempt,
          EXISTS (SELECT 1 FROM notification_events WHERE business_id = $1::text) AS has_notifications,
          EXISTS (SELECT 1 FROM billing_accounts WHERE business_id = $1) AS has_billing_account,

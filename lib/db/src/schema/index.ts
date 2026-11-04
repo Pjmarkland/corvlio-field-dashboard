@@ -24,6 +24,7 @@ export * from "./businesses";
 export * from "./leads";
 export * from "./leadInfoFlags";
 export * from "./retellCallRecords";
+export * from "./retellPendingCalls";
 export * from "./provisioningAttempts";
 export * from "./operationalFailures";
 export * from "./billing";

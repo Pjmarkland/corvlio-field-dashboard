@@ -186,7 +186,7 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::text[])`, [ids.map(String)]);
     }
     for (const table of ["billing_notices", "operational_failures",
-      "owner_demo_calls", "retell_call_records", "leads"]) {
+      "owner_demo_calls", "retell_pending_calls", "retell_call_records", "leads"]) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::int[])`, [ids]);
     }
     // Keep the financial event ledger, but detach its owner actor and business FK.
