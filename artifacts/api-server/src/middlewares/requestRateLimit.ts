@@ -16,12 +16,22 @@ export type RateLimitConsumer = (
 ) => Promise<RateLimitResult>;
 
 let callsSinceCleanup = 0;
+const testBuckets = new Map<string, RateLimitResult>();
 
 export async function consumeRateLimitBucket(
   key: string,
   windowMs: number,
   now = Date.now(),
 ): Promise<RateLimitResult> {
+  if (process.env.NODE_ENV === "test") {
+    const current = testBuckets.get(key);
+    const bucket = !current || current.resetAt.getTime() <= now
+      ? { count: 1, resetAt: new Date(now + windowMs) }
+      : { count: current.count + 1, resetAt: current.resetAt };
+    testBuckets.set(key, bucket);
+    return bucket;
+  }
+
   const resetAt = new Date(now + windowMs);
   const nowDate = new Date(now);
   const [bucket] = await db
