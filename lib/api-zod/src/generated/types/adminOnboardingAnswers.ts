@@ -55,4 +55,6 @@ export interface AdminOnboardingAnswers {
   websiteEnrichmentSources: AdminOnboardingAnswersWebsiteEnrichmentSources;
   /** @nullable */
   agreementsAcceptedAt: Date | null;
+  /** @nullable */
+  agreementsAcceptedVersion: string | null;
 }

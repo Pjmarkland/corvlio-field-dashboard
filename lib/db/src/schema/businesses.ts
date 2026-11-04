@@ -57,6 +57,7 @@ export const businessesTable = pgTable("businesses", {
     .notNull()
     .default(sql`'{}'::jsonb`),
   agreementsAcceptedAt: timestamp("agreements_accepted_at", { withTimezone: true }),
+  agreementsAcceptedVersion: text("agreements_accepted_version"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

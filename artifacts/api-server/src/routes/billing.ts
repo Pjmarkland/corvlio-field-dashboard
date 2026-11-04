@@ -28,7 +28,11 @@ router.get("/billing/native-summary", async (req, res): Promise<void> => {
 });
 router.get("/billing/availability", (_req, res) => {
   const gate = billingGate();
-  res.set("Cache-Control", "no-store").json({ enabled: gate.enabled, mode: gate.mode });
+  res.set("Cache-Control", "no-store").json({
+    enabled: gate.enabled,
+    mode: gate.mode,
+    smsAvailable: getOwnerSmsReadiness().ready,
+  });
 });
 router.post("/admin/billing/readiness-check", requireAdmin, async (req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");

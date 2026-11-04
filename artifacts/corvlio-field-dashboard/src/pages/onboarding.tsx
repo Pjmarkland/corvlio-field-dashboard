@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetLeadsQueryKey, getGetNativeBusinessSetupStatusQueryKey, submitNativeBusinessSetup, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
+import { getGetLeadsQueryKey, getGetNativeBusinessSetupStatusQueryKey, submitNativeBusinessSetup, useGetBillingAvailability, usePreviewBusinessWebsite, type WebsitePreview } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { PlanPicker } from '@/components/PlanPicker';
 import { validStartupAge, type PlanId } from '@/lib/invoicePlans';
@@ -378,6 +378,8 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { data: billingAvailability } = useGetBillingAvailability();
+  const smsAvailable = billingAvailability?.smsAvailable === true;
   const { revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
@@ -434,6 +436,13 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
       setForm((current) => ({ ...current, [key]: value }));
     }
   };
+  useEffect(() => {
+    if (!smsAvailable) {
+      setForm((current) => current.smsAlertsConsent
+        ? { ...current, smsAlertsConsent: false }
+        : current);
+    }
+  }, [smsAvailable]);
   const resetWebsitePreview = () => {
     websiteRequest.current += 1;
     setHoursDecision(initialHoursDecision);
@@ -495,7 +504,8 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
       setSubmission({ kind: 'error', message: 'Enter the owner mobile number with a country code.' });
       return;
     }
-    if (form.smsAlertsConsent && !ownerPhone) {
+    const smsConsent = smsAvailable && form.smsAlertsConsent;
+    if (smsConsent && !ownerPhone) {
       setSubmission({ kind: 'error', message: 'Enter a mobile number to receive text alerts.' });
       return;
     }
@@ -517,8 +527,8 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
         await submitNativeBusinessSetup({
           businessName: form.businessName.trim(),
           ownerEmail: form.ownerEmail.trim(),
-          ownerPhone: ownerPhone || null,
-          smsAlertsConsent: form.smsAlertsConsent,
+          ...(smsAvailable ? { ownerPhone: ownerPhone || null } : {}),
+          smsAlertsConsent: smsConsent,
           businessType: form.businessType.trim(),
           servicesOffered: form.servicesOffered.trim(),
           servicesNotOffered: form.servicesNotOffered.trim(),
@@ -574,8 +584,11 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           otherPolicies: form.otherPolicies,
           websiteSuggestionsReviewed: websiteReviewed,
           ownerEmail: form.ownerEmail,
-          ownerPhone: ownerPhone || null,
-          smsAlertsConsent: form.smsAlertsConsent,
+          ...(smsAvailable ? { ownerPhone: ownerPhone || null } : {}),
+          smsAlertsConsent: smsConsent,
+          privacyAccepted: true,
+          termsAccepted: true,
+          serviceAgreementAccepted: true,
           serviceArea: form.serviceArea,
           personalityToneDescription: form.receptionistTone,
           majorIssueExamples: form.majorIssueExamples,
@@ -728,40 +741,46 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                    hint="Optional. Read the site now to suggest answers for your review. Nothing is saved automatically."
                 />
                 <Field id="ownerEmail" label="Owner email" value={form.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} placeholder="owner@yourbusiness.com" type="email" required />
-                <div className="space-y-2" data-testid="owner-sms-consent-fields">
-                  <label htmlFor="ownerPhone" className="block text-xs font-semibold">Owner mobile number</label>
-                  <input
-                    id="ownerPhone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    maxLength={16}
-                    required={form.smsAlertsConsent}
-                    value={form.ownerPhone}
-                    onChange={(event) => updateField('ownerPhone', event.target.value)}
-                    placeholder="+14155550123"
-                    data-testid="input-owner-phone"
-                    className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground"
-                  />
-                  <p className="text-xs leading-relaxed text-muted-foreground">Use a country code if you opt in to text alerts.</p>
-                  <label className="flex items-start gap-2.5 text-xs leading-relaxed" htmlFor="smsAlertsConsent">
+                {smsAvailable ? (
+                  <div className="space-y-2" data-testid="owner-sms-consent-fields">
+                    <label htmlFor="ownerPhone" className="block text-xs font-semibold">Owner mobile number</label>
                     <input
-                      id="smsAlertsConsent"
-                      type="checkbox"
-                      checked={form.smsAlertsConsent}
-                      disabled={form.isSample}
-                      onChange={(event) => updateField('smsAlertsConsent', event.target.checked)}
-                      data-testid="checkbox-sms-alert-consent"
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+                      id="ownerPhone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={16}
+                      required={smsAvailable && form.smsAlertsConsent}
+                      value={form.ownerPhone}
+                      onChange={(event) => updateField('ownerPhone', event.target.value)}
+                      placeholder="+14155550123"
+                      data-testid="input-owner-phone"
+                      className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground"
                     />
-                    <span>
-                      I agree to receive text message alerts from Corvlio about new leads at this number. Msg frequency varies. Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help. See our{' '}
-                      <Link href="/terms" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-terms">Terms</Link>
-                      {' '}and{' '}
-                      <Link href="/privacy" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-privacy">Privacy Policy</Link>.
-                    </span>
-                  </label>
-                </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">Use a country code if you opt in to text alerts.</p>
+                    <label className="flex items-start gap-2.5 text-xs leading-relaxed" htmlFor="smsAlertsConsent">
+                      <input
+                        id="smsAlertsConsent"
+                        type="checkbox"
+                        checked={form.smsAlertsConsent}
+                        disabled={form.isSample}
+                        onChange={(event) => updateField('smsAlertsConsent', event.target.checked)}
+                        data-testid="checkbox-sms-alert-consent"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+                      />
+                      <span>
+                        I agree to receive text message alerts from Corvlio about new leads at this number. Msg frequency varies. Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help. See our{' '}
+                        <Link href="/terms" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-terms">Terms</Link>
+                        {' '}and{' '}
+                        <Link href="/privacy" className="font-semibold text-primary underline underline-offset-2" data-testid="link-sms-privacy">Privacy Policy</Link>.
+                      </span>
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-xs leading-relaxed text-muted-foreground" data-testid="sms-alerts-unavailable">
+                    Text alerts are not available yet. You can finish setup without opting in.
+                  </p>
+                )}
                 <Field id="serviceArea" label="Service area" value={form.serviceArea} onChange={(value) => updateField('serviceArea', value)} placeholder="Oakland, Berkeley, and nearby East Bay" required error={requiredError('serviceArea')} showError={Boolean(requiredError('serviceArea'))} />
               </div>
               {!form.isSample ? <div className="mt-4">

@@ -344,19 +344,16 @@ describe("Retell webhook safety", () => {
     expect(mocks.persistAnalyzedCall.mock.calls[0][4]).toBe(false);
     expect(mocks.runNotificationOutboxNow).not.toHaveBeenCalled();
   });
-  it("rejects missing pre-call signatures before looking up a business", async () => {
+  it("allows missing pre-call signatures during rollout and logs them", async () => {
     const response = await fetch(`${baseUrl}/webhooks/retell/pre-call`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ call_inbound: { to_number: "+14155550123" } }),
     });
-    expect(response.status).toBe(401);
-    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
-    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
-      issueKey: "retell:pre-call:invalid_signature",
-      endpoint: "pre-call",
-      summary: expect.stringContaining("invalid signature"),
-    }));
+    expect(response.status).toBe(200);
+    expect(mocks.findBusinessByPhoneNumber).toHaveBeenCalledOnce();
+    expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("without a signature"));
+    expect(mocks.recordRetellSystemAlert).not.toHaveBeenCalled();
   });
   it("verifies valid pre-call signatures against the exact raw bytes", async () => {
     const raw = '{ "call_inbound": { "to_number" : "+14155550123" } }';
@@ -395,9 +392,29 @@ describe("Retell webhook safety", () => {
     expect(mocks.persistAnalyzedCall.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.runNotificationOutboxNow.mock.invocationCallOrder[0]);
   });
-  it("keeps post-call signature verification mandatory", async () => {
+  it("allows missing post-call signatures during rollout and logs them", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValue(makeBusiness({ id: 1, ownerEmail: "test@example.com" }));
+    mocks.persistAnalyzedCall.mockResolvedValueOnce({ id: 101, notify: false });
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "call-missing-signature", to_number: "+14155550123", from_number: "+15551234567",
+      call_analysis: { custom_analysis_data: { caller_name: "Test caller", issue_reason: "Test issue" } },
+    } });
     const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: '{"event":"call_analyzed"}',
+      method: "POST", headers: { "content-type": "application/json" }, body: raw,
+    });
+    expect(response.status).toBe(204);
+    expect(mocks.persistAnalyzedCall).toHaveBeenCalledOnce();
+    expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("without a signature"));
+    expect(mocks.recordRetellSystemAlert).not.toHaveBeenCalled();
+  });
+  it("rejects present invalid post-call signatures", async () => {
+    const raw = JSON.stringify({ event: "call_analyzed", call: {
+      call_id: "call-invalid-signature", to_number: "+14155550123", from_number: "+15551234567",
+    } });
+    const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-retell-signature": "invalid" },
+      body: raw,
     });
     expect(response.status).toBe(401);
     expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
@@ -411,7 +428,7 @@ describe("Retell webhook safety", () => {
     for (let index = 0; index < 2; index++) {
       const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-retell-signature": "invalid" },
         body: '{"event":"call_analyzed"}',
       });
       expect(response.status).toBe(401);

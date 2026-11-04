@@ -10,4 +10,5 @@ import type { BillingAvailabilityMode } from './billingAvailabilityMode';
 export interface BillingAvailability {
   enabled: boolean;
   mode: BillingAvailabilityMode;
+  smsAvailable: boolean;
 }

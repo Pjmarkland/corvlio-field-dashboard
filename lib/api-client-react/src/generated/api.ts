@@ -51,6 +51,7 @@ import type {
   BillingSnapshot,
   BusinessCallUsage,
   BusinessMonthlyResultsReport,
+  BusinessOnboardingInput,
   BusinessProfile,
   BusinessProfileUpdate,
   CreateOwnerDemoCall200,
@@ -1004,6 +1005,77 @@ export const usePreviewBusinessWebsite = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPreviewBusinessWebsiteMutationOptions(options));
+    }
+
+export const getOnboardBusinessUrl = () => {
+
+
+
+
+  return `/api/businesses/onboard`
+}
+
+/**
+ * @summary Save a business setup after required details and agreements are accepted
+ */
+export const onboardBusiness = async (businessOnboardingInput: BusinessOnboardingInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getOnboardBusinessUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(businessOnboardingInput)
+  }
+);}
+
+
+
+
+
+export const getOnboardBusinessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof onboardBusiness>>, TError,{data: BodyType<BusinessOnboardingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof onboardBusiness>>, TError,{data: BodyType<BusinessOnboardingInput>}, TContext> => {
+
+const mutationKey = ['onboardBusiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof onboardBusiness>>, {data: BodyType<BusinessOnboardingInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  onboardBusiness(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OnboardBusinessMutationResult = NonNullable<Awaited<ReturnType<typeof onboardBusiness>>>
+    export type OnboardBusinessMutationBody = BodyType<BusinessOnboardingInput>
+    export type OnboardBusinessMutationError = ErrorType<void>
+
+    /**
+ * @summary Save a business setup after required details and agreements are accepted
+ */
+export const useOnboardBusiness = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof onboardBusiness>>, TError,{data: BodyType<BusinessOnboardingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof onboardBusiness>>,
+        TError,
+        {data: BodyType<BusinessOnboardingInput>},
+        TContext
+      > => {
+      return useMutation(getOnboardBusinessMutationOptions(options));
     }
 
 export const getGetNativeBusinessSetupStatusUrl = () => {

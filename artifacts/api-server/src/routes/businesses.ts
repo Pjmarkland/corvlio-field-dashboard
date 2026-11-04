@@ -8,6 +8,7 @@ import {
   PreviewBusinessWebsiteBody,
   PreviewBusinessWebsiteResponse,
   GetNativeBusinessSetupStatusResponse,
+  OnboardBusinessBody,
   SubmitNativeBusinessSetupBody,
   SubmitNativeBusinessSetupResponse,
 } from "@workspace/api-zod";
@@ -24,12 +25,35 @@ import { config as billingConfig } from "../billing/policy";
 import { normalizeWebsiteUrl, previewBusinessWebsite, unavailableWebsitePreview, UnsafeWebsiteUrlError } from "../lib/websiteEnrichment";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
+import { getOwnerSmsReadiness } from "../lib/ownerSms";
 import { recordOperationalFailure } from "../lib/operationalFailures";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { initializeInvoices } from "../invoicing/service";
 import { runInvoiceCycle } from "../invoicing/worker";
 
 const router: IRouter = Router();
+// Shared version for the Privacy Policy, Terms of Service, and Client Service Agreement; bump when any changes.
+const CURRENT_AGREEMENT_VERSION = "v1";
+const ONBOARDING_TRIMMED_FIELDS = [
+  "businessHours",
+  "timeZone",
+  "agentName",
+  "servicesOffered",
+  "servicesNotOffered",
+  "businessWebsiteUrl",
+  "otherPolicies",
+  "ownerPhone",
+  "emergencyEscalationPhone",
+] as const;
+
+function normalizeOnboardingInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const normalized = { ...(value as Record<string, unknown>) };
+  for (const field of ONBOARDING_TRIMMED_FIELDS) {
+    if (typeof normalized[field] === "string") normalized[field] = (normalized[field] as string).trim();
+  }
+  return normalized;
+}
 
 type OwnedBusiness = NonNullable<Awaited<ReturnType<typeof findBusinessByClerkUserId>>>;
 type BusinessProfileUpdate = z.infer<typeof UpdateBusinessProfileBody>;
@@ -532,9 +556,14 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Owner mobile number must include a country code, for example +14155550123." });
       return;
     }
-    const smsAlertsConsent = body.data.smsAlertsConsent
+    const smsReady = getOwnerSmsReadiness().ready;
+    if (body.data.smsAlertsConsent && !smsReady) {
+      res.status(409).json({ error: "Text alerts are not available right now." });
+      return;
+    }
+    const smsAlertsConsent = smsReady && (body.data.smsAlertsConsent
       ?? existingBusiness?.smsAlertsConsent
-      ?? false;
+      ?? false);
     if (smsAlertsConsent && !ownerPhone) {
       res.status(400).json({ error: "Enter a mobile number before opting in to text alerts." });
       return;
@@ -579,6 +608,7 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
       manualPaymentState: null,
       provisioningState: "awaiting_activation",
       agreementsAcceptedAt: new Date(),
+      agreementsAcceptedVersion: CURRENT_AGREEMENT_VERSION,
       websiteEnrichmentAttemptedAt: null,
     });
 
@@ -595,43 +625,6 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
   }
 });
 
-const OnboardBusinessBody = z.object({
-  chosenPlan: z.enum(["startup","starter","professional","managed"]),
-  startupAgeMonths: z.number().int().min(0).max(17).optional(),
-  businessHours: z.string().trim().max(500).refine(v => !v || parseBusinessHours(v) !== null).optional(),
-  timeZone: z.string().trim().max(100).refine(v => !v || validTimeZone(v)).optional(),
-  isSample: z.boolean().optional(),
-  businessName: z.string().min(1),
-  agentName: z.string().trim().max(40).optional(),
-  businessType: z.string().optional(),
-  servicesOffered: z.string().trim().min(1).max(500),
-  servicesNotOffered: z.string().trim().min(1).max(500),
-  businessWebsiteUrl: z.string().trim().max(2048).optional().or(z.literal("")),
-  ownerEmail: z.string().email(),
-  serviceArea: z.string().optional(),
-  personalityToneDescription: z.string().optional(),
-  otherPolicies: z.string().trim().max(4000).optional(),
-  majorIssueExamples: z.string().optional(),
-  pricingPolicy: z.string().optional(),
-  financingPolicy: z.string().optional(),
-  brandsWorkedWith: z.string().optional(),
-  responseTimeCommitment: z.string().optional(),
-  warrantyInfo: z.string().optional(),
-  maintenancePlanOfferings: z.string().optional(),
-  credentials: z.string().optional(),
-  ownerAvailability: z.string().optional(),
-  emergencyContactInfo: z.string().optional(),
-  emergencyAvailable: z.boolean(),
-  emergencyEscalationPhone: z.string().trim().max(16).nullable(),
-  aiPromisePolicy: z.enum(["callback_only", "appointment_windows"]),
-  ownerPhone: z.string().trim().max(16).nullable().optional(),
-  smsAlertsConsent: z.boolean().optional(),
-  websiteScrapePreviewed: z.boolean().optional(),
-  websiteSuggestionsReviewed: z.boolean().optional(),
-  websitePreviewAttempted: z.boolean().optional(),
-  servicesOfferedDeferred: z.boolean().optional(),
-});
-
 router.post("/businesses/onboard", async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   if (!userId) {
@@ -639,10 +632,10 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     return;
   }
 
-  const body = OnboardBusinessBody.safeParse(req.body);
+  const body = OnboardBusinessBody.safeParse(normalizeOnboardingInput(req.body));
   if (!body.success) {
     req.log.warn({ error: body.error.flatten() }, "Invalid business onboarding payload");
-    res.status(400).json({ error: "Business name and a valid owner email are required" });
+    res.status(400).json({ error: "Complete the required business details and accept all three agreements." });
     return;
   }
 
@@ -652,6 +645,16 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
   }
   if (nameError) {
     res.status(400).json({ error: nameError });
+    return;
+  }
+  if ([body.data.businessType, body.data.serviceArea, body.data.majorIssueExamples]
+    .some((value) => !value.trim())) {
+    res.status(400).json({ error: "Business type, service area, and urgent-issue examples are required." });
+    return;
+  }
+  if ((body.data.businessHours && !parseBusinessHours(body.data.businessHours))
+    || (body.data.timeZone && !validTimeZone(body.data.timeZone))) {
+    res.status(400).json({ error: "Enter valid business hours and a time zone." });
     return;
   }
   if (body.data.websiteScrapePreviewed && body.data.websiteSuggestionsReviewed !== true) {
@@ -708,6 +711,7 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     emergencyEscalationPhone: body.data.emergencyAvailable ? body.data.emergencyEscalationPhone : null,
     aiPromisePolicy: body.data.aiPromisePolicy,
     agreementsAcceptedAt: new Date(),
+    agreementsAcceptedVersion: CURRENT_AGREEMENT_VERSION,
   };
   const submittedOwnerPhone = body.data.ownerPhone?.trim() || null;
   if (submittedOwnerPhone && !/^\+[1-9]\d{7,14}$/.test(submittedOwnerPhone)) {
@@ -725,7 +729,12 @@ router.post("/businesses/onboard", async (req, res): Promise<void> => {
     const ownerPhone = isSample ? null : body.data.ownerPhone === undefined
       ? existingBusiness?.ownerPhone ?? null
       : submittedOwnerPhone;
-    const smsAlertsConsent = !isSample && (body.data.smsAlertsConsent
+    const smsReady = getOwnerSmsReadiness().ready;
+    if (!isSample && body.data.smsAlertsConsent === true && !smsReady) {
+      res.status(409).json({ error: "Text alerts are not available right now." });
+      return;
+    }
+    const smsAlertsConsent = smsReady && !isSample && (body.data.smsAlertsConsent
       ?? existingBusiness?.smsAlertsConsent
       ?? false);
     if (smsAlertsConsent && !ownerPhone) {

@@ -7,12 +7,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const nativeMocks = vi.hoisted(() => ({
   submit: vi.fn(),
   preview: vi.fn(),
+  smsAvailable: true,
 }));
 
 vi.mock('@workspace/api-client-react', () => ({
   getGetLeadsQueryKey: () => ['/api/leads'],
   getGetNativeBusinessSetupStatusQueryKey: () => ['/api/businesses/native-onboard/status'],
   submitNativeBusinessSetup: nativeMocks.submit,
+  useGetBillingAvailability: () => ({ data: { smsAvailable: nativeMocks.smsAvailable } }),
   usePreviewBusinessWebsite: () => ({ mutateAsync: nativeMocks.preview, isPending: false }),
 }));
 vi.mock('@clerk/react', () => ({ useUser: () => ({ user: { id: 'native-owner' } }) }));
@@ -33,6 +35,7 @@ function renderForm() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  nativeMocks.smsAvailable = true;
   nativeMocks.submit.mockResolvedValue({ status: 'received', provisioningState: 'awaiting_activation' });
 });
 
@@ -63,6 +66,15 @@ describe('native business setup', () => {
     expect(screen.queryByTestId('section-plan')).toBeNull();
     expect(screen.queryByTestId('agent-readiness-checklist')).toBeNull();
     expect(container.textContent).not.toMatch(/Startup|Starter|Professional|Managed|checkout|payment link|\\$\\d/i);
+  });
+
+  it('hides SMS opt-in and explains unavailability when sending is not ready', () => {
+    nativeMocks.smsAvailable = false;
+    renderForm();
+
+    expect(screen.queryByTestId('checkbox-sms-alert-consent')).toBeNull();
+    expect(screen.queryByTestId('input-owner-phone')).toBeNull();
+    expect(screen.getByTestId('sms-alerts-unavailable').textContent).toContain('not available yet');
   });
 
   it('submits native setup to the plan-free endpoint and stays on a confirmation state', async () => {

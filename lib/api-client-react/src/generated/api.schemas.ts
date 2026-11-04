@@ -161,6 +161,93 @@ export interface NativeBusinessSetupInput {
   serviceAgreementAccepted: true;
 }
 
+export type BusinessOnboardingInputChosenPlan = typeof BusinessOnboardingInputChosenPlan[keyof typeof BusinessOnboardingInputChosenPlan];
+
+
+export const BusinessOnboardingInputChosenPlan = {
+  startup: 'startup',
+  starter: 'starter',
+  professional: 'professional',
+  managed: 'managed',
+} as const;
+
+export type BusinessOnboardingInputAiPromisePolicy = typeof BusinessOnboardingInputAiPromisePolicy[keyof typeof BusinessOnboardingInputAiPromisePolicy];
+
+
+export const BusinessOnboardingInputAiPromisePolicy = {
+  callback_only: 'callback_only',
+  appointment_windows: 'appointment_windows',
+} as const;
+
+export interface BusinessOnboardingInput {
+  chosenPlan: BusinessOnboardingInputChosenPlan;
+  /**
+     * @minimum 0
+     * @maximum 17
+     */
+  startupAgeMonths?: number;
+  /** @maxLength 500 */
+  businessHours?: string;
+  /** @maxLength 100 */
+  timeZone?: string;
+  isSample?: boolean;
+  /** @minLength 1 */
+  businessName: string;
+  /** @maxLength 40 */
+  agentName?: string;
+  /** @minLength 1 */
+  businessType: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesOffered: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  servicesNotOffered: string;
+  /** @maxLength 2048 */
+  businessWebsiteUrl?: string;
+  ownerEmail: string;
+  /** @minLength 1 */
+  serviceArea: string;
+  personalityToneDescription?: string;
+  /** @maxLength 4000 */
+  otherPolicies?: string;
+  /** @minLength 1 */
+  majorIssueExamples: string;
+  pricingPolicy?: string;
+  financingPolicy?: string;
+  brandsWorkedWith?: string;
+  responseTimeCommitment?: string;
+  warrantyInfo?: string;
+  maintenancePlanOfferings?: string;
+  credentials?: string;
+  ownerAvailability?: string;
+  emergencyContactInfo?: string;
+  emergencyAvailable: boolean;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  emergencyEscalationPhone: string | null;
+  aiPromisePolicy: BusinessOnboardingInputAiPromisePolicy;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  ownerPhone?: string | null;
+  smsAlertsConsent?: boolean;
+  websiteScrapePreviewed?: boolean;
+  websiteSuggestionsReviewed?: boolean;
+  websitePreviewAttempted?: boolean;
+  servicesOfferedDeferred?: boolean;
+  privacyAccepted: true;
+  termsAccepted: true;
+  serviceAgreementAccepted: true;
+}
+
 export type NativeBusinessSetupResultStatus = typeof NativeBusinessSetupResultStatus[keyof typeof NativeBusinessSetupResultStatus];
 
 
@@ -260,6 +347,7 @@ export const BillingAvailabilityMode = {
 export interface BillingAvailability {
   enabled: boolean;
   mode: BillingAvailabilityMode;
+  smsAvailable: boolean;
 }
 
 export type BillingReadinessMode = typeof BillingReadinessMode[keyof typeof BillingReadinessMode];
@@ -1348,6 +1436,8 @@ export interface AdminBusinessSummary {
   pushPlatforms: NotificationPlatform[];
   /** @nullable */
   agreementsAcceptedAt: string | null;
+  /** @nullable */
+  agreementsAcceptedVersion: string | null;
   hasNoLeads: boolean;
   hasUncontactedOver24Hours: boolean;
   /** @nullable */
@@ -1419,6 +1509,8 @@ export interface AdminOnboardingAnswers {
   websiteEnrichmentSources: AdminOnboardingAnswersWebsiteEnrichmentSources;
   /** @nullable */
   agreementsAcceptedAt: string | null;
+  /** @nullable */
+  agreementsAcceptedVersion: string | null;
 }
 
 export interface AdminLeadActivity {

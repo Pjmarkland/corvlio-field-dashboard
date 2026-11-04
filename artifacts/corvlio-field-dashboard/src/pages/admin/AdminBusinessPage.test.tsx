@@ -52,6 +52,7 @@ function setBusiness(enabled: boolean, isInternal = false) {
         createdAt: '2026-01-01T00:00:00.000Z',
         ownerLastSignInAt: null,
         agreementsAcceptedAt: null,
+        agreementsAcceptedVersion: null,
         isSample: false,
         unusedNumber7Days: false,
         lastCallAt: null,
@@ -69,7 +70,7 @@ function setBusiness(enabled: boolean, isInternal = false) {
         resolvedPhoneNumber: '+18634463029',
         defaultPhoneNumber: '+18634463029',
       },
-      onboarding: { websiteEnrichmentSources: {}, websiteEnrichmentAttemptedAt: null, agreementsAcceptedAt: null },
+      onboarding: { websiteEnrichmentSources: {}, websiteEnrichmentAttemptedAt: null, agreementsAcceptedAt: null, agreementsAcceptedVersion: null },
       leads: [],
       calls: [],
     },
@@ -108,7 +109,7 @@ describe('AdminBusinessPage managed reports setting', () => {
   it('shows the resolved number and saves a business-specific US fallback', () => {
     render(<AdminBusinessPage />);
     expect(screen.getByTestId('text-resolved-fallback-phone').textContent).toBe('+18634463029');
-    expect(screen.getByText(/where calls ring if the AI is unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/where calls should ring if the AI is unavailable/i)).toBeTruthy();
     fireEvent.change(screen.getByTestId('input-business-fallback-phone'), {
       target: { value: '+1 (650) 555-0123' },
     });

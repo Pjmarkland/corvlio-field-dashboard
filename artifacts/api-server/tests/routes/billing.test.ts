@@ -93,7 +93,11 @@ describe("native read-only summary and unchanged payment gate", () => {
 describe("billing authorization and feature flag", () => {
   it("flag off exposes only availability, no billing data or SDK calls", async () => {
     m.enabled = false;
-    expect(await (await fetch(`${base}/billing/availability`)).json()).toEqual({ enabled: false, mode: "off" });
+    expect(await (await fetch(`${base}/billing/availability`)).json()).toEqual({
+      enabled: false,
+      mode: "off",
+      smsAvailable: false,
+    });
     for (const path of ["/billing", "/admin/billing"]) expect((await fetch(base + path, { headers: ownerHeaders })).status).toBe(404);
     expect((await fetch(`${base}/billing/cancel`, { method: "POST", headers: ownerHeaders })).status).toBe(404);
     expect(m.snapshot).not.toHaveBeenCalled(); expect(m.cancel).not.toHaveBeenCalled(); expect(m.signature).not.toHaveBeenCalled();

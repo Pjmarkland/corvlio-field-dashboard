@@ -62,11 +62,17 @@ const validBody = {
   chosenPlan: "starter",
   businessName: "Example Heating",
   ownerEmail: "business-owner@example.test",
+  businessType: "HVAC",
   servicesOffered: "Residential heating repair and replacement.",
   servicesNotOffered: "None",
+  serviceArea: "Northside",
+  majorIssueExamples: "No heat in winter or a gas smell.",
   emergencyAvailable: false,
   emergencyEscalationPhone: null,
   aiPromisePolicy: "callback_only",
+  privacyAccepted: true,
+  termsAccepted: true,
+  serviceAgreementAccepted: true,
 };
 
 beforeAll(async () => {
@@ -89,13 +95,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  vi.unstubAllEnvs();
   await new Promise<void>((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("SMS_ENABLED", "false");
   business = {
     id: 44,
     billingMode: "manual",
@@ -193,6 +203,16 @@ const validNativeBody = {
   serviceAgreementAccepted: true,
 };
 
+function enableSmsForTest() {
+  vi.stubEnv("SMS_ENABLED", "true");
+  vi.stubEnv("TWILIO_ACCOUNT_SID", `AC${"a".repeat(32)}`);
+  vi.stubEnv("TWILIO_API_KEY_SID", `SK${"b".repeat(32)}`);
+  vi.stubEnv("TWILIO_API_KEY_SECRET", "test-api-secret");
+  vi.stubEnv("TWILIO_MESSAGING_SERVICE_SID", `MG${"c".repeat(32)}`);
+  vi.stubEnv("TWILIO_AUTH_TOKEN", "test-auth-token");
+  vi.stubEnv("TWILIO_INBOUND_WEBHOOK_URL", "https://example.test/api/sms/twilio/inbound");
+}
+
 async function submitNativeSetup(body: Record<string, unknown>) {
   return fetch(`${baseUrl}/businesses/native-onboard`, {
     method: "POST",
@@ -261,7 +281,9 @@ describe("owner business profile API", () => {
       manualPaymentState: null,
       provisioningState: "awaiting_activation",
       isSample: false,
+      agreementsAcceptedVersion: "v1",
     });
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0].agreementsAcceptedAt).toBeInstanceOf(Date);
     expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("plan");
     expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("checkoutUrl");
     expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).not.toHaveProperty("paymentLink");
@@ -272,6 +294,7 @@ describe("owner business profile API", () => {
 
   it("stores affirmative native SMS consent and a server timestamp with the owner mobile number", async () => {
     business = undefined;
+    enableSmsForTest();
     const response = await submitNativeSetup({
       ...validNativeBody,
       ownerPhone: "+14155550123",
@@ -289,6 +312,7 @@ describe("owner business profile API", () => {
 
   it("rejects native SMS consent without an owner mobile number", async () => {
     business = undefined;
+    enableSmsForTest();
     const response = await submitNativeSetup({
       ...validNativeBody,
       smsAlertsConsent: true,
@@ -304,6 +328,7 @@ describe("owner business profile API", () => {
       chosenPlan: "starter",
       retellPhoneNumber: "+14155550000",
     };
+    enableSmsForTest();
     const response = await onboard({
       ...validBody,
       ownerPhone: "+14155550123",
@@ -317,6 +342,24 @@ describe("owner business profile API", () => {
       smsAlertsConsent: true,
     });
     expect(saved.smsAlertsConsentAt).toBeInstanceOf(Date);
+    expect(saved.agreementsAcceptedVersion).toBe("v1");
+    expect(saved.agreementsAcceptedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects web SMS consent when sending is unavailable", async () => {
+    business = {
+      ...business!,
+      chosenPlan: "starter",
+      retellPhoneNumber: "+14155550000",
+    };
+    const response = await onboard({
+      ...validBody,
+      ownerPhone: "+14155550123",
+      smsAlertsConsent: true,
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
   });
 
   it("allows web onboarding without SMS consent or a mobile number", async () => {
@@ -332,6 +375,40 @@ describe("owner business profile API", () => {
       ownerPhone: null,
       smsAlertsConsent: false,
       smsAlertsConsentAt: null,
+      agreementsAcceptedVersion: "v1",
+    });
+  });
+
+  it("requires required onboarding answers and all agreements on the server", async () => {
+    for (const field of ["businessType", "serviceArea", "majorIssueExamples"] as const) {
+      expect((await onboard({ ...validBody, [field]: "   " })).status).toBe(400);
+    }
+    for (const field of ["privacyAccepted", "termsAccepted", "serviceAgreementAccepted"] as const) {
+      expect((await onboard({ ...validBody, [field]: false })).status).toBe(400);
+    }
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+  });
+
+  it("keeps web onboarding schedule validation and trims values before saving", async () => {
+    expect((await onboard({ ...validBody, businessHours: "not a schedule" })).status).toBe(400);
+    expect((await onboard({ ...validBody, timeZone: "Mars/Unknown" })).status).toBe(400);
+    expect(mocks.saveBusinessWithOptionalPhone).not.toHaveBeenCalled();
+
+    const response = await onboard({
+      ...validBody,
+      businessHours: " Mon-Fri 08:00-17:00 ",
+      timeZone: " America/Los_Angeles ",
+      servicesOffered: " Residential heating repair. ",
+      servicesNotOffered: " None ",
+      otherPolicies: " Owner-reviewed note ",
+    });
+    expect([200, 201]).toContain(response.status);
+    expect(mocks.saveBusinessWithOptionalPhone.mock.calls[0][0]).toMatchObject({
+      businessHours: "Mon-Fri 08:00-17:00",
+      timeZone: "America/Los_Angeles",
+      servicesOffered: "Residential heating repair.",
+      servicesNotOffered: "None",
+      otherPolicies: "Owner-reviewed note",
     });
   });
 

@@ -41,6 +41,8 @@ export interface AdminBusinessSummary {
   pushPlatforms: NotificationPlatform[];
   /** @nullable */
   agreementsAcceptedAt: Date | null;
+  /** @nullable */
+  agreementsAcceptedVersion: string | null;
   hasNoLeads: boolean;
   hasUncontactedOver24Hours: boolean;
   /** @nullable */

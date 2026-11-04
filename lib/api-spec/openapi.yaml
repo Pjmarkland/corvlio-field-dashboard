@@ -249,6 +249,32 @@ paths:
           description: Invalid or non-public website URL
         "401":
           description: Authentication required
+  /businesses/onboard:
+    post:
+      operationId: onboardBusiness
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Save a business setup after required details and agreements are accepted
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessOnboardingInput"
+      responses:
+        "200":
+          description: Existing business setup updated
+        "201":
+          description: Business setup created
+        "400":
+          description: Invalid or incomplete setup
+        "401":
+          description: Authentication required
+        "409":
+          description: Setup conflicts with current account or SMS readiness
+        "502":
+          description: Setup could not be saved
   /businesses/native-onboard/status:
     get:
       operationId: getNativeBusinessSetupStatus
@@ -1506,6 +1532,47 @@ components:
         termsAccepted: { type: boolean, enum: [true] }
         serviceAgreementAccepted: { type: boolean, enum: [true] }
       required: [businessName, ownerEmail, businessType, servicesOffered, servicesNotOffered, emergencyAvailable, emergencyEscalationPhone, aiPromisePolicy, serviceArea, majorIssueExamples, businessHours, timeZone, privacyAccepted, termsAccepted, serviceAgreementAccepted]
+    BusinessOnboardingInput:
+      type: object
+      properties:
+        chosenPlan: { type: string, enum: [startup, starter, professional, managed] }
+        startupAgeMonths: { type: integer, minimum: 0, maximum: 17 }
+        businessHours: { type: string, maxLength: 500 }
+        timeZone: { type: string, maxLength: 100 }
+        isSample: { type: boolean }
+        businessName: { type: string, minLength: 1 }
+        agentName: { type: string, maxLength: 40 }
+        businessType: { type: string, minLength: 1 }
+        servicesOffered: { type: string, minLength: 1, maxLength: 500 }
+        servicesNotOffered: { type: string, minLength: 1, maxLength: 500 }
+        businessWebsiteUrl: { type: string, maxLength: 2048 }
+        ownerEmail: { type: string, format: email }
+        serviceArea: { type: string, minLength: 1 }
+        personalityToneDescription: { type: string }
+        otherPolicies: { type: string, maxLength: 4000 }
+        majorIssueExamples: { type: string, minLength: 1 }
+        pricingPolicy: { type: string }
+        financingPolicy: { type: string }
+        brandsWorkedWith: { type: string }
+        responseTimeCommitment: { type: string }
+        warrantyInfo: { type: string }
+        maintenancePlanOfferings: { type: string }
+        credentials: { type: string }
+        ownerAvailability: { type: string }
+        emergencyContactInfo: { type: string }
+        emergencyAvailable: { type: boolean }
+        emergencyEscalationPhone: { type: [string, "null"], maxLength: 16 }
+        aiPromisePolicy: { type: string, enum: [callback_only, appointment_windows] }
+        ownerPhone: { type: [string, "null"], maxLength: 16 }
+        smsAlertsConsent: { type: boolean }
+        websiteScrapePreviewed: { type: boolean }
+        websiteSuggestionsReviewed: { type: boolean }
+        websitePreviewAttempted: { type: boolean }
+        servicesOfferedDeferred: { type: boolean }
+        privacyAccepted: { type: boolean, enum: [true] }
+        termsAccepted: { type: boolean, enum: [true] }
+        serviceAgreementAccepted: { type: boolean, enum: [true] }
+      required: [chosenPlan, businessName, ownerEmail, businessType, servicesOffered, servicesNotOffered, emergencyAvailable, emergencyEscalationPhone, aiPromisePolicy, serviceArea, majorIssueExamples, privacyAccepted, termsAccepted, serviceAgreementAccepted]
     NativeBusinessSetupResult:
       type: object
       additionalProperties: false
@@ -1552,7 +1619,8 @@ components:
       properties:
         enabled: {type: boolean}
         mode: {type: string, enum: [off, test, live]}
-      required: [enabled, mode]
+        smsAvailable: {type: boolean}
+      required: [enabled, mode, smsAvailable]
     BillingReadiness:
       type: object
       properties:
@@ -2678,6 +2746,8 @@ components:
         agreementsAcceptedAt:
           type: [string, "null"]
           format: date-time
+        agreementsAcceptedVersion:
+          type: [string, "null"]
         hasNoLeads:
           type: boolean
         hasUncontactedOver24Hours:
@@ -2705,6 +2775,7 @@ components:
         - pushEnabledDeviceCount
         - pushPlatforms
         - agreementsAcceptedAt
+        - agreementsAcceptedVersion
         - hasNoLeads
         - hasUncontactedOver24Hours
         - oldestUncontactedAt
@@ -2764,6 +2835,8 @@ components:
         agreementsAcceptedAt:
           type: [string, "null"]
           format: date-time
+        agreementsAcceptedVersion:
+          type: [string, "null"]
       required:
         - businessName
         - agentName
@@ -2786,6 +2859,7 @@ components:
         - websiteEnrichmentAttemptedAt
         - websiteEnrichmentSources
         - agreementsAcceptedAt
+        - agreementsAcceptedVersion
     AdminLeadActivity:
       type: object
       properties:

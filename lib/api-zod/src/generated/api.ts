@@ -446,6 +446,79 @@ export const PreviewBusinessWebsiteResponse = zod.object({
 
 
 /**
+ * @summary Save a business setup after required details and agreements are accepted
+ */
+export const onboardBusinessBodyStartupAgeMonthsMin = 0;
+export const onboardBusinessBodyStartupAgeMonthsMax = 17;
+
+export const onboardBusinessBodyBusinessHoursMax = 500;
+
+export const onboardBusinessBodyTimeZoneMax = 100;
+
+
+export const onboardBusinessBodyAgentNameMax = 40;
+
+
+export const onboardBusinessBodyServicesOfferedMax = 500;
+
+export const onboardBusinessBodyServicesNotOfferedMax = 500;
+
+export const onboardBusinessBodyBusinessWebsiteUrlMax = 2048;
+
+
+export const onboardBusinessBodyOtherPoliciesMax = 4000;
+
+
+export const onboardBusinessBodyEmergencyEscalationPhoneMax = 16;
+
+export const onboardBusinessBodyOwnerPhoneMax = 16;
+
+
+
+export const OnboardBusinessBody = zod.object({
+  "chosenPlan": zod.enum(['startup', 'starter', 'professional', 'managed']),
+  "startupAgeMonths": zod.int().min(onboardBusinessBodyStartupAgeMonthsMin).max(onboardBusinessBodyStartupAgeMonthsMax).optional(),
+  "businessHours": zod.string().max(onboardBusinessBodyBusinessHoursMax).optional(),
+  "timeZone": zod.string().max(onboardBusinessBodyTimeZoneMax).optional(),
+  "isSample": zod.boolean().optional(),
+  "businessName": zod.string().min(1),
+  "agentName": zod.string().max(onboardBusinessBodyAgentNameMax).optional(),
+  "businessType": zod.string().min(1),
+  "servicesOffered": zod.string().min(1).max(onboardBusinessBodyServicesOfferedMax),
+  "servicesNotOffered": zod.string().min(1).max(onboardBusinessBodyServicesNotOfferedMax),
+  "businessWebsiteUrl": zod.string().max(onboardBusinessBodyBusinessWebsiteUrlMax).optional(),
+  "ownerEmail": zod.email(),
+  "serviceArea": zod.string().min(1),
+  "personalityToneDescription": zod.string().optional(),
+  "otherPolicies": zod.string().max(onboardBusinessBodyOtherPoliciesMax).optional(),
+  "majorIssueExamples": zod.string().min(1),
+  "pricingPolicy": zod.string().optional(),
+  "financingPolicy": zod.string().optional(),
+  "brandsWorkedWith": zod.string().optional(),
+  "responseTimeCommitment": zod.string().optional(),
+  "warrantyInfo": zod.string().optional(),
+  "maintenancePlanOfferings": zod.string().optional(),
+  "credentials": zod.string().optional(),
+  "ownerAvailability": zod.string().optional(),
+  "emergencyContactInfo": zod.string().optional(),
+  "emergencyAvailable": zod.boolean(),
+  "emergencyEscalationPhone": zod.string().max(onboardBusinessBodyEmergencyEscalationPhoneMax).nullable(),
+  "aiPromisePolicy": zod.enum(['callback_only', 'appointment_windows']),
+  "ownerPhone": zod.string().max(onboardBusinessBodyOwnerPhoneMax).nullish(),
+  "smsAlertsConsent": zod.boolean().optional(),
+  "websiteScrapePreviewed": zod.boolean().optional(),
+  "websiteSuggestionsReviewed": zod.boolean().optional(),
+  "websitePreviewAttempted": zod.boolean().optional(),
+  "servicesOfferedDeferred": zod.boolean().optional(),
+  "privacyAccepted": zod.literal(true),
+  "termsAccepted": zod.literal(true),
+  "serviceAgreementAccepted": zod.literal(true)
+})
+
+export const OnboardBusinessResponse = zod.unknown()
+
+
+/**
  * @summary Check whether native business setup has already been received
  */
 export const GetNativeBusinessSetupStatusResponse = zod.object({
@@ -1017,6 +1090,7 @@ export const GetAdminOverviewResponse = zod.object({
   "pushEnabledDeviceCount": zod.number().multipleOf(getAdminOverviewResponseBusinessesItemPushEnabledDeviceCountMultipleOf),
   "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
   "agreementsAcceptedAt": zod.coerce.date().nullable(),
+  "agreementsAcceptedVersion": zod.string().nullable(),
   "hasNoLeads": zod.boolean(),
   "hasUncontactedOver24Hours": zod.boolean(),
   "oldestUncontactedAt": zod.coerce.date().nullable()
@@ -1243,6 +1317,7 @@ export const GetAdminBusinessResponse = zod.object({
   "pushEnabledDeviceCount": zod.number().multipleOf(getAdminBusinessResponseBusinessPushEnabledDeviceCountMultipleOf),
   "pushPlatforms": zod.array(zod.enum(['ios', 'android'])),
   "agreementsAcceptedAt": zod.coerce.date().nullable(),
+  "agreementsAcceptedVersion": zod.string().nullable(),
   "hasNoLeads": zod.boolean(),
   "hasUncontactedOver24Hours": zod.boolean(),
   "oldestUncontactedAt": zod.coerce.date().nullable()
@@ -1276,7 +1351,8 @@ export const GetAdminBusinessResponse = zod.object({
   "businessWebsiteUrl": zod.string().nullable(),
   "websiteEnrichmentAttemptedAt": zod.coerce.date().nullable(),
   "websiteEnrichmentSources": zod.record(zod.string(), zod.string()),
-  "agreementsAcceptedAt": zod.coerce.date().nullable()
+  "agreementsAcceptedAt": zod.coerce.date().nullable(),
+  "agreementsAcceptedVersion": zod.string().nullable()
 }),
   "leads": zod.array(zod.object({
   "id": zod.number().multipleOf(getAdminBusinessResponseLeadsItemIdMultipleOf),
@@ -1635,7 +1711,8 @@ export const RetryAdminLeadEmailsResponse = zod.object({
 
 export const GetBillingAvailabilityResponse = zod.object({
   "enabled": zod.boolean(),
-  "mode": zod.enum(['off', 'test', 'live'])
+  "mode": zod.enum(['off', 'test', 'live']),
+  "smsAvailable": zod.boolean()
 })
 
 
