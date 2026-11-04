@@ -31,3 +31,4 @@
 - [SMS alert consent boundary](sms-alert-consent.md) — owner-only consent; keep sends off until A2P approval, required Twilio secrets, and signed HTTPS webhooks are ready.
 - [Browser push configuration](browser-push-configuration.md) — require explicit VAPID public/private keys and subject; admin readiness reports status without values.
 - [Owner lead status compatibility](owner-lead-status-compat.md) — keep precise detail statuses while preserving pending/contacted list behavior and legacy rows.
+- [Ongoing audits](ongoing-audits.md) — keep auditing Corvlio and fixing issues discovered during project work.

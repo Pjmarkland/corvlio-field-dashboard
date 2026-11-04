@@ -65,6 +65,7 @@ export async function seedReviewerDemo(client, emailInput, clerkUserId, now = ne
       const prefix = `${CALL_PREFIX}${business.id}:%`;
       const unsafe = await client.query(`
         SELECT EXISTS(SELECT 1 FROM retell_call_records WHERE business_id = $1)
+          OR EXISTS(SELECT 1 FROM retell_pending_calls WHERE business_id = $1)
           OR EXISTS(SELECT 1 FROM owner_demo_calls WHERE business_id = $1)
           OR EXISTS(SELECT 1 FROM leads WHERE business_id = $1 AND
             (retell_call_id IS NULL OR retell_call_id NOT LIKE $2
