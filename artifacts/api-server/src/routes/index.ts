@@ -17,9 +17,12 @@ import ownerSmsRouter from "./ownerSms";
 import pendingReleasesRouter from "./pendingReleases";
 import invoicingRouter from "./invoicing";
 import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 router.use(healthRouter);
+// This guard runs before all route groups so no /api/admin path can bypass it.
+router.use("/admin", requireAdmin);
 router.use(accountDeletionGuard);
 router.use(accountRouter);
 router.use(ownerSmsRouter);
@@ -38,5 +41,8 @@ router.use(welcomeRouter);
 router.use(ownerDemoRouter);
 router.use(leadAlertsRouter);
 router.use(webPushRouter);
+router.use("/admin", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
 
 export default router;

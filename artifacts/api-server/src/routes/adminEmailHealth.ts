@@ -7,6 +7,7 @@ import { getEmailHealth, retryFailedLeadEmails } from "../lib/emailHealth";
 import { emailDiagnosis } from "../lib/emailDiagnostics";
 import { sendAdminTestEmail } from "../lib/gmail";
 import { recordOperationalFailure } from "../lib/operationalFailures";
+import { redactSensitiveText } from "../lib/privacyRedaction";
 
 const router=Router();
 router.use("/admin/email-health",requireAdmin,(_req,res,next)=>{
@@ -48,7 +49,7 @@ router.post("/admin/email-health/test",async(req,res)=>{
       {success:false,...emailDiagnosis(existing.error??"Previous test failed.")});return;}
     let failure:string|null=null;
     try {await sendAdminTestEmail(email.emailAddress);}
-    catch(e){failure=emailDiagnosis(e instanceof Error?e.message:"Test email failed.").error;}
+    catch(e){failure=redactSensitiveText(emailDiagnosis(e instanceof Error?e.message:"Test email failed.").error);}
     await pool.query("UPDATE email_health_attempts SET status=$2,error=$3,finished_at=now() WHERE id=$1",
       [body.data.requestId,failure?"failed":"sent",failure]);
     if(failure){

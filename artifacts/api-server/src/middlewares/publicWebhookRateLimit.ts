@@ -1,63 +1,52 @@
 import type { RequestHandler } from "express";
+import {
+  consumeRateLimitBucket,
+  hashRateLimitIdentity,
+  requestIp,
+  setRateLimitHeaders,
+  type RateLimitConsumer,
+} from "./requestRateLimit";
 
 type RateLimitOptions = {
   windowMs?: number;
   maxRequests?: number;
-  maxKeys?: number;
   now?: () => number;
-};
-
-type WindowCounter = {
-  count: number;
-  resetAt: number;
+  consume?: RateLimitConsumer;
 };
 
 export function createPublicWebhookRateLimiter({
   windowMs = 60_000,
   maxRequests = 120,
-  maxKeys = 10_000,
   now = Date.now,
+  consume = consumeRateLimitBucket,
 }: RateLimitOptions = {}): RequestHandler {
-  const counters = new Map<string, WindowCounter>();
-  let callsSinceCleanup = 0;
-
-  return (req, res, next) => {
-    const currentTime = now();
+  return async (req, res, next): Promise<void> => {
     const requestPath = `${req.baseUrl}${req.path}`.split("?")[0];
-    const key = `${req.ip || req.socket.remoteAddress || "unknown"}:${requestPath}`;
-    let counter = counters.get(key);
+    const identity = `${requestIp(req)}:${requestPath}`;
+    try {
+      const result = await consume(
+        `webhook:${hashRateLimitIdentity(identity)}`,
+        windowMs,
+        now(),
+      );
+      setRateLimitHeaders(res, maxRequests, result);
 
-    if (!counter || counter.resetAt <= currentTime) {
-      counter = { count: 0, resetAt: currentTime + windowMs };
-      counters.delete(key);
-      counters.set(key, counter);
-    }
-
-    counter.count += 1;
-    callsSinceCleanup += 1;
-    if (callsSinceCleanup >= 256 || counters.size > maxKeys) {
-      callsSinceCleanup = 0;
-      for (const [candidateKey, candidate] of counters) {
-        if (candidate.resetAt <= currentTime) counters.delete(candidateKey);
+      if (result.count > maxRequests) {
+        res.setHeader(
+          "Retry-After",
+          String(Math.max(1, Math.ceil((result.resetAt.getTime() - now()) / 1000))),
+        );
+        res.status(429).json({ error: "Too many webhook requests" });
+        return;
       }
-      while (counters.size > maxKeys) {
-        const oldestKey = counters.keys().next().value;
-        if (oldestKey === undefined) break;
-        counters.delete(oldestKey);
-      }
+      next();
+    } catch (error) {
+      req.log.error(
+        { errorName: error instanceof Error ? error.name : "UnknownError" },
+        "Webhook rate limit could not be checked",
+      );
+      res.status(503).json({ error: "Webhook could not be processed securely" });
     }
-
-    const remaining = Math.max(0, maxRequests - counter.count);
-    res.setHeader("RateLimit-Limit", String(maxRequests));
-    res.setHeader("RateLimit-Remaining", String(remaining));
-    res.setHeader("RateLimit-Reset", String(Math.ceil(counter.resetAt / 1000)));
-
-    if (counter.count > maxRequests) {
-      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((counter.resetAt - currentTime) / 1000))));
-      res.status(429).json({ error: "Too many webhook requests" });
-      return;
-    }
-    next();
   };
 }
 

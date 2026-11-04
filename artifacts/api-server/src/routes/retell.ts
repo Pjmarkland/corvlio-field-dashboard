@@ -28,6 +28,13 @@ import {
   recordRetellSystemAlert,
   recordRetellWebhookSuccess,
 } from "../lib/retellSystemAlerts";
+import {
+  claimRetellWebhookEvent,
+  completeRetellWebhookEvent,
+  markRetellWebhookEventFailed,
+  type RetellEventType,
+} from "../lib/retellWebhookEventStore";
+import { maskPhoneNumber, redactSensitiveText } from "../lib/privacyRedaction";
 
 const router: IRouter = Router();
 const RETELL_API_KEY_ENV = "RETELL_API_KEY";
@@ -368,19 +375,35 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     return;
   }
 
+  const eventType = body.data.event as RetellEventType;
+  const retellCallId = providerCallId
+    ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
+  let eventClaimed = false;
+  const completeClaimedEvent = async () => {
+    if (!eventClaimed) return;
+    await completeRetellWebhookEvent(retellCallId, eventType);
+    eventClaimed = false;
+  };
   let processingBusiness: { id: number; businessName: string } | null = null;
   try {
+    const claimed = await claimRetellWebhookEvent(retellCallId, eventType);
+    if (!claimed) {
+      void recordRetellWebhookSuccess("post-call");
+      res.sendStatus(204);
+      return;
+    }
+    eventClaimed = true;
+
     const business = await findBusinessByPhoneNumber(phoneNumber);
     processingBusiness = business
       ? { id: business.id, businessName: business.businessName }
       : null;
-    const retellCallId = providerCallId
-      ?? `legacy-${createHash("sha256").update(JSON.stringify(call)).digest("hex")}`;
     const startedAt = callStartedAt(call.start_timestamp);
     const occurredAt = startedAt ?? new Date();
 
     if (!business) {
       if (pendingCallEnded) {
+        await completeClaimedEvent();
         void recordRetellWebhookSuccess("post-call");
         res.sendStatus(204);
         return;
@@ -390,7 +413,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       await recordPostCallFailure(req, {
         eventKey,
         summary: isBlankCall(call) ? "Blank or failed call" : "Retell post-call webhook for unmatched number",
-        details: `Called number: ${phoneNumber}; call time: ${occurredAt.toISOString()}; duration: ${durationText}; business: unmatched number.`,
+        details: `Called number: ${maskPhoneNumber(phoneNumber)}; call time: ${occurredAt.toISOString()}; duration: ${durationText}; business: unmatched number.`,
         systemAlert: {
           issueKey: retellPhoneIssueKey("post-call-unmatched-business", phoneNumber),
           category: "unmatched_business",
@@ -404,6 +427,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           deepLink: "/dashboard",
         },
       });
+      await completeClaimedEvent();
       res.sendStatus(204);
       return;
     }
@@ -416,6 +440,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         callStartedAt: occurredAt,
         durationMs,
       });
+      await completeClaimedEvent();
       void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
@@ -437,7 +462,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
         durationMs,
       });
       if (recorded.inserted) {
-        const details = `Called number: ${phoneNumber}; call time: ${occurredAt.toISOString()}; duration: ${durationMs === null ? "unknown" : `${Math.round(durationMs / 1000)} sec`}; status: ${call.status?.trim() || "unknown"}.`;
+        const details = `Called number: ${maskPhoneNumber(phoneNumber)}; call time: ${occurredAt.toISOString()}; duration: ${durationMs === null ? "unknown" : `${Math.round(durationMs / 1000)} sec`}; status: ${call.status?.trim() || "unknown"}.`;
         await recordPostCallFailure(req, {
           eventKey: `retell-blank:${retellCallId}`,
           summary: "Blank or failed call",
@@ -452,7 +477,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           await recordPostCallFailure(req, {
             eventKey,
             summary: "Three consecutive blank or failed calls",
-            details: `Business: ${business.businessName}; latest called number: ${phoneNumber}; latest call time: ${occurredAt.toISOString()}.`,
+            details: `Business: ${business.businessName}; latest called number: ${maskPhoneNumber(phoneNumber)}; latest call time: ${occurredAt.toISOString()}.`,
             businessId: business.id,
             businessName: business.businessName,
             founderPush: {
@@ -464,6 +489,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
           });
         }
       }
+      await completeClaimedEvent();
       void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
@@ -471,6 +497,7 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
 
     if (body.data.event === "call_ended" && !call.call_id) {
       req.log.warn("Call-ended webhook missing call ID; waiting for analyzed event to avoid duplicate legacy leads");
+      await completeClaimedEvent();
       void recordRetellWebhookSuccess("post-call");
       res.sendStatus(204);
       return;
@@ -508,10 +535,16 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
     });
     }
 
+    await completeClaimedEvent();
     void recordRetellWebhookSuccess("post-call");
     res.sendStatus(204);
   } catch (error) {
-    const details = error instanceof Error ? error.message : "Unknown Retell post-call processing error";
+    if (eventClaimed) {
+      await markRetellWebhookEventFailed(retellCallId, eventType).catch(() => undefined);
+    }
+    const details = redactSensitiveText(
+      error instanceof Error ? error.message : "Unknown Retell post-call processing error",
+    );
     req.log.error(
       databaseErrorFields(error),
       "Retell post-call processing failed",

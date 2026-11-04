@@ -3,15 +3,26 @@ import { Router } from "express";
 import { DeleteMyAccountBody } from "@workspace/api-zod";
 import { AccountDeletionError, deleteAccount, accountDeletionEligibility } from "../lib/accountDeletion";
 import { destructiveOriginAllowed } from "../middlewares/destructiveOrigin";
+import { createUserRateLimit } from "../middlewares/requestRateLimit";
 const router = Router();
-router.get("/account/deletion-eligibility",async(req,res)=>{
+const accountDeletionRateLimit = createUserRateLimit({
+  bucket: "account-deletion",
+  windowMs: 60 * 60_000,
+  maxRequests: 3,
+});
+const accountEligibilityRateLimit = createUserRateLimit({
+  bucket: "account-deletion-eligibility",
+  windowMs: 60_000,
+  maxRequests: 30,
+});
+router.get("/account/deletion-eligibility",accountEligibilityRateLimit,async(req,res)=>{
   res.set("Cache-Control","private, no-store");
   const {userId}=getAuth(req);
   if(!userId){res.sendStatus(401);return;}
   try {res.json(await accountDeletionEligibility(userId));}
   catch {res.status(503).json({error:"Account protection could not be checked. Please retry before deleting."});}
 });
-router.delete("/account/me", async (req, res) => {
+router.delete("/account/me", accountDeletionRateLimit, async (req, res) => {
   res.set("Cache-Control", "private, no-store");
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }

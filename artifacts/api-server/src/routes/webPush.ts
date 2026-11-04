@@ -14,8 +14,14 @@ import {
   revokeWebPushSubscription,
   WebPushConfigurationError,
 } from "../lib/webPushService";
+import { createUserRateLimit } from "../middlewares/requestRateLimit";
 
 const router = Router();
+const webPushSubscriptionRateLimit = createUserRateLimit({
+  bucket: "web-push-subscriptions",
+  windowMs: 60_000,
+  maxRequests: 30,
+});
 
 function isHttpsEndpoint(endpoint: string): boolean {
   try {
@@ -58,7 +64,7 @@ router.get("/web-push/config", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/web-push-subscriptions", async (req, res): Promise<void> => {
+router.post("/web-push-subscriptions", webPushSubscriptionRateLimit, async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
@@ -96,7 +102,7 @@ router.post("/web-push-subscriptions", async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/web-push-subscriptions", async (req, res): Promise<void> => {
+router.delete("/web-push-subscriptions", webPushSubscriptionRateLimit, async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import {
   getGetBusinessProfileQueryKey,
@@ -56,21 +56,12 @@ import NativeBusinessSetupGate from '@/components/NativeBusinessSetupGate';
 import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
-import AdminOverviewPage from '@/pages/admin/AdminOverviewPage';
 import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/AccountDeletionPanel';
 import NativeBillingSection from '@/components/NativeBillingSection';
 import NativeBillingPage from '@/pages/NativeBillingPage';
-import AdminActivityPage from '@/pages/admin/AdminActivityPage';
-import AdminSystemAlertsPage from '@/pages/admin/AdminSystemAlertsPage';
-import AdminHealthCheckPage from '@/pages/admin/AdminHealthCheckPage';
 import BillingPage from '@/pages/billing';
-import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage';
 import OwnerInvoicePanel from '@/components/OwnerInvoicePanel';
-import AdminBillingPage from '@/pages/admin/AdminBillingPage';
-import AdminSmsPage from '@/pages/admin/AdminSmsPage';
 import { useBillingAvailability } from '@/hooks/useBilling';
-import AdminBusinessPage from '@/pages/admin/AdminBusinessPage';
-import AdminFallbackPhoneSettingsPage from '@/pages/admin/AdminFallbackPhoneSettingsPage';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -129,6 +120,15 @@ const EMPTY_LEAD_SUMMARY: LeadWorkspace['summary'] = {
 
 const queryClient = new QueryClient();
 const SETTINGS_KEY = 'corvlio-settings-v1';
+const AdminOverviewPage = lazy(() => import('@/pages/admin/AdminOverviewPage'));
+const AdminActivityPage = lazy(() => import('@/pages/admin/AdminActivityPage'));
+const AdminSystemAlertsPage = lazy(() => import('@/pages/admin/AdminSystemAlertsPage'));
+const AdminHealthCheckPage = lazy(() => import('@/pages/admin/AdminHealthCheckPage'));
+const AdminInvoicesPage = lazy(() => import('@/pages/admin/AdminInvoicesPage'));
+const AdminBillingPage = lazy(() => import('@/pages/admin/AdminBillingPage'));
+const AdminSmsPage = lazy(() => import('@/pages/admin/AdminSmsPage'));
+const AdminBusinessPage = lazy(() => import('@/pages/admin/AdminBusinessPage'));
+const AdminFallbackPhoneSettingsPage = lazy(() => import('@/pages/admin/AdminFallbackPhoneSettingsPage'));
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -1000,13 +1000,9 @@ function AuthenticatedRouter() {
   return <><Show when="signed-in"><LeadDataRouter /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
 }
 
-function AdminNativeHidden() {
-  return <div className="grid min-h-[100dvh] place-items-center bg-background px-6 text-center"><div className="max-w-sm"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-muted text-muted-foreground"><ShieldCheck size={24} /></div><h1 className="text-2xl font-800">Founder console unavailable</h1><p className="mt-2 text-sm leading-relaxed text-muted-foreground">This internal view is available in the web console only.</p></div></div>;
-}
-
-function AdminGuard({ children }: { children: ReactNode }) {
-  if (Capacitor.isNativePlatform()) return <AdminNativeHidden />;
-  return children;
+export function AdminGuard({ children }: { children: ReactNode }) {
+  if (!useAdminAccess({ forceRefresh: true })) return <NotFound />;
+  return <Suspense fallback={<NotFound />}>{children}</Suspense>;
 }
 
 function AdminOverviewRoute() {

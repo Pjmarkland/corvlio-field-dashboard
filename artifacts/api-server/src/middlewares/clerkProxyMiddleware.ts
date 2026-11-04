@@ -35,6 +35,14 @@ const NATIVE_APP_ORIGINS = new Set([
 ]);
 const DEFAULT_ALLOW_METHODS = 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOW_HEADERS = 'Content-Type, Authorization, X-Native-Clerk-Client';
+const MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH = 4096;
+const NATIVE_CLERK_CLIENT_COOKIE_PATTERN = /^[A-Za-z0-9._~%-]+$/;
+
+export function isValidNativeClerkClientCookie(value: string): boolean {
+  return value.length > 0
+    && value.length <= MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH
+    && NATIVE_CLERK_CLIENT_COOKIE_PATTERN.test(value);
+}
 
 function getNativeAppOrigin(origin: string | string[] | undefined): string | undefined {
   return typeof origin === 'string' && NATIVE_APP_ORIGINS.has(origin)
@@ -98,7 +106,13 @@ function getNativeClientCookieValue(
       return false;
     });
 
-    clientValue = value === '' || isExpired ? '' : value;
+    if (value === '' || isExpired) {
+      clientValue = '';
+    } else if (isValidNativeClerkClientCookie(value)) {
+      clientValue = value;
+    } else {
+      clientValue = '';
+    }
   }
 
   return clientValue;

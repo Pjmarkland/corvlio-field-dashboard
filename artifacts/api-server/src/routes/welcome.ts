@@ -4,9 +4,15 @@ import { ClaimWelcomeResponse } from "@workspace/api-zod";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { provisioningStore } from "../lib/provisioningStore";
 import { claimNewUserWelcome } from "../lib/welcomePolicy";
+import { createUserRateLimit } from "../middlewares/requestRateLimit";
 
 const router = Router();
-router.post("/user/welcome", async (req, res) => {
+const welcomeRateLimit = createUserRateLimit({
+  bucket: "user-welcome",
+  windowMs: 60_000,
+  maxRequests: 10,
+});
+router.post("/user/welcome", welcomeRateLimit, async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Vary", "Cookie");
   const { userId } = getAuth(req);

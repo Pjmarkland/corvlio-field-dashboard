@@ -30,8 +30,24 @@ import { recordOperationalFailure } from "../lib/operationalFailures";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { initializeInvoices } from "../invoicing/service";
 import { runInvoiceCycle } from "../invoicing/worker";
+import { createUserRateLimit } from "../middlewares/requestRateLimit";
 
 const router: IRouter = Router();
+const businessProfileWriteRateLimit = createUserRateLimit({
+  bucket: "business-profile-write",
+  windowMs: 60_000,
+  maxRequests: 30,
+});
+const websitePreviewRateLimit = createUserRateLimit({
+  bucket: "website-preview",
+  windowMs: 60_000,
+  maxRequests: 5,
+});
+const businessOnboardingRateLimit = createUserRateLimit({
+  bucket: "business-onboarding",
+  windowMs: 60 * 60_000,
+  maxRequests: 10,
+});
 // Shared version for the Privacy Policy, Terms of Service, and Client Service Agreement; bump when any changes.
 const CURRENT_AGREEMENT_VERSION = "v1";
 const ONBOARDING_TRIMMED_FIELDS = [
@@ -293,7 +309,7 @@ router.get("/businesses/me/monthly-report", async (req, res): Promise<void> => {
   }
 });
 
-router.patch("/businesses/me", async (req, res): Promise<void> => {
+router.patch("/businesses/me", businessProfileWriteRateLimit, async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   setPrivateOwnerResponseHeaders(res);
   if (!userId) {
@@ -426,25 +442,17 @@ router.patch("/businesses/me", async (req, res): Promise<void> => {
 });
 
 const activeWebsitePreviews = new Set<string>();
-const websitePreviewAttempts = new Map<string, { count: number; expiresAt: number }>();
 
-router.post("/businesses/onboarding/website-preview", async (req, res): Promise<void> => {
+router.post("/businesses/onboarding/website-preview", websitePreviewRateLimit, async (req, res): Promise<void> => {
   setPrivateOwnerResponseHeaders(res);
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
   const body = PreviewBusinessWebsiteBody.strict().safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Enter a valid public business website URL." }); return; }
-  const now = Date.now();
-  for (const [key, attempt] of websitePreviewAttempts) {
-    if (attempt.expiresAt <= now) websitePreviewAttempts.delete(key);
-  }
-  const attempt = websitePreviewAttempts.get(userId) ?? { count: 0, expiresAt: now + 60_000 };
-  if (activeWebsitePreviews.has(userId) || attempt.count >= 5) {
+  if (activeWebsitePreviews.has(userId)) {
     res.status(429).json({ error: "Please wait a moment before reading the website again." });
     return;
   }
-  attempt.count += 1;
-  websitePreviewAttempts.set(userId, attempt);
   activeWebsitePreviews.add(userId);
   try {
     const url = normalizeWebsiteUrl(body.data.websiteUrl);
@@ -489,7 +497,7 @@ router.get("/businesses/native-onboard/status", async (req, res): Promise<void> 
   }
 });
 
-router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
+router.post("/businesses/native-onboard", businessOnboardingRateLimit, async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
@@ -625,7 +633,7 @@ router.post("/businesses/native-onboard", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/businesses/onboard", async (req, res): Promise<void> => {
+router.post("/businesses/onboard", businessOnboardingRateLimit, async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });

@@ -10,6 +10,7 @@ import { retellMalformedJsonAlertHandler } from "./lib/retellWebhookAlerts";
 import { billingWebhook } from "./billing/webhook";
 import { corsOptions, rejectUnexpectedOrigin } from "./lib/corsPolicy";
 import { publicWebhookRateLimit } from "./middlewares/publicWebhookRateLimit";
+import { apiSecurityHeaders } from "./middlewares/securityHeaders";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -19,6 +20,7 @@ import { captureWebhookRawBody, createRetellWebhookJsonParser } from "./middlewa
 
 const app: Express = express();
 app.set("trust proxy", 1);
+app.use(apiSecurityHeaders);
 // Stripe must receive its unmodified Buffer before the global JSON parser.
 app.post("/api/billing/webhook", publicWebhookRateLimit, express.raw({ type: "application/json" }), billingWebhook);
 // Raw bytes are mandatory for Clerk/Svix signature verification; before JSON/auth.

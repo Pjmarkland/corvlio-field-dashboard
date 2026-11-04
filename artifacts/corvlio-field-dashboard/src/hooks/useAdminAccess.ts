@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { getGetAdminOverviewQueryKey, useGetAdminOverview } from '@workspace/api-client-react';
 
 /** Use the same server-side allowlist/verified-email gate as the admin pages. */
-export function useAdminAccess() {
+export function useAdminAccess(options: { forceRefresh?: boolean } = {}) {
   const { user, isSignedIn } = useUser();
   const enabled = Boolean(isSignedIn && user?.id) && !Capacitor.isNativePlatform();
   const query = useGetAdminOverview({ query: {
@@ -11,6 +11,8 @@ export function useAdminAccess() {
     enabled,
     retry: false,
     staleTime: 60_000,
+    refetchOnMount: options.forceRefresh ? 'always' : false,
   } });
-  return enabled && query.isSuccess && !query.isError;
+  return enabled && query.isSuccess && !query.isError
+    && (!options.forceRefresh || !query.isFetching);
 }
