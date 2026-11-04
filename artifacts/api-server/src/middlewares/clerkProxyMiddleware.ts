@@ -58,17 +58,25 @@ function mergeNativeClientCookie(
   existingCookie: string | undefined,
   clientValue: string,
 ): string {
-  const cookies = (existingCookie ?? '')
+  const cookies = stripNativeClientCookie(existingCookie)
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter(Boolean);
+
+  cookies.push(`__client=${clientValue}`);
+  return cookies.join('; ');
+}
+
+function stripNativeClientCookie(existingCookie: string | undefined): string {
+  return (existingCookie ?? '')
     .split(';')
     .map((cookie) => cookie.trim())
     .filter(Boolean)
     .filter((cookie) => {
       const separator = cookie.indexOf('=');
       return cookie.slice(0, separator < 0 ? undefined : separator).trim() !== '__client';
-    });
-
-  cookies.push(`__client=${clientValue}`);
-  return cookies.join('; ');
+    })
+    .join('; ');
 }
 
 function getNativeClientCookieValue(
@@ -239,20 +247,27 @@ export function clerkProxyMiddleware(): RequestHandler {
           if (req.headers.authorization !== undefined) {
             proxyReq.setHeader('Authorization', req.headers.authorization);
           }
+          const incomingCookie = Array.isArray(req.headers.cookie)
+            ? req.headers.cookie.join('; ')
+            : req.headers.cookie;
           const nativeClientValue = firstHeaderValue(
             req.headers['x-native-clerk-client'],
           )?.trim();
-          if (nativeClientValue) {
-            const incomingCookie = Array.isArray(req.headers.cookie)
-              ? req.headers.cookie.join('; ')
-              : req.headers.cookie;
+          if (nativeClientValue && isValidNativeClerkClientCookie(nativeClientValue)) {
             proxyReq.setHeader(
               'Cookie',
               mergeNativeClientCookie(incomingCookie, nativeClientValue),
             );
+          } else {
+            const filteredCookie = stripNativeClientCookie(incomingCookie);
+            if (filteredCookie) {
+              proxyReq.setHeader('Cookie', filteredCookie);
+            } else {
+              proxyReq.removeHeader('Cookie');
+            }
           }
-          proxyReq.removeHeader('X-Native-Clerk-Client');
         }
+        proxyReq.removeHeader('X-Native-Clerk-Client');
 
         const xff = req.headers['x-forwarded-for'];
         const clientIp =
@@ -330,6 +345,17 @@ export function clerkProxyMiddleware(): RequestHandler {
 
   return (req, res, next) => {
     const nativeOrigin = getNativeAppOrigin(req.headers.origin);
+    const nativeClientHeader = firstHeaderValue(
+      req.headers['x-native-clerk-client'],
+    );
+    if (
+      nativeOrigin
+      && nativeClientHeader !== undefined
+      && !isValidNativeClerkClientCookie(nativeClientHeader.trim())
+    ) {
+      res.status(400).json({ error: 'Invalid native Clerk client cookie' });
+      return;
+    }
     if (req.method === 'OPTIONS' && nativeOrigin) {
       const headers: OutgoingHttpHeaders = {};
       setNativeCorsHeaders(req, headers, nativeOrigin);

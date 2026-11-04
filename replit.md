@@ -47,6 +47,17 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 _Populate as you build — sharp edges, "always run X before Y" rules._
 
+## Security Rules
+
+- Keep `/api/admin/*` and `/admin` protected by server-side Clerk authorization. Non-admins receive the same generic 404 as unknown routes; client-side visibility is not authorization.
+- Admin access requires the signed-in user's primary verified Clerk email to match `ADMIN_EMAILS`. The owner must enable MFA on every admin account and ensure `ADMIN_EMAILS` contains each admin's verified primary email; never print or expose secret values.
+- Preserve Clerk's virtual routing and native cookie bridge behavior. Only allow the fixed native app origins, same-origin Clerk proxy paths, and length- and character-validated `__client` cookie values.
+- Retell webhooks must keep their existing compatibility rule: missing signatures remain accepted during rollout, while present invalid or stale signatures are rejected. Keep call/event deduplication and business scoping intact.
+- Do not log raw auth headers, cookies, Clerk tokens, caller names, transcripts, full phone numbers, or unfiltered provider/database errors. Mask phone/email text and prefer stable error names and allowlisted operational details.
+- Android app backups stay disabled in both the manifest and Android data-extraction rules.
+- Apply schema changes to the development database only with the documented DB push command. Do not apply RLS policies or change database roles without a separately approved rollout.
+- Keep the frontend CSP and other browser security headers in its deployment response-header configuration. Do not weaken the policy to fix an asset or auth issue without checking the specific required origin.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details

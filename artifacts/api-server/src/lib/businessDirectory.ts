@@ -6,6 +6,8 @@ import {
 } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { billingGate } from "../billing/policy";
+import { logger } from "./logger";
+import { maskPhoneNumber } from "./privacyRedaction";
 
 export const WEBSITE_ENRICHMENT_FIELDS = [
   "businessType",
@@ -45,7 +47,10 @@ export async function refreshBusinessPhoneCache(): Promise<void> {
         const normalizedPhoneNumber = normalizePhoneNumber(business.retellPhoneNumber);
         if (normalizedPhoneNumber) {
           if (nextBusinessesByPhone.has(normalizedPhoneNumber)) {
-            console.error("Duplicate business phone mapping", { normalizedPhoneNumber });
+            logger.error(
+              { phoneNumber: maskPhoneNumber(normalizedPhoneNumber) },
+              "Duplicate business phone mapping",
+            );
             throw new Error("Duplicate assigned phone number; refusing ambiguous business routing");
           }
           nextBusinessesByPhone.set(normalizedPhoneNumber, business);
@@ -69,7 +74,10 @@ export async function findBusinessByPhoneNumber(
     .where(sql`regexp_replace(${businessesTable.retellPhoneNumber}, '[^0-9]', '', 'g') = ${normalized}`)
     .limit(2);
   if (matches.length > 1) {
-    console.error("Duplicate business phone mapping", { normalizedPhoneNumber: normalized });
+    logger.error(
+      { phoneNumber: maskPhoneNumber(normalized) },
+      "Duplicate business phone mapping",
+    );
     throw new Error("Duplicate assigned phone number; refusing ambiguous business routing");
   }
   return matches[0];
@@ -85,7 +93,7 @@ export async function findBusinessByClerkUserId(
     .limit(2);
 
   if (matches.length > 1) {
-    throw new Error(`Clerk user is linked to multiple businesses: ${clerkUserId}`);
+    throw new Error("Clerk user is linked to multiple businesses");
   }
 
   return matches[0];

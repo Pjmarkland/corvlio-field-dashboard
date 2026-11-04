@@ -1,4 +1,6 @@
 import type { Business, NewBusiness } from "@workspace/db";
+import { logger } from "./logger";
+import { maskPhoneNumber } from "./privacyRedaction";
 
 export type Purchase = { phoneNumber: string; agentId: string };
 export type PurchaseAttempt = { purchasedNumber: string | null; status: string };
@@ -69,7 +71,10 @@ export async function guardedProvisioning(
     try {
       attempt = await store.attempt(account);
     } catch (error) {
-      console.error("Provisioning journal lookup failed; business remains pending", { businessId: business.id });
+      logger.error(
+        { businessId: business.id, errorName: error instanceof Error ? error.name : "UnknownError" },
+        "Provisioning journal lookup failed; business remains pending",
+      );
       return result(business, error);
     }
     if (attempt?.purchasedNumber) {
@@ -78,7 +83,13 @@ export async function guardedProvisioning(
         return result(await store.attach(business.id, account, attempt.purchasedNumber));
       } catch (error) {
         await store.state(business.id, "recovery").catch((stateError) => {
-          console.error("Could not record pending purchase recovery", { businessId: business.id, error: String(stateError) });
+          logger.error(
+            {
+              businessId: business.id,
+              errorName: stateError instanceof Error ? stateError.name : "UnknownError",
+            },
+            "Could not record pending purchase recovery",
+          );
         });
         return result({ ...business, provisioningState: "recovery" }, error);
       }
@@ -93,7 +104,10 @@ export async function guardedProvisioning(
         return result({ ...business, provisioningState: "capped" });
       }
     } catch (error) {
-      console.error("Provisioning budget reservation failed; no provider purchase attempted", { businessId: business.id });
+      logger.error(
+        { businessId: business.id, errorName: error instanceof Error ? error.name : "UnknownError" },
+        "Provisioning budget reservation failed; no provider purchase attempted",
+      );
       return result(business, error);
     }
 
@@ -102,7 +116,10 @@ export async function guardedProvisioning(
       await store.state(business.id, "purchasing");
       bought = await purchase(business.id);
       // Recovery evidence even if the database becomes unavailable at this exact point.
-      console.info("Retell number purchased", { businessId: business.id, phoneNumber: bought.phoneNumber });
+      logger.info(
+        { businessId: business.id, phoneNumber: maskPhoneNumber(bought.phoneNumber) },
+        "Retell number purchased",
+      );
       await store.purchased(account, bought);
       return result(await store.attach(business.id, account, bought.phoneNumber));
     } catch (error) {
@@ -110,9 +127,14 @@ export async function guardedProvisioning(
       try {
         await store.failure(account, business.id, reason, bought);
       } catch (journalError) {
-        console.error("Provisioning recovery journal unavailable; do not repurchase", {
-          businessId: business.id, purchasedNumber: bought?.phoneNumber, error: String(journalError),
-        });
+        logger.error(
+          {
+            businessId: business.id,
+            purchasedNumber: bought ? maskPhoneNumber(bought.phoneNumber) : undefined,
+            errorName: journalError instanceof Error ? journalError.name : "UnknownError",
+          },
+          "Provisioning recovery journal unavailable; do not repurchase",
+        );
       }
       return result({ ...business, provisioningState: bought ? "recovery" : "uncertain" }, error);
     }

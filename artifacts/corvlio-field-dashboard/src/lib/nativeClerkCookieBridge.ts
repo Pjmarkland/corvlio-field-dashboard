@@ -3,6 +3,25 @@ import { Capacitor } from '@capacitor/core';
 const NATIVE_CLERK_CLIENT_STORAGE_KEY = 'corvlio.clerkClient';
 const NATIVE_CLERK_CLIENT_HEADER = 'X-Native-Clerk-Client';
 const CLERK_PROXY_PATH_SEGMENT = '/api/__clerk';
+const MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH = 4096;
+const NATIVE_CLERK_CLIENT_COOKIE_PATTERN = /^[A-Za-z0-9._~%-]+$/;
+
+function isValidNativeClientValue(value: string): boolean {
+  return value.length > 0
+    && value.length <= MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH
+    && NATIVE_CLERK_CLIENT_COOKIE_PATTERN.test(value);
+}
+
+function isClerkProxyRequest(inputUrl: string): boolean {
+  try {
+    const url = new URL(inputUrl, window.location.href);
+    return url.origin === window.location.origin
+      && (url.pathname === CLERK_PROXY_PATH_SEGMENT
+        || url.pathname.startsWith(`${CLERK_PROXY_PATH_SEGMENT}/`));
+  } catch {
+    return false;
+  }
+}
 
 if (Capacitor.isNativePlatform()) {
   const originalFetch = window.fetch.bind(window);
@@ -18,14 +37,7 @@ if (Capacitor.isNativePlatform()) {
           ? input.href
           : input.url;
 
-    let path: string;
-    try {
-      path = new URL(inputUrl, window.location.href).pathname;
-    } catch {
-      return originalFetch(input, init);
-    }
-
-    if (!path.includes(CLERK_PROXY_PATH_SEGMENT)) {
+    if (!isClerkProxyRequest(inputUrl)) {
       return originalFetch(input, init);
     }
 
@@ -38,8 +50,10 @@ if (Capacitor.isNativePlatform()) {
       const clientValue = window.localStorage.getItem(
         NATIVE_CLERK_CLIENT_STORAGE_KEY,
       );
-      if (clientValue) {
+      if (clientValue && isValidNativeClientValue(clientValue)) {
         headers.set(NATIVE_CLERK_CLIENT_HEADER, clientValue);
+      } else if (clientValue !== null) {
+        window.localStorage.removeItem(NATIVE_CLERK_CLIENT_STORAGE_KEY);
       }
     } catch {
       // Storage can be unavailable in hardened WebView contexts.
@@ -49,7 +63,7 @@ if (Capacitor.isNativePlatform()) {
     const clientValue = response.headers.get(NATIVE_CLERK_CLIENT_HEADER);
     if (clientValue !== null) {
       try {
-        if (clientValue) {
+        if (isValidNativeClientValue(clientValue)) {
           window.localStorage.setItem(
             NATIVE_CLERK_CLIENT_STORAGE_KEY,
             clientValue,

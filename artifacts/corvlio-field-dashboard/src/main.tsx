@@ -59,8 +59,8 @@ if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator && import.meta
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
-  onCaughtError: (error, errorInfo) => {
-    console.error(error, errorInfo.componentStack);
+  onCaughtError: () => {
+    console.error("Unexpected dashboard render error");
   },
 }).render(
   <ErrorBoundary>
