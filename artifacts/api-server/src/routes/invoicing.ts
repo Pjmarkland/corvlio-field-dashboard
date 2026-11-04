@@ -9,6 +9,8 @@ import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { activateBusiness, approveStartup, assignBusinessPlan, InvoiceError, markInvoicePaid, ownerInvoiceOverview, paymentInstructions } from "../invoicing/service";
 import { validPaymentLink } from "../invoicing/policy";
 import { provisionPaidBusinesses, runInvoiceCycle } from "../invoicing/worker";
+import { billingService } from "../billing/runtime";
+import { BillingError } from "../billing/policy";
 const router = Router();
 const idSchema=z.coerce.number().int().positive();
 router.get("/invoicing/me",async(req,res,next) => {
@@ -57,7 +59,20 @@ router.patch("/admin/invoicing/:businessId/plan",async(req,res,next) => {
     res.status(400).json({error:"Choose a valid plan and provide the Startup business age when required."});return;
   }
   try {
-    res.json(await assignBusinessPlan(id.data,body.data.plan,body.data.startupAgeMonths));
+    const actor = getAuth(req).userId;
+    if (!actor) { res.sendStatus(401); return; }
+    const account = await pool.query<{billing_mode:string}>(
+      "SELECT billing_mode FROM businesses WHERE id=$1 AND is_internal=false AND is_sample=false",
+      [id.data],
+    );
+    if (account.rows[0]?.billing_mode === "stripe") {
+      await billingService.adminChangePlan(id.data, body.data.plan, actor, body.data.reason ?? null);
+      res.json(await ownerInvoiceOverview(id.data));
+      return;
+    }
+    res.json(await assignBusinessPlan(
+      id.data, body.data.plan, body.data.startupAgeMonths, actor, body.data.reason ?? null,
+    ));
   }catch(e){next(e);}
 });
 router.post("/admin/invoicing/:businessId/activate",async(req,res,next) => {
@@ -80,6 +95,7 @@ router.post("/admin/invoicing/invoices/:invoiceId/paid",async(req,res,next) => {
 });
 router.use((e:unknown,req:Request,res:Response,_next:NextFunction) => {
   req.log.error(databaseErrorFields(e),"Manual invoicing request failed");
-  res.status(e instanceof InvoiceError ? e.status : 503).json({error:e instanceof InvoiceError ? e.message : "Invoice details are temporarily unavailable. Please try again."});
+  const known = e instanceof InvoiceError || e instanceof BillingError;
+  res.status(known ? e.status : 503).json({error:known ? e.message : "Invoice details are temporarily unavailable. Please try again."});
 });
 export default router;

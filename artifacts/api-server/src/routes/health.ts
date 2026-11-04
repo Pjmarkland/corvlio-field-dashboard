@@ -13,4 +13,14 @@ router.get("/healthz", async (_req, res): Promise<void> => {
   }
 });
 
+router.get("/health/launch", async (_req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "ok", database: "available" });
+  } catch {
+    res.status(503).json({ status: "degraded", database: "unavailable" });
+  }
+});
+
 export default router;

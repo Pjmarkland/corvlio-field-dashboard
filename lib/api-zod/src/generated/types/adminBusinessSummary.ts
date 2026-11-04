@@ -5,10 +5,18 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminBusinessSummaryAccountStatus } from './adminBusinessSummaryAccountStatus';
+import type { AdminBusinessSummaryChosenPlan } from './adminBusinessSummaryChosenPlan';
 import type { AdminBusinessSummaryProvisioningStatus } from './adminBusinessSummaryProvisioningStatus';
 import type { NotificationPlatform } from './notificationPlatform';
 
 export interface AdminBusinessSummary {
+  /** @nullable */
+  chosenPlan: AdminBusinessSummaryChosenPlan;
+  accountStatus: AdminBusinessSummaryAccountStatus;
+  /** @nullable */
+  accountStatusReason: string | null;
+  billingReviewReasons: string[];
   managedReportsEnabled?: boolean;
   isInternal?: boolean;
   isSample?: boolean;

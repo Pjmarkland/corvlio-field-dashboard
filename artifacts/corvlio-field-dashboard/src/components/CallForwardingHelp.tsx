@@ -1,3 +1,67 @@
+import { useEffect, useState } from 'react';
+
+type ForwardingStatus = {
+  requestedAt: string | null;
+  verifiedAt: string | null;
+  verified: boolean;
+};
+
+function ForwardingVerification() {
+  const [status, setStatus] = useState<ForwardingStatus | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!status?.requestedAt || status.verified) return;
+    let active = true;
+    const check = async () => {
+      try {
+        const response = await fetch('/api/businesses/me/forwarding-test', { credentials: 'include' });
+        if (!response.ok) throw new Error('Verification status could not be checked.');
+        const next = await response.json() as ForwardingStatus;
+        if (active) setStatus(next);
+      } catch {
+        if (active) setError('Could not check yet. You can try again below.');
+      }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [status?.requestedAt, status?.verified]);
+
+  const start = async () => {
+    setStarting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/businesses/me/forwarding-test', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Could not start verification.');
+      setStatus(await response.json() as ForwardingStatus);
+    } catch {
+      setError('Could not start the forwarding check. Please try again.');
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4" data-testid="forwarding-verification">
+    <h4 className="font-bold">Verify forwarding</h4>
+    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Start the check, then call your existing business number from another phone. A lead must reach your dashboard to verify forwarding. This test call will appear as a regular lead.</p>
+    {status?.verified
+      ? <p role="status" data-testid="forwarding-verified" className="mt-3 text-sm font-semibold text-emerald-700">Forwarding verified · {new Date(status.verifiedAt!).toLocaleString()}</p>
+      : status?.requestedAt
+        ? <p role="status" data-testid="forwarding-pending" className="mt-3 text-sm text-muted-foreground">Waiting for a new lead from your test call…</p>
+        : null}
+    <button type="button" disabled={starting} onClick={() => void start()} data-testid="button-start-forwarding-test" className="mt-3 min-h-10 rounded-xl border border-border px-3 text-xs font-bold text-foreground disabled:opacity-60">
+      {starting ? 'Starting…' : status?.requestedAt ? 'Start another check' : 'Start forwarding check'}
+    </button>
+    {error ? <p role="alert" className="mt-2 text-xs text-destructive">{error}</p> : null}
+  </div>;
+}
+
 /** Instructions only: Corvlio never enables forwarding or makes carrier changes. */
 export function CallForwardingHelp({ phoneNumber }: { phoneNumber?: string | null }) {
   const number = phoneNumber?.trim() || null;
@@ -56,5 +120,6 @@ export function CallForwardingHelp({ phoneNumber }: { phoneNumber?: string | nul
     </div>
     <p className="mt-3 font-semibold">Test from another phone: call your existing business number—not just the new Corvlio number—and confirm your receptionist answers.</p>
     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Setting up, testing, and maintaining forwarding stays the owner’s responsibility. Corvlio does not turn it on for you. Avoid forwarding the Corvlio number back to your original line.</p>
+    <ForwardingVerification />
   </section>;
 }

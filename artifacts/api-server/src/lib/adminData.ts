@@ -13,9 +13,14 @@ import {
   retellCallRecordsTable,
   provisioningAttemptsTable,
   operationalFailuresTable,
+  billingAccountsTable,
+  pool,
 } from "@workspace/db";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { numberActivity } from "./numberActivity";
+import { addBusinessDays, config as billingConfig } from "../billing/policy";
+import { recordOperationalFailure } from "./operationalFailures";
+import { runNotificationOutboxNow } from "./notificationService";
 
 const ONBOARDING_FIELDS = [
   { key: "businessName", label: "Business name" },
@@ -109,6 +114,7 @@ function summarizeBusiness(
   now: number,
   calls: Array<typeof retellCallRecordsTable.$inferSelect> = [],
   assignedAt = business.createdAt,
+  billingState: Record<string, unknown> = {},
 ) {
   const missingOnboardingFields = ONBOARDING_FIELDS
     .filter(({ key }) => {
@@ -125,10 +131,37 @@ function summarizeBusiness(
       .map(({ platform }) => platform)
       .filter((platform): platform is "ios" | "android" => platform === "ios" || platform === "android"),
   )];
+  const billingPlanId = typeof billingState.plan === "string" ? billingState.plan : business.chosenPlan;
+  const plan = billingConfig.plans.find((item) => item.id === billingPlanId);
+  const monthStart = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth() + 1, 1));
+  const periodStart = typeof billingState.periodStart === "string" ? new Date(billingState.periodStart) : monthStart;
+  const periodEnd = typeof billingState.periodEnd === "string" ? new Date(billingState.periodEnd) : monthEnd;
+  const recordsByCall = new Map(calls.map((call) => [call.retellCallId, call]));
+  const billableCallIds = new Set(leads.filter((lead) => {
+    if (!lead.retellCallId?.trim()) return false;
+    const record = recordsByCall.get(lead.retellCallId);
+    const startedAt = record?.callStartedAt ?? lead.createdAt;
+    const meaningful = Boolean(lead.transcript?.trim() || lead.summary?.trim() || lead.issueReason?.trim());
+    return meaningful && startedAt >= periodStart && startedAt < periodEnd
+      && (!record || record.analysisComplete || (record.durationMs ?? 0) > 0);
+  }).map((lead) => lead.retellCallId!));
+  const billingReviewReasons: string[] = [];
+  if (billingState.status === "past_due" && typeof billingState.graceEndsAt === "string"
+    && Date.parse(billingState.graceEndsAt) <= now) {
+    billingReviewReasons.push("Past due beyond the grace period");
+  }
+  if (plan?.callLimit && billableCallIds.size > plan.callLimit) {
+    billingReviewReasons.push("Plan call allowance exceeded");
+  }
 
   return {
     ...numberActivity(business, calls, now, assignedAt),
     id: business.id,
+    chosenPlan: business.chosenPlan ?? null,
+    accountStatus: business.accountStatus ?? "active",
+    accountStatusReason: business.accountStatusReason ?? null,
+    billingReviewReasons,
     isInternal: business.isInternal,
     managedReportsEnabled: business.managedReportsEnabled ?? false,
     businessName: business.businessName,
@@ -177,7 +210,7 @@ function toActivityLead(
 }
 
 async function loadWorkspaceData() {
-  const [businesses, leads, activeDevices] = await Promise.all([
+  const [businesses, leads, activeDevices, billingAccounts] = await Promise.all([
     db
       .select()
       .from(businessesTable)
@@ -193,6 +226,7 @@ async function loadWorkspaceData() {
         eq(notificationDevicesTable.enabled, true),
         isNull(notificationDevicesTable.invalidatedAt),
       )),
+    db.select().from(billingAccountsTable),
   ]);
 
   const leadsByBusiness = new Map<number, AdminLead[]>();
@@ -209,7 +243,11 @@ async function loadWorkspaceData() {
     devicesByBusiness.set(device.businessId, devices);
   }
 
-  return { businesses, leads, leadsByBusiness, devicesByBusiness, activeDevices };
+  const billingByBusiness = new Map(billingAccounts.map((row) => [
+    row.businessId,
+    row.state as Record<string, unknown>,
+  ]));
+  return { businesses, leads, leadsByBusiness, devicesByBusiness, activeDevices, billingByBusiness };
 }
 
 async function summarizeBusinesses(
@@ -217,10 +255,14 @@ async function summarizeBusinesses(
   leadsByBusiness: Map<number, AdminLead[]>,
   devicesByBusiness: Map<string, Array<{ platform: string }>>,
   now: number,
+  billingByBusiness: Map<number, Record<string, unknown>>,
 ) {
-  const [calls, attempts] = await Promise.all([
+  const [calls, attempts, unpaidInvoices] = await Promise.all([
     db.select().from(retellCallRecordsTable),
     db.select().from(provisioningAttemptsTable),
+    pool.query<{business_id: number; id: number; due_at: Date}>(
+      "SELECT business_id, id, due_at FROM manual_invoices WHERE paid_at IS NULL",
+    ),
   ]);
   const summaries = await Promise.all(businesses.map(async (business) => {
     const profile = await loadOwnerProfile(business.clerkUserId);
@@ -232,8 +274,56 @@ async function summarizeBusinesses(
       now,
       calls.filter((call) => call.businessId === business.id),
       attempts.find((attempt) => attempt.businessId === business.id)?.purchasedAt ?? business.createdAt,
+      billingByBusiness.get(business.id) ?? {},
     );
   }));
+  const businessById = new Map(businesses.map((business) => [business.id, business]));
+  for (const invoice of unpaidInvoices.rows) {
+    if (addBusinessDays(invoice.due_at, 5).getTime() > now) continue;
+    const business = businessById.get(invoice.business_id);
+    if (!business) continue;
+    const inserted = await recordOperationalFailure({
+      eventKey: `billing:manual-overdue:${business.id}:${invoice.id}`,
+      source: "billing_review",
+      summary: "Account is past due beyond the grace period",
+      details: "Unpaid manual invoice beyond its grace period.",
+      businessId: business.id,
+      businessName: business.businessName,
+      founderPush: {
+        eventKey: `billing:manual-overdue:${business.id}:${invoice.id}`,
+        title: "Account payment needs review",
+        body: `${business.businessName} has an unpaid invoice beyond its grace period.`,
+        deepLink: `/admin/businesses/${business.id}`,
+      },
+    });
+    if (inserted) void runNotificationOutboxNow().catch(() => undefined);
+  }
+  for (const business of businesses) {
+    const state = billingByBusiness.get(business.id) ?? {};
+    const reasons = summaries.find((summary) => summary.id === business.id)?.billingReviewReasons ?? [];
+    for (const reason of reasons) {
+      const period = typeof state.periodStart === "string" ? state.periodStart.slice(0, 10)
+        : new Date(now).toISOString().slice(0, 7);
+      const eventKey = `billing:${reason === "Past due beyond the grace period" ? "past-due" : "over-limit"}:${business.id}:${period}`;
+      const inserted = await recordOperationalFailure({
+        eventKey,
+        source: "billing_review",
+        summary: reason === "Past due beyond the grace period"
+          ? "Account is past due beyond the grace period"
+          : "Call allowance exceeded",
+        details: reason,
+        businessId: business.id,
+        businessName: business.businessName,
+        founderPush: {
+          eventKey,
+          title: "Billing account needs review",
+          body: `${business.businessName}: ${reason}. No automatic change was made.`,
+          deepLink: `/admin/businesses/${business.id}`,
+        },
+      });
+      if (inserted) void runNotificationOutboxNow().catch(() => undefined);
+    }
+  }
   return summaries;
 }
 
@@ -244,6 +334,7 @@ export async function getAdminOverview() {
     data.leadsByBusiness,
     data.devicesByBusiness,
     Date.now(),
+    data.billingByBusiness,
   );
   const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
   const uncontacted = data.leads.filter((lead) => !isContactedStatus(lead.status));

@@ -28,6 +28,8 @@ import type {
   AdminBusinessFallbackPhoneUpdate,
   AdminBusinessFallbackRouting,
   AdminBusinessPlanInput,
+  AdminBusinessSuspensionInput,
+  AdminBusinessSuspensionStatus,
   AdminCallQuality,
   AdminEmailHealth,
   AdminFallbackPhoneSettings,
@@ -39,6 +41,7 @@ import type {
   AdminResolveSystemAlertResponse,
   AdminRetellWebhookUrls,
   AdminSmsMessagesResponse,
+  AdminSupportRequests,
   AdminSystemAlertsResponse,
   AlertReadReceipt,
   AppReviewDemoLinkInput,
@@ -59,6 +62,7 @@ import type {
   EmailRetryResult,
   EmailTestRequest,
   EmailTestResult,
+  ForwardingTestStatus,
   GetAdminInvoices200,
   GetLeadsParams,
   HealthStatus,
@@ -67,6 +71,7 @@ import type {
   InternalBusinessInput,
   InternalBusinessRecord,
   InvoiceOverview,
+  LaunchHealthStatus,
   LeadAlertInbox,
   LeadDetail,
   LeadInformationFlagInput,
@@ -89,8 +94,11 @@ import type {
   NotificationOutboxEvent,
   NotificationPollResult,
   NotificationStatus,
+  OwnerDataExport,
   OwnerDemoCapability,
   OwnerDemoConfirmation,
+  OwnerSupportRequestInput,
+  OwnerSupportRequestResult,
   PaymentInstructions,
   PendingRetellRelease,
   SmsTestInput,
@@ -637,6 +645,84 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+export const getLaunchHealthCheckUrl = () => {
+
+
+
+
+  return `/api/health/launch`
+}
+
+/**
+ * Reports API and database readiness without authentication or internal error details
+ * @summary External-monitor health check
+ */
+export const launchHealthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<LaunchHealthStatus> => {
+
+  return customFetch<LaunchHealthStatus>(getLaunchHealthCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLaunchHealthCheckQueryKey = () => {
+    return [
+    `/api/health/launch`
+    ] as const;
+    }
+
+
+export const getLaunchHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof launchHealthCheck>>, TError = ErrorType<LaunchHealthStatus>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof launchHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLaunchHealthCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof launchHealthCheck>>> = ({ signal }) => launchHealthCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof launchHealthCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type LaunchHealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof launchHealthCheck>>>
+export type LaunchHealthCheckQueryError = ErrorType<LaunchHealthStatus>
+
+
+/**
+ * @summary External-monitor health check
+ */
+
+export function useLaunchHealthCheck<TData = Awaited<ReturnType<typeof launchHealthCheck>>, TError = ErrorType<LaunchHealthStatus>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof launchHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getLaunchHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetBusinessProfileUrl = () => {
 
 
@@ -783,6 +869,302 @@ export const useUpdateBusinessProfile = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateBusinessProfileMutationOptions(options));
+    }
+
+export const getExportOwnerDataUrl = () => {
+
+
+
+
+  return `/api/businesses/me/export`
+}
+
+/**
+ * @summary Export the signed-in owner's leads and onboarding answers
+ */
+export const exportOwnerData = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerDataExport> => {
+
+  return customFetch<OwnerDataExport>(getExportOwnerDataUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportOwnerDataQueryKey = () => {
+    return [
+    `/api/businesses/me/export`
+    ] as const;
+    }
+
+
+export const getExportOwnerDataQueryOptions = <TData = Awaited<ReturnType<typeof exportOwnerData>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportOwnerData>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportOwnerDataQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportOwnerData>>> = ({ signal }) => exportOwnerData({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportOwnerData>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportOwnerDataQueryResult = NonNullable<Awaited<ReturnType<typeof exportOwnerData>>>
+export type ExportOwnerDataQueryError = ErrorType<void>
+
+
+/**
+ * @summary Export the signed-in owner's leads and onboarding answers
+ */
+
+export function useExportOwnerData<TData = Awaited<ReturnType<typeof exportOwnerData>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportOwnerData>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportOwnerDataQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetOwnerForwardingTestUrl = () => {
+
+
+
+
+  return `/api/businesses/me/forwarding-test`
+}
+
+/**
+ * @summary Check a requested forwarding test
+ */
+export const getOwnerForwardingTest = async ( options?: Parameters<typeof customFetch>[1]): Promise<ForwardingTestStatus> => {
+
+  return customFetch<ForwardingTestStatus>(getGetOwnerForwardingTestUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerForwardingTestQueryKey = () => {
+    return [
+    `/api/businesses/me/forwarding-test`
+    ] as const;
+    }
+
+
+export const getGetOwnerForwardingTestQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerForwardingTest>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerForwardingTest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerForwardingTestQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerForwardingTest>>> = ({ signal }) => getOwnerForwardingTest({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerForwardingTest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerForwardingTestQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerForwardingTest>>>
+export type GetOwnerForwardingTestQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check a requested forwarding test
+ */
+
+export function useGetOwnerForwardingTest<TData = Awaited<ReturnType<typeof getOwnerForwardingTest>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerForwardingTest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerForwardingTestQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getStartOwnerForwardingTestUrl = () => {
+
+
+
+
+  return `/api/businesses/me/forwarding-test`
+}
+
+/**
+ * @summary Start a forwarding test
+ */
+export const startOwnerForwardingTest = async ( options?: Parameters<typeof customFetch>[1]): Promise<ForwardingTestStatus> => {
+
+  return customFetch<ForwardingTestStatus>(getStartOwnerForwardingTestUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStartOwnerForwardingTestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startOwnerForwardingTest>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startOwnerForwardingTest>>, TError,void, TContext> => {
+
+const mutationKey = ['startOwnerForwardingTest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startOwnerForwardingTest>>, void> = () => {
+
+
+          return  startOwnerForwardingTest(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartOwnerForwardingTestMutationResult = NonNullable<Awaited<ReturnType<typeof startOwnerForwardingTest>>>
+
+    export type StartOwnerForwardingTestMutationError = ErrorType<void>
+
+    /**
+ * @summary Start a forwarding test
+ */
+export const useStartOwnerForwardingTest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startOwnerForwardingTest>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startOwnerForwardingTest>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartOwnerForwardingTestMutationOptions(options));
+    }
+
+export const getCreateOwnerSupportRequestUrl = () => {
+
+
+
+
+  return `/api/businesses/me/support-requests`
+}
+
+/**
+ * @summary Send a support request
+ */
+export const createOwnerSupportRequest = async (ownerSupportRequestInput: OwnerSupportRequestInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSupportRequestResult> => {
+
+  return customFetch<OwnerSupportRequestResult>(getCreateOwnerSupportRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ownerSupportRequestInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerSupportRequestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerSupportRequest>>, TError,{data: BodyType<OwnerSupportRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerSupportRequest>>, TError,{data: BodyType<OwnerSupportRequestInput>}, TContext> => {
+
+const mutationKey = ['createOwnerSupportRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerSupportRequest>>, {data: BodyType<OwnerSupportRequestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOwnerSupportRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerSupportRequestMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerSupportRequest>>>
+    export type CreateOwnerSupportRequestMutationBody = BodyType<OwnerSupportRequestInput>
+    export type CreateOwnerSupportRequestMutationError = ErrorType<void>
+
+    /**
+ * @summary Send a support request
+ */
+export const useCreateOwnerSupportRequest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerSupportRequest>>, TError,{data: BodyType<OwnerSupportRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerSupportRequest>>,
+        TError,
+        {data: BodyType<OwnerSupportRequestInput>},
+        TContext
+      > => {
+      return useMutation(getCreateOwnerSupportRequestMutationOptions(options));
     }
 
 export const getGetBusinessCallUsageUrl = () => {
@@ -3357,6 +3739,155 @@ export function useGetAdminBusiness<TData = Awaited<ReturnType<typeof getAdminBu
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAdminBusinessQueryOptions(businessId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminBusinessSuspensionUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}/suspension`
+}
+
+/**
+ * @summary Suspend or restore a business account
+ */
+export const updateAdminBusinessSuspension = async (businessId: number,
+    adminBusinessSuspensionInput: AdminBusinessSuspensionInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminBusinessSuspensionStatus> => {
+
+  return customFetch<AdminBusinessSuspensionStatus>(getUpdateAdminBusinessSuspensionUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminBusinessSuspensionInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminBusinessSuspensionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessSuspension>>, TError,{businessId: number;data: BodyType<AdminBusinessSuspensionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessSuspension>>, TError,{businessId: number;data: BodyType<AdminBusinessSuspensionInput>}, TContext> => {
+
+const mutationKey = ['updateAdminBusinessSuspension'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminBusinessSuspension>>, {businessId: number;data: BodyType<AdminBusinessSuspensionInput>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  updateAdminBusinessSuspension(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminBusinessSuspensionMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminBusinessSuspension>>>
+    export type UpdateAdminBusinessSuspensionMutationBody = BodyType<AdminBusinessSuspensionInput>
+    export type UpdateAdminBusinessSuspensionMutationError = ErrorType<void>
+
+    /**
+ * @summary Suspend or restore a business account
+ */
+export const useUpdateAdminBusinessSuspension = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessSuspension>>, TError,{businessId: number;data: BodyType<AdminBusinessSuspensionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminBusinessSuspension>>,
+        TError,
+        {businessId: number;data: BodyType<AdminBusinessSuspensionInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminBusinessSuspensionMutationOptions(options));
+    }
+
+export const getGetAdminSupportRequestsUrl = () => {
+
+
+
+
+  return `/api/admin/support-requests`
+}
+
+/**
+ * @summary List recent owner support requests
+ */
+export const getAdminSupportRequests = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminSupportRequests> => {
+
+  return customFetch<AdminSupportRequests>(getGetAdminSupportRequestsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminSupportRequestsQueryKey = () => {
+    return [
+    `/api/admin/support-requests`
+    ] as const;
+    }
+
+
+export const getGetAdminSupportRequestsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSupportRequests>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSupportRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSupportRequestsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSupportRequests>>> = ({ signal }) => getAdminSupportRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSupportRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSupportRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSupportRequests>>>
+export type GetAdminSupportRequestsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List recent owner support requests
+ */
+
+export function useGetAdminSupportRequests<TData = Awaited<ReturnType<typeof getAdminSupportRequests>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSupportRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSupportRequestsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

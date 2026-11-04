@@ -7,6 +7,8 @@ import {
   ownerSmsMessagesTable,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { recordOperationalFailure } from "./operationalFailures";
+import { runNotificationOutboxNow } from "./notificationService";
 
 export type OwnerSmsCategory = "lead_alert" | "test" | "help_reply";
 export type OwnerSmsStatus = "queued" | "sent" | "delivered" | "failed" | "undelivered";
@@ -325,6 +327,22 @@ export async function sendOwnerLeadSms(businessId: number, leadId: number): Prom
     body,
   });
   if (result.status === "failed" || result.status === "undelivered") {
+    const eventKey = `twilio-delivery:${result.id}:${result.status}`;
+    const inserted = await recordOperationalFailure({
+      eventKey,
+      source: "twilio_delivery",
+      summary: "Owner lead SMS delivery failed",
+      details: "Twilio reported that an owner lead alert was not delivered.",
+      businessId,
+      businessName: business.businessName,
+      founderPush: {
+        eventKey,
+        title: "Text alert delivery failed",
+        body: `${business.businessName} owner text alert was not delivered. Review SMS status.`,
+        deepLink: "/admin/activity",
+      },
+    }).catch(() => false);
+    if (inserted) void runNotificationOutboxNow().catch(() => undefined);
     logger.warn(
       { businessId, leadId, messageId: result.id, errorCode: result.errorCode },
       "Owner lead SMS was not delivered",
@@ -354,7 +372,32 @@ export async function updateSmsStatusFromWebhook(
   const errorCode = typeof errorCodeValue === "string" || typeof errorCodeValue === "number"
     ? String(errorCodeValue).slice(0, 64)
     : null;
-  return updateMessageStatus(id, messageSid, status, errorCode);
+  const savedStatus = await updateMessageStatus(id, messageSid, status, errorCode);
+  if (savedStatus === "failed" || savedStatus === "undelivered") {
+    const [message] = await db.select({
+      businessId: ownerSmsMessagesTable.businessId,
+      businessName: businessesTable.businessName,
+    }).from(ownerSmsMessagesTable)
+      .leftJoin(businessesTable, eq(ownerSmsMessagesTable.businessId, businessesTable.id))
+      .where(eq(ownerSmsMessagesTable.id, id)).limit(1);
+    const eventKey = `twilio-delivery:${id}:${savedStatus}`;
+    const inserted = await recordOperationalFailure({
+      eventKey,
+      source: "twilio_delivery",
+      summary: "Owner lead SMS delivery failed",
+      details: "Twilio reported that an owner alert was not delivered.",
+      businessId: message?.businessId,
+      businessName: message?.businessName,
+      founderPush: {
+        eventKey,
+        title: "Text alert delivery failed",
+        body: `${message?.businessName ?? "An owner"} text alert was not delivered. Review SMS status.`,
+        deepLink: "/admin/activity",
+      },
+    }).catch(() => false);
+    if (inserted) void runNotificationOutboxNow().catch(() => undefined);
+  }
+  return savedStatus;
 }
 
 function maskPhone(phone: string): string {

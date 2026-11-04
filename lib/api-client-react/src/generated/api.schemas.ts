@@ -284,6 +284,8 @@ export interface AdminBusinessPlanInput {
      * @maximum 17
      */
   startupAgeMonths?: number;
+  /** @maxLength 300 */
+  reason?: string;
 }
 
 export type AccountDeletionInputConfirmation = typeof AccountDeletionInputConfirmation[keyof typeof AccountDeletionInputConfirmation];
@@ -1451,6 +1453,27 @@ export interface AdminMetrics {
   activePushDeviceCount: number;
 }
 
+/**
+ * @nullable
+ */
+export type AdminBusinessSummaryChosenPlan = typeof AdminBusinessSummaryChosenPlan[keyof typeof AdminBusinessSummaryChosenPlan] | null;
+
+
+export const AdminBusinessSummaryChosenPlan = {
+  startup: 'startup',
+  starter: 'starter',
+  professional: 'professional',
+  managed: 'managed',
+} as const;
+
+export type AdminBusinessSummaryAccountStatus = typeof AdminBusinessSummaryAccountStatus[keyof typeof AdminBusinessSummaryAccountStatus];
+
+
+export const AdminBusinessSummaryAccountStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
 export type AdminBusinessSummaryProvisioningStatus = typeof AdminBusinessSummaryProvisioningStatus[keyof typeof AdminBusinessSummaryProvisioningStatus];
 
 
@@ -1461,6 +1484,12 @@ export const AdminBusinessSummaryProvisioningStatus = {
 } as const;
 
 export interface AdminBusinessSummary {
+  /** @nullable */
+  chosenPlan: AdminBusinessSummaryChosenPlan;
+  accountStatus: AdminBusinessSummaryAccountStatus;
+  /** @nullable */
+  accountStatusReason: string | null;
+  billingReviewReasons: string[];
   managedReportsEnabled?: boolean;
   isInternal?: boolean;
   isSample?: boolean;
@@ -1622,6 +1651,99 @@ export interface AdminBusinessDetail {
   onboarding: AdminOnboardingAnswers;
   leads: AdminLeadActivity[];
   calls: AdminCallRecord[];
+}
+
+export type LaunchHealthStatusStatus = typeof LaunchHealthStatusStatus[keyof typeof LaunchHealthStatusStatus];
+
+
+export const LaunchHealthStatusStatus = {
+  ok: 'ok',
+  degraded: 'degraded',
+} as const;
+
+export type LaunchHealthStatusDatabase = typeof LaunchHealthStatusDatabase[keyof typeof LaunchHealthStatusDatabase];
+
+
+export const LaunchHealthStatusDatabase = {
+  available: 'available',
+  unavailable: 'unavailable',
+} as const;
+
+export interface LaunchHealthStatus {
+  status: LaunchHealthStatusStatus;
+  database: LaunchHealthStatusDatabase;
+}
+
+export type OwnerDataExportOnboarding = { [key: string]: unknown };
+
+export type OwnerDataExportLeadsItem = { [key: string]: unknown };
+
+export interface OwnerDataExport {
+  exportedAt: string;
+  businessName: string;
+  onboarding: OwnerDataExportOnboarding;
+  leads: OwnerDataExportLeadsItem[];
+}
+
+export interface ForwardingTestStatus {
+  /** @nullable */
+  requestedAt: string | null;
+  /** @nullable */
+  verifiedAt: string | null;
+  verified: boolean;
+}
+
+export interface OwnerSupportRequestInput {
+  /**
+     * @minLength 5
+     * @maxLength 3000
+     */
+  message: string;
+  urgent?: boolean;
+}
+
+export interface OwnerSupportRequestResult {
+  id: number;
+  emailSent: boolean;
+}
+
+export interface AdminBusinessSuspensionInput {
+  suspended: boolean;
+  /**
+     * @minLength 3
+     * @maxLength 300
+     */
+  reason?: string;
+}
+
+export type AdminBusinessSuspensionStatusAccountStatus = typeof AdminBusinessSuspensionStatusAccountStatus[keyof typeof AdminBusinessSuspensionStatusAccountStatus];
+
+
+export const AdminBusinessSuspensionStatusAccountStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
+export interface AdminBusinessSuspensionStatus {
+  businessId: number;
+  accountStatus: AdminBusinessSuspensionStatusAccountStatus;
+  /** @nullable */
+  reason: string | null;
+}
+
+export type AdminSupportRequestsItemsItem = {
+  id: number;
+  businessId: number;
+  businessName: string;
+  ownerEmail: string;
+  message: string;
+  urgent: boolean;
+  createdAt: string;
+  emailStatus: string;
+};
+
+export interface AdminSupportRequests {
+  items: AdminSupportRequestsItemsItem[];
 }
 
 export interface AdminFallbackPhoneSettings {

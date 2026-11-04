@@ -66,6 +66,7 @@ export type RetellSystemAlertInput = {
   source: Extract<OperationalFailureSource, "pre_call_fallback" | "post_call_webhook">;
   businessId?: number | null;
   businessName?: string | null;
+  maskedCallerNumber?: string;
 };
 
 function notificationEventKey(issueKey: string, notifiedAt: Date): string {
@@ -118,7 +119,9 @@ export async function recordRetellSystemAlert(input: RetellSystemAlertInput): Pr
     ...input,
     category: safeCopy.category,
     summary: safeCopy.summary,
-    details: safeCopy.details,
+    details: input.maskedCallerNumber && /^\*{3}\d{4}$/.test(input.maskedCallerNumber)
+      ? `${safeCopy.details} Caller number: ${input.maskedCallerNumber}.`
+      : safeCopy.details,
   };
   try {
     const [record] = await db

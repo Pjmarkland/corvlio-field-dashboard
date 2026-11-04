@@ -14,4 +14,6 @@ export interface AdminBusinessPlanInput {
      * @maximum 17
      */
   startupAgeMonths?: number;
+  /** @maxLength 300 */
+  reason?: string;
 }

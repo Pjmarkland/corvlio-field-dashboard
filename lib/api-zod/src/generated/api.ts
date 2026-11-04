@@ -92,6 +92,16 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Reports API and database readiness without authentication or internal error details
+ * @summary External-monitor health check
+ */
+export const LaunchHealthCheckResponse = zod.object({
+  "status": zod.enum(['ok', 'degraded']),
+  "database": zod.enum(['available', 'unavailable'])
+})
+
+
+/**
  * @summary Get the signed-in owner's business profile
  */
 export const getBusinessProfileResponseEmergencyEscalationPhoneMax = 16;
@@ -245,6 +255,56 @@ export const UpdateBusinessProfileResponse = zod.object({
   "emergencyEscalationPhone": zod.string().max(updateBusinessProfileResponseEmergencyEscalationPhoneMax).nullable(),
   "aiPromisePolicy": zod.union([zod.literal('callback_only'),zod.literal('appointment_windows'),zod.literal(null)]).nullable(),
   "retellPhoneNumber": zod.string().nullable()
+})
+
+
+/**
+ * @summary Export the signed-in owner's leads and onboarding answers
+ */
+export const ExportOwnerDataResponse = zod.object({
+  "exportedAt": zod.coerce.date(),
+  "businessName": zod.string(),
+  "onboarding": zod.record(zod.string(), zod.unknown()),
+  "leads": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+/**
+ * @summary Check a requested forwarding test
+ */
+export const GetOwnerForwardingTestResponse = zod.object({
+  "requestedAt": zod.coerce.date().nullable(),
+  "verifiedAt": zod.coerce.date().nullable(),
+  "verified": zod.boolean()
+})
+
+
+/**
+ * @summary Start a forwarding test
+ */
+export const StartOwnerForwardingTestResponse = zod.object({
+  "requestedAt": zod.coerce.date().nullable(),
+  "verifiedAt": zod.coerce.date().nullable(),
+  "verified": zod.boolean()
+})
+
+
+/**
+ * @summary Send a support request
+ */
+export const createOwnerSupportRequestBodyMessageMin = 5;
+export const createOwnerSupportRequestBodyMessageMax = 3000;
+
+
+
+export const CreateOwnerSupportRequestBody = zod.object({
+  "message": zod.string().min(createOwnerSupportRequestBodyMessageMin).max(createOwnerSupportRequestBodyMessageMax),
+  "urgent": zod.boolean().optional()
+})
+
+export const CreateOwnerSupportRequestResponse = zod.object({
+  "id": zod.int(),
+  "emailSent": zod.boolean()
 })
 
 
@@ -1126,6 +1186,10 @@ export const GetAdminOverviewResponse = zod.object({
   "activePushDeviceCount": zod.number().multipleOf(getAdminOverviewResponseMetricsActivePushDeviceCountMultipleOf)
 }),
   "businesses": zod.array(zod.object({
+  "chosenPlan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "accountStatus": zod.enum(['active', 'suspended']),
+  "accountStatusReason": zod.string().nullable(),
+  "billingReviewReasons": zod.array(zod.string()),
   "managedReportsEnabled": zod.boolean().optional(),
   "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
@@ -1353,6 +1417,10 @@ export const getAdminBusinessResponseCallsItemDurationMsMultipleOf = 1;
 
 export const GetAdminBusinessResponse = zod.object({
   "business": zod.object({
+  "chosenPlan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "accountStatus": zod.enum(['active', 'suspended']),
+  "accountStatusReason": zod.string().nullable(),
+  "billingReviewReasons": zod.array(zod.string()),
   "managedReportsEnabled": zod.boolean().optional(),
   "isInternal": zod.boolean().optional(),
   "isSample": zod.boolean().optional(),
@@ -1436,6 +1504,50 @@ export const GetAdminBusinessResponse = zod.object({
   "durationMs": zod.number().multipleOf(getAdminBusinessResponseCallsItemDurationMsMultipleOf).nullable(),
   "outcome": zod.string().nullable(),
   "recordedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Suspend or restore a business account
+ */
+
+
+
+export const UpdateAdminBusinessSuspensionParams = zod.object({
+  "businessId": zod.coerce.number().int().min(1)
+})
+
+export const updateAdminBusinessSuspensionBodyReasonMin = 3;
+export const updateAdminBusinessSuspensionBodyReasonMax = 300;
+
+
+
+export const UpdateAdminBusinessSuspensionBody = zod.object({
+  "suspended": zod.boolean(),
+  "reason": zod.string().min(updateAdminBusinessSuspensionBodyReasonMin).max(updateAdminBusinessSuspensionBodyReasonMax).optional()
+})
+
+export const UpdateAdminBusinessSuspensionResponse = zod.object({
+  "businessId": zod.int(),
+  "accountStatus": zod.enum(['active', 'suspended']),
+  "reason": zod.string().nullable()
+})
+
+
+/**
+ * @summary List recent owner support requests
+ */
+export const GetAdminSupportRequestsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.int(),
+  "businessId": zod.int(),
+  "businessName": zod.string(),
+  "ownerEmail": zod.string(),
+  "message": zod.string(),
+  "urgent": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "emailStatus": zod.string()
 }))
 })
 
@@ -2264,11 +2376,14 @@ export const assignAdminBusinessPlanBodyStartupAgeMonthsMin = 0;
 export const assignAdminBusinessPlanBodyStartupAgeMonthsMax = 17;
 export const assignAdminBusinessPlanBodyStartupAgeMonthsMultipleOf = 1;
 
+export const assignAdminBusinessPlanBodyReasonMax = 300;
+
 
 
 export const AssignAdminBusinessPlanBody = zod.object({
   "plan": zod.enum(['startup', 'starter', 'professional', 'managed']),
-  "startupAgeMonths": zod.number().min(assignAdminBusinessPlanBodyStartupAgeMonthsMin).max(assignAdminBusinessPlanBodyStartupAgeMonthsMax).multipleOf(assignAdminBusinessPlanBodyStartupAgeMonthsMultipleOf).optional()
+  "startupAgeMonths": zod.number().min(assignAdminBusinessPlanBodyStartupAgeMonthsMin).max(assignAdminBusinessPlanBodyStartupAgeMonthsMax).multipleOf(assignAdminBusinessPlanBodyStartupAgeMonthsMultipleOf).optional(),
+  "reason": zod.string().max(assignAdminBusinessPlanBodyReasonMax).optional()
 })
 
 export const assignAdminBusinessPlanResponseSettingsInstructionsMax = 6000;

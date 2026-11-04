@@ -88,6 +88,8 @@ export async function assignBusinessPlan(
   businessId: number,
   plan: string,
   startupAgeMonths?: number,
+  actorUserId = "admin",
+  reason: string | null = null,
 ) {
   if (!isPlan(plan)) throw new InvoiceError("Choose a valid plan.", 400);
   if (plan === "startup" && (startupAgeMonths === undefined
@@ -100,6 +102,24 @@ export async function assignBusinessPlan(
       "SELECT * FROM businesses WHERE id=$1 FOR UPDATE", [businessId],
     )).rows[0];
     if (!b || b.is_internal || b.is_sample) throw new InvoiceError("Business not found.", 404);
+    if (b.provisioning_state !== "awaiting_activation") {
+      if (b.billing_mode !== "manual" || !b.first_invoice_paid_at || !b.retell_phone_number) {
+        throw new InvoiceError("Only an active manual-invoice account can be changed here.");
+      }
+      if (plan === "startup") throw new InvoiceError("Startup cannot be assigned after activation.");
+      if (b.chosen_plan === plan) return;
+      await c.query(
+        "UPDATE businesses SET chosen_plan=$2,startup_age_months=NULL,updated_at=now() WHERE id=$1",
+        [businessId, plan],
+      );
+      await c.query(
+        `INSERT INTO business_admin_events
+          (business_id,actor_user_id,action,previous_value,new_value,reason)
+         VALUES($1,$2,'plan_changed',$3,$4,$5)`,
+        [businessId, actorUserId, b.chosen_plan, plan, reason?.slice(0, 300) ?? null],
+      );
+      return;
+    }
     if (b.provisioning_state !== "awaiting_activation") {
       throw new InvoiceError("Only a pending native setup can have its plan assigned here.");
     }
@@ -138,6 +158,12 @@ export async function assignBusinessPlan(
       `UPDATE businesses SET chosen_plan=$2,startup_age_months=$3,
         manual_payment_state=$4,updated_at=now() WHERE id=$1`,
       [businessId, plan, age, paymentState],
+    );
+    await c.query(
+      `INSERT INTO business_admin_events
+        (business_id,actor_user_id,action,previous_value,new_value,reason)
+       VALUES($1,$2,'plan_changed',$3,$4,$5)`,
+      [businessId, actorUserId, b.chosen_plan, plan, reason?.slice(0, 300) ?? null],
     );
     if (plan !== "startup" && !invoiceHistory.rows.length) {
       await insertInvoice(c, {

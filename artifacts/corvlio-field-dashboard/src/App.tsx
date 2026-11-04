@@ -57,6 +57,7 @@ import OnboardingPage from '@/pages/onboarding';
 import TermsPage from '@/pages/terms';
 import ClientAgreementPage from '@/pages/client-agreement';
 import AccountDeletionPanel, { DeletedAccountSignOut } from '@/components/AccountDeletionPanel';
+import { DataAndSupportSettings } from '@/components/DataAndSupportSettings';
 import NativeBillingSection from '@/components/NativeBillingSection';
 import NativeBillingPage from '@/pages/NativeBillingPage';
 import BillingPage from '@/pages/billing';
@@ -737,6 +738,7 @@ function SettingsPage({ businessName, retellPhoneNumber }: { businessName: strin
       <a href="mailto:hello@corvlio.com" data-testid="link-settings-support" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted"><span>Support / Contact</span><ExternalLink size={15} /></a>
       <button type="button" disabled={isSigningOut} onClick={() => void handleSignOut()} data-testid="button-sign-out-settings" className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"><span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span><ExternalLink size={15} /></button>
     </section>
+    <DataAndSupportSettings />
     <AccountDeletionPanel />
   </>;
 }

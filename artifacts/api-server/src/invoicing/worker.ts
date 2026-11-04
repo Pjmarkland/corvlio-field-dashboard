@@ -2,10 +2,13 @@ import { pool } from "@workspace/db";
 import { databaseErrorFields } from "@workspace/db/errors";
 import { logger } from "../lib/logger";
 import { sendBillingNotificationEmail } from "../lib/gmail";
+import { recordOperationalFailure } from "../lib/operationalFailures";
+import { runNotificationOutboxNow } from "../lib/notificationService";
 import { saveBusinessWithOptionalPhone } from "../lib/retellProvisioning";
 import { findBusinessById } from "../lib/businessDirectory";
 import { invoiceNumber, PAYEE, PLANS, isPlan } from "./policy";
 import { paymentInstructions, scheduleInvoiceWork, type InvoiceRow } from "./service";
+import { addBusinessDays } from "../billing/policy";
 
 function money(cents: number) { return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(cents/100); }
 export function invoiceEmailBody(i: InvoiceRow, instructions: string, link: string, reminder: boolean) {
@@ -52,7 +55,54 @@ export async function deliverInvoiceEmails() {
         [id,sent ? "sent" : "unconfigured"]);
     } catch (error) {
       await pool.query("UPDATE invoice_emails SET status='needs_review' WHERE id=$1",[id]);
+      const eventKey = `invoice-email-failure:${invoice.id}:${item.kind}`;
+      const inserted = await recordOperationalFailure({
+        eventKey,
+        source: "gmail_delivery",
+        summary: "Manual invoice email delivery failed",
+        details: error instanceof Error ? error.message : "Gmail delivery failed",
+        businessId: invoice.business_id,
+        businessName: invoice.business_name,
+        founderPush: {
+          eventKey,
+          title: "Invoice email delivery failed",
+          body: `${invoice.business_name} invoice email needs review. It will not be retried automatically.`,
+          deepLink: `/admin/businesses/${invoice.business_id}`,
+        },
+      }).catch(() => false);
+      if (inserted) void runNotificationOutboxNow().catch(() => undefined);
       logger.error({emailId:id,...databaseErrorFields(error)},"Invoice email delivery uncertain; review before resending");
+    }
+  }
+}
+async function alertOverdueManualInvoices(now = new Date()) {
+  const result = await pool.query<{id:number;business_id:number;business_name:string;due_at:Date}>(`
+    SELECT i.id,i.business_id,b.business_name,i.due_at
+    FROM manual_invoices i JOIN businesses b ON b.id=i.business_id
+    WHERE i.paid_at IS NULL AND b.is_internal=false AND b.is_sample=false AND b.billing_mode='manual'
+  `);
+  for (const invoice of result.rows) {
+    if (addBusinessDays(invoice.due_at, 5).getTime() > now.getTime()) continue;
+    const eventKey = `billing:manual-overdue:${invoice.business_id}:${invoice.id}`;
+    try {
+      const inserted = await recordOperationalFailure({
+        eventKey,
+        source: "billing_review",
+        summary: "Account is past due beyond the grace period",
+        details: "Unpaid manual invoice beyond its grace period.",
+        businessId: invoice.business_id,
+        businessName: invoice.business_name,
+        founderPush: {
+          eventKey,
+          title: "Account payment needs review",
+          body: `${invoice.business_name} has an unpaid invoice beyond its grace period.`,
+          deepLink: `/admin/businesses/${invoice.business_id}`,
+        },
+      });
+      if (inserted) void runNotificationOutboxNow().catch(() => undefined);
+    } catch (error) {
+      logger.warn({ businessId: invoice.business_id, invoiceId: invoice.id, ...databaseErrorFields(error) },
+        "Manual invoice grace alert could not be queued");
     }
   }
 }
@@ -75,6 +125,7 @@ export function runInvoiceCycle() {
   if (running) return running;
   running = (async () => {
     await scheduleInvoiceWork();
+    await alertOverdueManualInvoices();
     await deliverInvoiceEmails();
     await provisionPaidBusinesses();
   })().catch(error => logger.error(databaseErrorFields(error),"Manual invoice worker failed"))

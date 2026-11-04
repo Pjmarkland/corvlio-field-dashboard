@@ -69,6 +69,12 @@ export async function deliverLeadAlertEmails() {
           details: terminalFailure.details,
           businessId: terminalFailure.businessId,
           businessName: terminalFailure.businessName,
+          founderPush: {
+            eventKey: `lead-gmail:${event.id}`,
+            title: "Lead email delivery failed",
+            body: "An owner lead email could not be delivered after retries. Review email health.",
+            deepLink: "/admin/activity",
+          },
         });
         if (inserted) {
           void runNotificationOutboxNow().catch(() => {

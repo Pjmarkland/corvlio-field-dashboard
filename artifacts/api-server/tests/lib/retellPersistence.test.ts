@@ -158,6 +158,39 @@ describe("ended/analyzed reconciliation enriches one lead without losing richer 
     expect(mock.pendingCalls).toHaveLength(1);
   });
 
+  it("does not store a pending call for a suspended business", async () => {
+    mock.business = { id: 2, accountStatus: "suspended", leadAlertsEnabled: false, isSample: false };
+    await expect(persistPendingRetellCall({
+      callId: "suspended-pending-call",
+      businessId: 2,
+      callerNumber: "+15550000001",
+      callStartedAt: new Date("2026-01-02T03:03:55.000Z"),
+      durationMs: 10_000,
+    })).resolves.toBe(false);
+    expect(mock.pendingCalls).toHaveLength(0);
+  });
+
+  it("does not persist an analyzed lead for a suspended business", async () => {
+    mock.business = { id: 2, accountStatus: "suspended", leadAlertsEnabled: false, isSample: false };
+    await expect(persistAnalyzedCall("suspended-analysis-call", {
+      businessId: 2, callerName: "Sam", callerId: "+15550000001", issueReason: "Leaking pipe",
+    }, { businessId: 2, retellCallId: "suspended-analysis-call" }, true)).resolves.toBeNull();
+    expect(mock.inserted.filter(row => row.table === leadsTable)).toHaveLength(0);
+  });
+
+  it("suppresses a delayed fallback when suspension happens before lead creation", async () => {
+    mock.business = { id: 2, accountStatus: "suspended", leadAlertsEnabled: false, isSample: false };
+    const deadlineAt = new Date("2026-01-02T03:14:05.000Z");
+    mock.pendingCalls = [{
+      id: 1, businessId: 2, retellCallId: "suspended-fallback-call", callerNumber: "+15550000001",
+      callStartedAt: new Date("2026-01-02T03:03:55.000Z"), durationMs: 10_000, deadlineAt, status: "pending",
+    }];
+    await expect(persistPendingCallFallback("suspended-fallback-call", new Date("2026-01-02T03:15:00.000Z")))
+      .resolves.toBeNull();
+    expect(mock.pendingCalls[0]).toMatchObject({ status: "suppressed_suspended", callerNumber: null });
+    expect(mock.inserted.filter(row => row.table === leadsTable)).toHaveLength(0);
+  });
+
   it("resolves the pending record when analyzed data is persisted", async () => {
     mock.pendingCalls = [{
       id: 1, businessId: 2, retellCallId: "test-call", status: "pending",

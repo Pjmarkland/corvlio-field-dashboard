@@ -22,6 +22,10 @@ export async function persistPendingRetellCall(input: {
   const receivedAt = input.receivedAt ?? new Date();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(542312, hashtext(${input.callId}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${input.businessId})`);
+    const [business] = await tx.select().from(businessesTable)
+      .where(eq(businessesTable.id, input.businessId));
+    if (!business || business.accountStatus === "suspended") return false;
     const [record] = await tx.select().from(retellCallRecordsTable)
       .where(eq(retellCallRecordsTable.retellCallId, input.callId));
     if (record?.analysisComplete || record?.leadId || record?.outcome === "blank_or_failed") {
@@ -50,6 +54,10 @@ export async function persistPendingRetellCall(input: {
 export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, recordInput: RecordInput, analysisComplete = true, alertsEnabled = true) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(542312, hashtext(${callId}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${leadInput.businessId})`);
+    const [business] = await tx.select().from(businessesTable)
+      .where(eq(businessesTable.id, leadInput.businessId));
+    if (!business || business.accountStatus === "suspended") return null;
     const result = await reconcileCall(callId, leadInput.businessId, {
       async findLead(id) {
         const [lead] = await tx.select().from(leadsTable).where(eq(leadsTable.retellCallId, id));
@@ -173,6 +181,7 @@ export async function persistPendingCallFallback(callId: string, now = new Date(
     const [pending] = await tx.select().from(retellPendingCallsTable)
       .where(eq(retellPendingCallsTable.retellCallId, callId));
     if (!pending || pending.status !== "pending" || pending.deadlineAt > now) return null;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${pending.businessId})`);
     const [existingRecord] = await tx.select().from(retellCallRecordsTable)
       .where(eq(retellCallRecordsTable.retellCallId, callId));
     if (existingRecord?.analysisComplete || existingRecord?.leadId || existingRecord?.outcome === "blank_or_failed") {
@@ -188,6 +197,17 @@ export async function persistPendingCallFallback(callId: string, now = new Date(
     if (!business) {
       await tx.update(retellPendingCallsTable).set({ status: "resolved", callerNumber: null, resolvedAt: now })
         .where(eq(retellPendingCallsTable.retellCallId, callId));
+      return null;
+    }
+    if (business.accountStatus === "suspended") {
+      await tx.update(retellPendingCallsTable).set({
+        status: "suppressed_suspended",
+        callerNumber: null,
+        resolvedAt: now,
+      }).where(and(
+        eq(retellPendingCallsTable.retellCallId, callId),
+        eq(retellPendingCallsTable.status, "pending"),
+      ));
       return null;
     }
     const callerNumber = pending.callerNumber?.trim() || null;

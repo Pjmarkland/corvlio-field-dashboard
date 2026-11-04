@@ -148,6 +148,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /health/launch:
+    get:
+      operationId: launchHealthCheck
+      tags: [health]
+      summary: External-monitor health check
+      description: Reports API and database readiness without authentication or internal error details
+      responses:
+        "200":
+          description: API and database are available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaunchHealthStatus"
+        "503":
+          description: API is available but database is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaunchHealthStatus"
   /businesses/me:
     get:
       operationId: getBusinessProfile
@@ -195,6 +214,78 @@ paths:
           description: No business is configured for this account
         "502":
           description: Business profile could not be updated
+  /businesses/me/export:
+    get:
+      operationId: exportOwnerData
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Export the signed-in owner's leads and onboarding answers
+      responses:
+        "200":
+          description: Owner-scoped business and lead data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerDataExport"
+        "401": {description: Authentication required}
+        "404": {description: No business is configured for this account}
+        "502": {description: Export could not be generated}
+  /businesses/me/forwarding-test:
+    get:
+      operationId: getOwnerForwardingTest
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Check a requested forwarding test
+      responses:
+        "200":
+          description: Forwarding verification state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForwardingTestStatus"
+        "401": {description: Authentication required}
+        "404": {description: No business is configured for this account}
+    post:
+      operationId: startOwnerForwardingTest
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Start a forwarding test
+      responses:
+        "200":
+          description: Forwarding test started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForwardingTestStatus"
+        "401": {description: Authentication required}
+        "404": {description: No business is configured for this account}
+  /businesses/me/support-requests:
+    post:
+      operationId: createOwnerSupportRequest
+      tags: [businesses]
+      security:
+        - clerkSession: []
+      summary: Send a support request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerSupportRequestInput"
+      responses:
+        "201":
+          description: Request saved for the admin team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerSupportRequestResult"
+        "400": {description: Invalid support request}
+        "401": {description: Authentication required}
+        "404": {description: No business is configured for this account}
+        "502": {description: Request could not be saved}
   /businesses/me/call-usage:
     get:
       operationId: getBusinessCallUsage
@@ -1042,6 +1133,49 @@ paths:
           description: Invalid business ID
         "404":
           description: Not found, business missing, or administrator access unavailable
+  /admin/businesses/{businessId}/suspension:
+    patch:
+      operationId: updateAdminBusinessSuspension
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Suspend or restore a business account
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminBusinessSuspensionInput"
+      responses:
+        "200":
+          description: Updated account status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessSuspensionStatus"
+        "400": {description: "Invalid status, business ID, or suspension reason"}
+        "404": {description: Business not found}
+        "502": {description: Account status could not be updated}
+  /admin/support-requests:
+    get:
+      operationId: getAdminSupportRequests
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: List recent owner support requests
+      responses:
+        "200":
+          description: Recent support inbox items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequests"
+        "502": {description: Support requests could not be loaded}
   /admin/fallback-phone-settings:
     get:
       operationId: getAdminFallbackPhoneSettings
@@ -1650,6 +1784,7 @@ components:
       properties:
         plan: { type: string, enum: [startup, starter, professional, managed] }
         startupAgeMonths: { type: number, multipleOf: 1, minimum: 0, maximum: 17 }
+        reason: { type: string, maxLength: 300 }
       required: [plan]
     AccountDeletionInput:
       type: object
@@ -2797,6 +2932,17 @@ components:
     AdminBusinessSummary:
       type: object
       properties:
+        chosenPlan:
+          type: [string, "null"]
+          enum: [startup, starter, professional, managed, null]
+        accountStatus:
+          type: string
+          enum: [active, suspended]
+        accountStatusReason:
+          type: [string, "null"]
+        billingReviewReasons:
+          type: array
+          items: {type: string}
         managedReportsEnabled:
           type: boolean
         isInternal:
@@ -2874,6 +3020,10 @@ components:
           type: [string, "null"]
           format: date-time
       required:
+        - chosenPlan
+        - accountStatus
+        - accountStatusReason
+        - billingReviewReasons
         - id
         - businessName
         - ownerEmail
@@ -3060,6 +3210,85 @@ components:
           items:
             $ref: "#/components/schemas/AdminCallRecord"
       required: [business, fallbackRouting, onboarding, leads, calls]
+    LaunchHealthStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        status: {type: string, enum: [ok, degraded]}
+        database: {type: string, enum: [available, unavailable]}
+      required: [status, database]
+    OwnerDataExport:
+      type: object
+      additionalProperties: false
+      properties:
+        exportedAt: {type: string, format: date-time}
+        businessName: {type: string}
+        onboarding:
+          type: object
+          additionalProperties: true
+        leads:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [exportedAt, businessName, onboarding, leads]
+    ForwardingTestStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        requestedAt: {type: [string, "null"], format: date-time}
+        verifiedAt: {type: [string, "null"], format: date-time}
+        verified: {type: boolean}
+      required: [requestedAt, verifiedAt, verified]
+    OwnerSupportRequestInput:
+      type: object
+      additionalProperties: false
+      properties:
+        message: {type: string, minLength: 5, maxLength: 3000}
+        urgent: {type: boolean}
+      required: [message]
+    OwnerSupportRequestResult:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: integer}
+        emailSent: {type: boolean}
+      required: [id, emailSent]
+    AdminBusinessSuspensionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        suspended: {type: boolean}
+        reason: {type: string, minLength: 3, maxLength: 300}
+      required: [suspended]
+    AdminBusinessSuspensionStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        businessId: {type: integer}
+        accountStatus: {type: string, enum: [active, suspended]}
+        reason: {type: [string, "null"]}
+      required: [businessId, accountStatus, reason]
+    AdminSupportRequests:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id: {type: integer}
+              businessId: {type: integer}
+              businessName: {type: string}
+              ownerEmail: {type: string}
+              message: {type: string}
+              urgent: {type: boolean}
+              createdAt: {type: string, format: date-time}
+              emailStatus: {type: string}
+            required: [id, businessId, businessName, ownerEmail, message, urgent, createdAt, emailStatus]
+      required: [items]
     AdminFallbackPhoneSettings:
       type: object
       additionalProperties: false

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, ExternalLink, FileText, Globe2, Phone, Radio, UserRound } from 'lucide-react';
 import { useParams } from 'wouter';
-import { getGetAdminBusinessQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers } from '@workspace/api-client-react';
+import { getGetAdminBusinessQueryKey, getGetAdminOverviewQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers, type AdminBusinessSummary } from '@workspace/api-client-react';
 
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, BackLink, SectionHeading, formatAdminDate, formatAdminDuration, formatAdminResponse } from './AdminShared';
 
@@ -31,7 +31,7 @@ function SummaryHero({ detail }: { detail: AdminBusinessDetail }) {
   const { business } = detail;
   return <section className="mb-7 rounded-3xl bg-[#244d3f] p-6 text-[#eff6ee] shadow-[0_16px_40px_rgba(36,77,63,.14)] sm:p-8">
     <div className="flex flex-col justify-between gap-6 xl:flex-row xl:items-end">
-      <div className="flex items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#3b7056] text-xl font-800 text-[#e5f2e6]">{business.businessName.slice(0, 1).toUpperCase()}</div><div><div className="mb-3 flex flex-wrap items-center gap-2">{business.isInternal ? <span className="rounded-full bg-[#e4f0e9] px-2.5 py-1 text-xs font-semibold text-[#d9ecdc]" data-testid="badge-internal-detail">Internal / non-billed</span> : null}<AdminStatus status={business.provisioningStatus} /><span className="font-mono text-[10px] uppercase tracking-wide text-[#bbd9c1]">Business #{business.id}</span></div><h2 className="text-3xl font-800 leading-none tracking-[-.06em] sm:text-5xl">{business.businessName}</h2><p className="mt-3 text-sm text-[#c6ddcb]">{business.ownerName ?? 'Owner details unavailable'} · {business.ownerEmail ?? 'Owner email not recorded'}</p></div></div>
+       <div className="flex items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#3b7056] text-xl font-800 text-[#e5f2e6]">{business.businessName.slice(0, 1).toUpperCase()}</div><div><div className="mb-3 flex flex-wrap items-center gap-2">{business.isInternal ? <span className="rounded-full bg-[#e4f0e9] px-2.5 py-1 text-xs font-semibold text-[#d9ecdc]" data-testid="badge-internal-detail">Internal / non-billed</span> : null}<AdminStatus status={business.provisioningStatus} /><span data-testid="badge-account-status" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${business.accountStatus === 'suspended' ? 'bg-[#fae8df] text-[#a3432d]' : 'bg-[#e4f0e9] text-[#2c6b56]'}`}>{business.accountStatus === 'suspended' ? 'Suspended' : 'Active'}</span><span className="font-mono text-[10px] uppercase tracking-wide text-[#bbd9c1]">Business #{business.id}</span></div><h2 className="text-3xl font-800 leading-none tracking-[-.06em] sm:text-5xl">{business.businessName}</h2><p className="mt-3 text-sm text-[#c6ddcb]">{business.ownerName ?? 'Owner details unavailable'} · {business.ownerEmail ?? 'Owner email not recorded'}</p></div></div>
       <div className="grid grid-cols-2 gap-x-8 gap-y-3 border-t border-[#75a183]/30 pt-5 text-sm xl:min-w-[350px] xl:border-l xl:border-t-0 xl:pl-7 xl:pt-0"><div><p className="admin-label text-[#9fc5a8]">Retell number</p><p className="mt-1 font-semibold">{business.retellPhoneNumber ?? 'Not provisioned'}</p></div><div><p className="admin-label text-[#9fc5a8]">Created</p><p className="mt-1 font-semibold">{formatAdminDate(business.createdAt)}</p></div><div><p className="admin-label text-[#9fc5a8]">Last sign-in</p><p className="mt-1 font-semibold">{formatAdminDate(business.ownerLastSignInAt)}</p></div><div><p className="admin-label text-[#9fc5a8]">Agreement</p><p className="mt-1 font-semibold">{business.agreementsAcceptedAt ? `Accepted · ${business.agreementsAcceptedVersion ?? 'version not recorded'}` : 'Not accepted'}</p></div></div>
     </div>
   </section>;
@@ -146,6 +146,89 @@ function BusinessFallbackPhoneSettings({
   </section>;
 }
 
+function AccountControls({ businessId, business, refresh }: {
+  businessId: number;
+  business: AdminBusinessSummary;
+  refresh: () => void;
+}) {
+  const [plan, setPlan] = useState<string>(business.chosenPlan ?? 'starter');
+  const [planReason, setPlanReason] = useState('');
+  const [suspensionReason, setSuspensionReason] = useState(business.accountStatusReason ?? '');
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const submitPlan = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving || planReason.trim().length < 3) return;
+    setSaving(true);
+    setNotice('');
+    try {
+      const response = await fetch(`/api/admin/invoicing/${businessId}/plan`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plan, reason: planReason.trim() }),
+      });
+      if (!response.ok) throw new Error('Plan update failed');
+      setPlanReason('');
+      setNotice('Plan change saved and recorded.');
+      refresh();
+    } catch {
+      setNotice('Plan change could not be saved. Check billing status and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateSuspension = async (suspended: boolean) => {
+    if (saving || (suspended && suspensionReason.trim().length < 3)) return;
+    setSaving(true);
+    setNotice('');
+    try {
+      const response = await fetch(`/api/admin/businesses/${businessId}/suspension`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ suspended, ...(suspended ? { reason: suspensionReason.trim() } : {}) }),
+      });
+      if (!response.ok) throw new Error('Status update failed');
+      setNotice(suspended ? 'Account suspended. Incoming calls use the generic fallback.' : 'Account restored.');
+      if (!suspended) setSuspensionReason('');
+      refresh();
+    } catch {
+      setNotice('Account status could not be updated. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <section className="admin-panel mb-7 rounded-2xl p-5" data-testid="section-account-controls">
+    <div className="grid gap-6 lg:grid-cols-2">
+      <form onSubmit={submitPlan} className="space-y-3">
+        <div><p className="admin-label">Plan management</p><p className="mt-1 text-sm text-[#68766c]">Plan changes are explicit and audited. Existing invoices are not rewritten.</p></div>
+        <label className="block text-xs font-semibold text-[#34443b]">Plan
+          <select value={plan} onChange={(event) => setPlan(event.target.value)} data-testid="select-admin-business-plan" className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d8e1d8] bg-white px-3 text-sm">
+            {business.chosenPlan === 'startup' ? <option value="startup">Startup</option> : null}<option value="starter">Starter</option><option value="professional">Professional</option><option value="managed">Managed</option>
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-[#34443b]">Reason for change
+          <input value={planReason} onChange={(event) => setPlanReason(event.target.value)} maxLength={300} minLength={3} data-testid="input-admin-plan-reason" className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d8e1d8] bg-white px-3 text-sm font-normal" />
+        </label>
+        <button type="submit" disabled={saving || planReason.trim().length < 3 || plan === business.chosenPlan} data-testid="button-save-admin-plan" className="min-h-10 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save plan change'}</button>
+      </form>
+      <div className="space-y-3">
+        <div><p className="admin-label">Account status</p><p className="mt-1 text-sm font-semibold text-[#34443b]" data-testid="text-admin-account-status">{business.accountStatus === 'suspended' ? 'Suspended' : 'Active'}</p><p className="mt-1 text-xs text-[#68766c]">Suspension is manual; overdue payment or high usage never suspends an account automatically.</p></div>
+        {business.accountStatus === 'suspended'
+          ? <button type="button" disabled={saving} onClick={() => void updateSuspension(false)} data-testid="button-restore-admin-business" className="min-h-10 rounded-xl border border-[#c7dccb] px-4 text-sm font-bold text-[#2c6b56] disabled:opacity-50">Restore account</button>
+          : <><label className="block text-xs font-semibold text-[#34443b]">Suspension reason
+            <input value={suspensionReason} onChange={(event) => setSuspensionReason(event.target.value)} maxLength={300} minLength={3} data-testid="input-admin-suspension-reason" className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d8e1d8] bg-white px-3 text-sm font-normal" />
+          </label><button type="button" disabled={saving || suspensionReason.trim().length < 3} onClick={() => void updateSuspension(true)} data-testid="button-suspend-admin-business" className="min-h-10 rounded-xl border border-[#e5c7be] px-4 text-sm font-bold text-[#a3432d] disabled:opacity-50">Suspend account</button></>}
+      </div>
+    </div>
+    {notice ? <p role="status" data-testid="status-admin-account-controls" className="mt-4 text-sm text-[#4f6f5c]">{notice}</p> : null}
+  </section>;
+}
+
 export default function AdminBusinessPage() {
   const params = useParams<{ businessId: string }>();
   const queryClient = useQueryClient();
@@ -164,6 +247,10 @@ export default function AdminBusinessPage() {
   return <AdminShell title={business.businessName} eyebrow="Business detail">
     <BackLink href="/admin">Back to overview</BackLink>
     <SummaryHero detail={data} />
+    {!business.isInternal && !business.isSample ? <AccountControls businessId={businessId} business={business} refresh={() => {
+      void queryClient.invalidateQueries({ queryKey: getGetAdminBusinessQueryKey(businessId) });
+      void queryClient.invalidateQueries({ queryKey: getGetAdminOverviewQueryKey() });
+    }} /> : null}
     <section className="admin-panel mb-7 rounded-2xl p-4 text-sm text-[#34443b]" aria-label="Number setup state">
       <p className="font-semibold">{data.business.isSample ? 'Sample / demo — no live number purchased' : `Provisioning state: ${data.business.provisioningState ?? data.business.provisioningStatus}`}</p>
       {data.business.unusedNumber7Days ? <p className="mt-2 font-semibold text-[#a3432d]">No recorded calls in 7+ days. Review this number in the Retell dashboard; this console does not release or delete numbers.</p> : null}

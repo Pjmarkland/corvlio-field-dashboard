@@ -145,7 +145,7 @@ async function recordRetellFailure(
     businessName?: string;
     eventKey?: string;
     suppressAlert?: boolean;
-    systemAlert?: { issueKey: string; category: string; summary?: string; details?: string };
+    systemAlert?: { issueKey: string; category: string; summary?: string; details?: string; maskedCallerNumber?: string };
     founderPush?: {
       eventKey: string;
       title: string;
@@ -165,6 +165,7 @@ async function recordRetellFailure(
         source,
         businessId: input.businessId,
         businessName: input.businessName,
+        maskedCallerNumber: input.systemAlert.maskedCallerNumber,
       });
       return;
     }
@@ -242,6 +243,8 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     body.data.call_inbound ?? body.data.call ?? {},
     body.data.to_number,
   );
+  const preCall = (body.data.call_inbound ?? body.data.call ?? {}) as { from_number?: unknown };
+  const callerNumber = firstString(preCall.from_number);
   if (!phoneNumber) {
     req.log.warn("Retell pre-call webhook has no destination number; using generic message fallback");
     await alertRejectedRetellWebhook("pre-call", "malformed_payload");
@@ -281,11 +284,12 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
     } else {
       void recordRetellWebhookSuccess("pre-call");
     }
+    const availableBusiness = business && business.accountStatus !== "suspended" ? business : null;
     res.json({
       call_inbound: {
         dynamic_variables: dynamicVariables(
-          business ?? null,
-          business?.fallbackPhoneNumber ?? defaultFallbackPhoneNumber,
+          availableBusiness,
+          availableBusiness?.fallbackPhoneNumber ?? defaultFallbackPhoneNumber,
         ),
       },
     });
@@ -302,6 +306,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
       systemAlert: {
         issueKey: timedOut ? "retell:pre-call:business-lookup-timeout" : "retell:pre-call:business-lookup-error",
         category: timedOut ? "pre_call_timeout" : "pre_call_error",
+        maskedCallerNumber: callerNumber ? maskPhoneNumber(callerNumber) : undefined,
       },
     });
     res.status(200).json({
@@ -432,6 +437,15 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       return;
     }
 
+    // Suspension may take effect after the pre-call lookup but before analysis.
+    // Complete the provider event without persisting any customer data.
+    if (business.accountStatus === "suspended") {
+      await completeClaimedEvent();
+      void recordRetellWebhookSuccess("post-call");
+      res.sendStatus(204);
+      return;
+    }
+
     if (pendingCallEnded && providerCallId && durationMs !== null) {
       await persistPendingRetellCall({
         callId: providerCallId,
@@ -516,6 +530,12 @@ router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
       analysisComplete: body.data.event === "call_analyzed",
     }, body.data.event === "call_analyzed", business.leadAlertsEnabled !== false && !business.isSample);
 
+    if (!lead) {
+      await completeClaimedEvent();
+      void recordRetellWebhookSuccess("post-call");
+      res.sendStatus(204);
+      return;
+    }
     if (lead.notify) {
     void runNotificationOutboxNow().catch((error) => {
       req.log.error(

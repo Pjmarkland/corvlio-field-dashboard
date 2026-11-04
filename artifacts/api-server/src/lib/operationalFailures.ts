@@ -16,7 +16,11 @@ export type OperationalFailureSource =
   | "lead_gmail_notification"
   | "phone_provisioning"
   | "account_deletion_balance"
-  | "account_deletion_billing";
+  | "account_deletion_billing"
+  | "support_request_email"
+  | "billing_review"
+  | "twilio_delivery"
+  | "gmail_delivery";
 
 export type OperationalFailureInput = {
   eventKey: string;
@@ -27,6 +31,7 @@ export type OperationalFailureInput = {
   businessName?: string | null;
   /** Individual blank calls are recorded, but only the third consecutive one alerts. */
   suppressAlert?: boolean;
+  founderPush?: FounderPushInput;
 };
 
 const FAILURE_SUMMARY_FALLBACK: Record<OperationalFailureSource, string> = {
@@ -36,6 +41,10 @@ const FAILURE_SUMMARY_FALLBACK: Record<OperationalFailureSource, string> = {
   phone_provisioning: "Business phone provisioning needs attention",
   account_deletion_balance: "Account deletion balance cleanup needs attention",
   account_deletion_billing: "Account deletion billing cleanup needs attention",
+  support_request_email: "Owner support email delivery needs attention",
+  billing_review: "Billing account needs admin review",
+  twilio_delivery: "Twilio message delivery needs attention",
+  gmail_delivery: "Gmail delivery needs attention",
 };
 
 const FAILURE_SUMMARY_ALLOWLIST: Record<OperationalFailureSource, Record<string, string>> = {
@@ -70,6 +79,19 @@ const FAILURE_SUMMARY_ALLOWLIST: Record<OperationalFailureSource, Record<string,
   account_deletion_billing: {
     "Stripe cancellation remains queued after account deletion": "Account deletion billing cleanup remains queued",
   },
+  support_request_email: {
+    "Owner support request email delivery failed": "Owner support request email delivery failed",
+  },
+  billing_review: {
+    "Account is past due beyond the grace period": "Account is past due beyond the grace period",
+    "Call allowance exceeded": "Plan call allowance exceeded",
+  },
+  twilio_delivery: {
+    "Owner lead SMS delivery failed": "Owner lead SMS delivery failed",
+  },
+  gmail_delivery: {
+    "Manual invoice email delivery failed": "Manual invoice email delivery failed",
+  },
 };
 
 const FAILURE_DETAILS: Record<OperationalFailureSource, string> = {
@@ -79,6 +101,10 @@ const FAILURE_DETAILS: Record<OperationalFailureSource, string> = {
   phone_provisioning: "Phone-number provisioning is incomplete. Review the pending business setup.",
   account_deletion_balance: "A balance cleanup remains pending after account deletion. Review payment status.",
   account_deletion_billing: "A billing cleanup remains pending after account deletion. Review payment status.",
+  support_request_email: "A saved owner support request could not be delivered by email. Review Gmail delivery settings.",
+  billing_review: "Billing requires admin review. No automatic suspension or plan change was made.",
+  twilio_delivery: "A Twilio text message was not delivered. Review provider status and SMS configuration.",
+  gmail_delivery: "A Corvlio billing email could not be delivered. Review Gmail delivery settings.",
 };
 
 export function allowlistedOperationalFailureSummary(
@@ -126,6 +152,7 @@ export async function recordOperationalFailure(input: OperationalFailureInput): 
     })
     .onConflictDoNothing()
     .returning({ id: operationalFailuresTable.id });
+  if (record && input.founderPush) await queueFounderPushNotification(input.founderPush);
   return Boolean(record);
 }
 

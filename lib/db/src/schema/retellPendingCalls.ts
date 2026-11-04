@@ -2,7 +2,7 @@ import { index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "d
 import { businessesTable } from "./businesses";
 import { leadsTable } from "./leads";
 
-export type RetellPendingCallStatus = "pending" | "resolved" | "fallback_created";
+export type RetellPendingCallStatus = "pending" | "resolved" | "fallback_created" | "suppressed_suspended";
 
 export const retellPendingCallsTable = pgTable(
   "retell_pending_calls",

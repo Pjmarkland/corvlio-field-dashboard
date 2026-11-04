@@ -55,7 +55,13 @@ router.post("/admin/email-health/test",async(req,res)=>{
     if(failure){
       req.log.warn({error:failure},"Admin Gmail test failed; no automatic retry");
       await recordOperationalFailure({eventKey:`gmail-test:${body.data.requestId}`,source:"lead_gmail_notification",
-        summary:"Admin Gmail test failed",details:failure}).catch(()=>req.log.warn("Unable to record Gmail test incident"));
+        summary:"Admin Gmail test failed",details:failure,
+        founderPush:{
+          eventKey:`gmail-test:${body.data.requestId}`,
+          title:"Gmail test delivery failed",
+          body:"The requested admin Gmail test failed. Review email health.",
+          deepLink:"/admin/activity",
+        }}).catch(()=>req.log.warn("Unable to record Gmail test incident"));
     }
     res.json(failure?{success:false,...emailDiagnosis(failure)}:
       {success:true,error:null,cause:"Test email sent to your verified email address.",hint:""});

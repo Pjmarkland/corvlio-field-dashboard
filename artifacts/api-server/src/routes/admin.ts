@@ -23,7 +23,7 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { getAdminCallQuality } from "../lib/callQuality";
 import { z } from "zod";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { businessesTable, db, leadInfoFlagsTable, leadsTable, pool } from "@workspace/db";
+import { businessAdminEventsTable, businessesTable, db, leadInfoFlagsTable, leadsTable, pool, supportRequestsTable } from "@workspace/db";
 import { createInternalBusiness, internalBusinessDirectory, internalBusinessRecord, InternalBusinessError } from "../lib/internalBusinesses";
 import { AppReviewDemoError, getAppReviewDemoStatus, linkAppReviewDemoEmail, resetAppReviewDemo } from "../lib/appReviewDemo";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
@@ -34,6 +34,8 @@ import {
   saveDefaultFallbackPhoneNumber,
 } from "../lib/fallbackPhoneSettings";
 import { normalizeUsPhoneNumber } from "../lib/usPhoneNumber";
+import { getAuth } from "@clerk/express";
+import { sql } from "drizzle-orm";
 import {
   getAdminRetellHealthCheck,
   getAdminRetellSystemAlerts,
@@ -43,6 +45,79 @@ import {
 const router: IRouter = Router();
 
 router.use("/admin", requireAdmin);
+router.patch("/admin/businesses/:businessId/suspension", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const id = z.coerce.number().int().positive().safeParse(req.params.businessId);
+  const input = z.object({
+    suspended: z.boolean(),
+    reason: z.string().trim().min(3).max(300).optional(),
+  }).strict().safeParse(req.body);
+  if (!id.success || !input.success || (input.data.suspended && !input.data.reason)) {
+    res.status(400).json({ error: "A reason of 3–300 characters is required to suspend an account." });
+    return;
+  }
+  try {
+    const actorUserId = getAuth(req).userId;
+    if (!actorUserId) { res.sendStatus(401); return; }
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${id.data})`);
+      const locked = await tx.execute(sql`
+        SELECT id, account_status, account_status_reason
+        FROM businesses WHERE id=${id.data} AND is_internal=false AND is_sample=false
+        FOR UPDATE
+      `);
+      const current = locked.rows[0] as {
+        id: number; account_status: "active" | "suspended"; account_status_reason: string | null;
+      } | undefined;
+      if (!current) return null;
+      const nextStatus = input.data.suspended ? "suspended" : "active";
+      const nextReason = input.data.suspended ? input.data.reason!.trim() : null;
+      if (current.account_status !== nextStatus || current.account_status_reason !== nextReason) {
+        await tx.update(businessesTable).set({
+          accountStatus: nextStatus,
+          accountStatusReason: nextReason,
+          accountStatusUpdatedAt: new Date(),
+          updatedAt: new Date(),
+        }).where(eq(businessesTable.id, id.data));
+        await tx.insert(businessAdminEventsTable).values({
+          businessId: id.data,
+          actorUserId,
+          action: input.data.suspended ? "suspended" : "restored",
+          previousValue: current.account_status,
+          newValue: nextStatus,
+          reason: nextReason,
+        });
+      }
+      return { businessId: id.data, accountStatus: nextStatus, reason: nextReason };
+    });
+    if (!result) { res.sendStatus(404); return; }
+    res.json(result);
+  } catch (error) {
+    req.log.error({ businessId: id.data, errorName: error instanceof Error ? error.name : "UnknownError" }, "Business suspension update failed");
+    res.status(502).json({ error: "The account status could not be updated." });
+  }
+});
+
+router.get("/admin/support-requests", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    const rows = await db.select().from(supportRequestsTable)
+      .orderBy(desc(supportRequestsTable.createdAt), desc(supportRequestsTable.id)).limit(100);
+    res.json({ items: rows.map((row) => ({
+      id: row.id,
+      businessId: row.businessId,
+      businessName: row.businessName,
+      ownerEmail: row.ownerEmail,
+      message: row.message,
+      urgent: row.urgent,
+      createdAt: row.createdAt.toISOString(),
+      emailStatus: row.emailStatus,
+    })) });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Admin support inbox failed");
+    res.status(502).json({ error: "Support requests could not be loaded." });
+  }
+});
 router.get("/admin/fallback-phone-settings", async (req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");
   try {

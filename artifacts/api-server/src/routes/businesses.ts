@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
 import {
   GetBusinessProfileResponse,
@@ -20,13 +21,14 @@ import {
   WEBSITE_ENRICHMENT_FIELDS,
   type WebsiteEnrichmentField,
 } from "../lib/businessDirectory";
-import { pool } from "@workspace/db";
+import { pool, supportRequestsTable, db } from "@workspace/db";
 import { config as billingConfig } from "../billing/policy";
 import { normalizeWebsiteUrl, previewBusinessWebsite, unavailableWebsitePreview, UnsafeWebsiteUrlError } from "../lib/websiteEnrichment";
 import { parseBusinessHours, validTimeZone } from "../lib/businessHours";
 import { businessNameValidationError } from "../lib/businessNameValidation";
 import { getOwnerSmsReadiness } from "../lib/ownerSms";
-import { recordOperationalFailure } from "../lib/operationalFailures";
+import { queueFounderPushNotification, recordOperationalFailure } from "../lib/operationalFailures";
+import { sendAdminSupportRequestEmail } from "../lib/gmail";
 import { runNotificationOutboxNow } from "../lib/notificationService";
 import { initializeInvoices } from "../invoicing/service";
 import { runInvoiceCycle } from "../invoicing/worker";
@@ -47,6 +49,11 @@ const businessOnboardingRateLimit = createUserRateLimit({
   bucket: "business-onboarding",
   windowMs: 60 * 60_000,
   maxRequests: 10,
+});
+const supportRequestRateLimit = createUserRateLimit({
+  bucket: "owner-support-request",
+  windowMs: 60 * 60_000,
+  maxRequests: 5,
 });
 // Shared version for the Privacy Policy, Terms of Service, and Client Service Agreement; bump when any changes.
 const CURRENT_AGREEMENT_VERSION = "v1";
@@ -823,6 +830,180 @@ router.post("/businesses/onboard", businessOnboardingRateLimit, async (req, res)
     res.status(502).json({
       error: error instanceof Error ? error.message : "Unable to save business setup",
     });
+  }
+});
+
+router.get("/businesses/me/export", async (req, res): Promise<void> => {
+  const userId = getAuth(req).userId;
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.sendStatus(401); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business || business.isInternal || business.isSample) { res.sendStatus(404); return; }
+    const leads = await pool.query(
+      `SELECT id, caller_name AS "callerName", phone_number AS "phoneNumber",
+        callback_number AS "callbackNumber", transcript, summary, sentiment,
+        private_notes AS "privateNotes", issue_reason AS "issueReason", address,
+        urgency_level AS "urgencyLevel", availability, trade_intake_answers AS "tradeIntakeAnswers",
+        status, contacted_at AS "contactedAt", contacted_by AS "contactedBy",
+        created_at AS "createdAt"
+       FROM leads WHERE business_id=$1 ORDER BY created_at DESC, id DESC`,
+      [business.id],
+    );
+    const onboarding = {
+      businessName: business.businessName,
+      ownerEmail: business.ownerEmail,
+      ownerPhone: business.ownerPhone,
+      businessHours: business.businessHours,
+      timeZone: business.timeZone,
+      agentName: business.agentName,
+      businessType: business.businessType,
+      servicesOffered: business.servicesOffered,
+      majorIssueExamples: business.majorIssueExamples,
+      personalityToneDescription: business.personalityToneDescription,
+      servicesNotOffered: business.servicesNotOffered,
+      otherPolicies: business.otherPolicies,
+      pricingPolicy: business.pricingPolicy,
+      financingPolicy: business.financingPolicy,
+      brandsWorkedWith: business.brandsWorkedWith,
+      typicalResponseTimeCommitment: business.typicalResponseTimeCommitment,
+      warrantyInfo: business.warrantyInfo,
+      maintenancePlanOfferings: business.maintenancePlanOfferings,
+      credentialsCertifications: business.credentialsCertifications,
+      ownerAvailability: business.ownerAvailability,
+      emergencyContactInfo: business.emergencyContactInfo,
+      emergencyAvailable: business.emergencyAvailable,
+      emergencyEscalationPhone: business.emergencyEscalationPhone,
+      aiPromisePolicy: business.aiPromisePolicy,
+      serviceArea: business.serviceArea,
+      businessWebsiteUrl: business.businessWebsiteUrl,
+      agreementsAcceptedAt: business.agreementsAcceptedAt,
+      agreementsAcceptedVersion: business.agreementsAcceptedVersion,
+    };
+    res.json({
+      exportedAt: new Date().toISOString(),
+      businessName: business.businessName,
+      onboarding,
+      leads: leads.rows,
+    });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Owner data export failed");
+    res.status(502).json({ error: "Your data export could not be created. Please try again." });
+  }
+});
+
+router.post("/businesses/me/forwarding-test", async (req, res): Promise<void> => {
+  const userId = getAuth(req).userId;
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.sendStatus(401); return; }
+  try {
+    const result = await pool.query<{ id: number; requested_at: Date }>(
+      `UPDATE businesses SET forwarding_test_requested_at=now(), updated_at=now()
+       WHERE clerk_user_id=$1 AND is_internal=false AND is_sample=false
+       RETURNING id, forwarding_test_requested_at AS requested_at`,
+      [userId],
+    );
+    const row = result.rows[0];
+    if (!row) { res.sendStatus(404); return; }
+    res.json({ requestedAt: row.requested_at.toISOString(), verifiedAt: null, verified: false });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Forwarding test could not start");
+    res.status(503).json({ error: "Forwarding verification is temporarily unavailable." });
+  }
+});
+
+router.get("/businesses/me/forwarding-test", async (req, res): Promise<void> => {
+  const userId = getAuth(req).userId;
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.sendStatus(401); return; }
+  try {
+    const result = await pool.query<{ requested_at: Date | null; verified_at: Date | null }>(
+      `SELECT b.forwarding_test_requested_at AS requested_at,
+        (SELECT max(l.created_at) FROM leads l
+          WHERE l.business_id=b.id AND b.forwarding_test_requested_at IS NOT NULL
+            AND l.created_at >= b.forwarding_test_requested_at) AS verified_at
+       FROM businesses b WHERE b.clerk_user_id=$1 AND b.is_internal=false AND b.is_sample=false`,
+      [userId],
+    );
+    const row = result.rows[0];
+    if (!row) { res.sendStatus(404); return; }
+    const freshCutoff = Date.now() - 24 * 60 * 60_000;
+    const verifiedAt = row.verified_at && row.verified_at.getTime() >= freshCutoff
+      ? row.verified_at.toISOString()
+      : null;
+    res.json({
+      requestedAt: row.requested_at?.toISOString() ?? null,
+      verifiedAt,
+      verified: Boolean(verifiedAt),
+    });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Forwarding test status could not load");
+    res.status(503).json({ error: "Forwarding verification is temporarily unavailable." });
+  }
+});
+
+router.post("/businesses/me/support-requests", supportRequestRateLimit, async (req, res): Promise<void> => {
+  const userId = getAuth(req).userId;
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.sendStatus(401); return; }
+  const input = z.object({
+    message: z.string().trim().min(5).max(3000),
+    urgent: z.boolean().optional(),
+  }).strict().safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: "Write a message between 5 and 3,000 characters." }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business || business.isInternal || business.isSample) { res.sendStatus(404); return; }
+    const urgent = input.data.urgent === true;
+    const [saved] = await db.insert(supportRequestsTable).values({
+      businessId: business.id,
+      businessName: business.businessName,
+      ownerEmail: business.ownerEmail ?? "Not recorded",
+      message: input.data.message,
+      urgent,
+    }).returning({ id: supportRequestsTable.id });
+    if (!saved) throw new Error("Support request was not saved");
+    let emailSent = false;
+    try {
+      emailSent = await sendAdminSupportRequestEmail({
+        businessName: business.businessName,
+        ownerEmail: business.ownerEmail ?? "Not recorded",
+        message: input.data.message,
+        urgent,
+      });
+      await db.update(supportRequestsTable).set({ emailStatus: emailSent ? "sent" : "unconfigured" })
+        .where(eq(supportRequestsTable.id, saved.id));
+    } catch (error) {
+      await db.update(supportRequestsTable).set({ emailStatus: "failed" })
+        .where(eq(supportRequestsTable.id, saved.id));
+      await recordOperationalFailure({
+        eventKey: `support-request-email:${saved.id}`,
+        source: "support_request_email",
+        summary: "Owner support request email delivery failed",
+        details: error instanceof Error ? error.message : "Gmail delivery failed",
+        businessId: business.id,
+        businessName: business.businessName,
+        founderPush: {
+          eventKey: `support-request-email:${saved.id}`,
+          title: "Support request email failed",
+          body: `${business.businessName} support request is saved, but email delivery failed.`,
+          deepLink: "/admin/activity",
+        },
+      }).catch(() => false);
+    }
+    if (urgent) {
+      const inserted = await queueFounderPushNotification({
+        eventKey: `support-request-urgent:${saved.id}`,
+        title: "Urgent owner support request",
+        body: `${business.businessName} submitted an urgent support request.`,
+        deepLink: "/admin/activity",
+      }).catch(() => false);
+      if (inserted) void runNotificationOutboxNow().catch(() => undefined);
+    }
+    res.status(201).json({ id: saved.id, emailSent });
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Owner support request could not be saved");
+    res.status(503).json({ error: "Your support request could not be saved. Please try again." });
   }
 });
 

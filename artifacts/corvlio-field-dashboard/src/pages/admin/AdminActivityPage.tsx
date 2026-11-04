@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ArrowUpRight, CircleAlert, Clock3, Phone, Radio, Users, Wrench } from 'lucide-react';
 import { Link } from 'wouter';
-import { getGetAdminActivityQueryKey, getGetAdminFlaggedLeadsQueryKey, useGetAdminActivity, useGetAdminFlaggedLeads, useResolveAdminLeadInformationFlag, type AdminLeadActivity } from '@workspace/api-client-react';
+import { getGetAdminActivityQueryKey, getGetAdminFlaggedLeadsQueryKey, getGetAdminSupportRequestsQueryKey, useGetAdminActivity, useGetAdminFlaggedLeads, useResolveAdminLeadInformationFlag, useGetAdminSupportRequests, type AdminLeadActivity } from '@workspace/api-client-react';
 
 import { AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, SectionHeading, formatAdminDate } from './AdminShared';
 import EmailHealthSection from './EmailHealthSection';
@@ -26,6 +26,7 @@ function LeadActivityRow({ lead }: { lead: AdminLeadActivity }) {
 export default function AdminActivityPage() {
   const flaggedQuery = useGetAdminFlaggedLeads({ query: { queryKey: getGetAdminFlaggedLeadsQueryKey(), retry: false } });
   const resolveFlag = useResolveAdminLeadInformationFlag();
+  const supportRequests = useGetAdminSupportRequests({ query: { queryKey: getGetAdminSupportRequestsQueryKey(), retry: false } });
   const { data: flags } = flaggedQuery;
   const resolve = (flagId: number) => resolveFlag.mutate({ flagId }, {
     onSuccess: () => void flaggedQuery.refetch(),
@@ -47,6 +48,20 @@ export default function AdminActivityPage() {
       <AdminMetric label="Over 24 hours" value={data.uncontactedOver24HoursCount} detail="Oldest open follow-ups" tone={data.uncontactedOver24HoursCount ? 'coral' : 'neutral'} icon={Clock3} />
     </section>
     <EmailHealthSection />
+    <section className="mb-10" data-testid="section-admin-support-requests">
+      <SectionHeading eyebrow="Owner support" title="Support inbox" detail="Requests sent from the signed-in client dashboard." />
+      {supportRequests.isLoading ? <AdminLoading label="Loading support inbox" />
+        : supportRequests.isError ? <div role="alert" className="admin-panel rounded-2xl p-5 text-sm text-[#a3432d]">Support requests could not load. <button type="button" onClick={() => void supportRequests.refetch()} className="font-semibold underline">Try again</button></div>
+        : supportRequests.data?.items.length ? <div className="admin-panel overflow-hidden rounded-2xl">
+          {supportRequests.data.items.map((request) => <article key={request.id} className="border-b border-[#e1e6df] px-4 py-5 last:border-b-0 sm:px-6" data-testid={`row-support-request-${request.id}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0"><h3 className="text-sm font-800 text-[#25362e]">{request.businessName}{request.urgent ? ' · Urgent' : ''}</h3><p className="mt-1 text-xs text-[#68766c]">{request.ownerEmail}</p><p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[#526158]">{request.message}</p><time className="mt-2 block font-mono text-[10px] text-[#8a948d]" dateTime={request.createdAt}>{formatAdminDate(request.createdAt)}</time></div>
+              <div className="flex items-center gap-2"><span className={`rounded-full px-2 py-1 font-mono text-[9px] uppercase ${request.urgent ? 'bg-[#fae8df] text-[#aa573f]' : 'bg-[#e4f0e7] text-[#2c6b56]'}`}>{request.urgent ? 'Urgent' : 'Standard'}</span><Link href={`/admin/businesses/${request.businessId}`} className="admin-link inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#d5dfd5] px-3 text-xs font-semibold">Business <ArrowUpRight size={12} /></Link></div>
+            </div>
+            {request.emailStatus !== 'sent' ? <p className="mt-3 text-xs text-[#a3432d]">Email status: {request.emailStatus}. The request is saved in this inbox.</p> : null}
+          </article>)}
+        </div> : <AdminEmpty title="No support requests" description="Owner messages sent from Settings will appear here." icon={Wrench} />}
+    </section>
     <section className="mb-10" data-testid="section-flagged-leads">
       <SectionHeading eyebrow="Owner reports" title="Flagged lead information" detail="Review inaccurate lead details reported by client businesses." />
       {flaggedQuery.isLoading ? <AdminLoading label="Loading flagged leads" />

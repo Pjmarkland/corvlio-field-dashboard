@@ -122,6 +122,41 @@ export async function sendAdminTestEmail(recipient: string): Promise<void> {
   if (!response.ok) throw gmailSendFailure("admin test email", response.status, await response.text());
 }
 
+export async function sendAdminSupportRequestEmail(input: {
+  businessName: string;
+  ownerEmail: string;
+  message: string;
+  urgent: boolean;
+}): Promise<boolean> {
+  const recipients = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => normalizedRecipient(value))
+    .filter((value): value is string => Boolean(value));
+  if (!recipients.length) return false;
+  const accessToken = await getAccessToken();
+  if (!accessToken) return false;
+  const raw = [
+    `To: ${recipients.join(", ")}`,
+    `Subject: ${input.urgent ? "[Urgent] " : ""}Corvlio owner support request`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    `Business: ${input.businessName}`,
+    `Owner: ${input.ownerEmail}`,
+    `Urgent: ${input.urgent ? "Yes" : "No"}`,
+    "",
+    input.message,
+  ].join("\r\n");
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    signal: AbortSignal.timeout(15_000),
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ raw: encodeBase64Url(raw) }),
+  });
+  if (!response.ok) throw gmailSendFailure("support request", response.status, await response.text());
+  return true;
+}
+
 /** Reuses the existing OAuth email path; plain text only, no card information. */
 export async function sendBillingNotificationEmail(recipientInput: string | null, title: string, body: string): Promise<boolean> {
   const recipient = normalizedRecipient(recipientInput);

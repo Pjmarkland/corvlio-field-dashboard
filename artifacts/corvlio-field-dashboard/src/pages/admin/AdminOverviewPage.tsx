@@ -34,6 +34,8 @@ function BusinessRow({ business }: { business: AdminBusinessSummary }) {
     <td className="px-4 py-4 sm:px-5">
       {business.isInternal ? <span className="mb-1 mr-1 inline-block rounded-full bg-[#e4f0e9] px-2.5 py-1 text-xs font-semibold text-[#2c6b56]" data-testid={`badge-internal-row-${business.id}`}>Internal / non-billed</span> : null}
       {business.isSample ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Sample / demo</span> : <AdminStatus status={business.provisioningStatus} />}
+      {business.accountStatus === 'suspended' ? <span data-testid={`badge-suspended-${business.id}`} className="mt-1 inline-block rounded-full bg-[#fae8df] px-2.5 py-1 text-xs font-semibold text-[#a3432d]">Suspended</span> : null}
+      {business.billingReviewReasons.map((reason) => <span key={reason} data-testid={`badge-billing-review-${business.id}`} className="mt-1 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{reason}</span>)}
       <p className="mt-2 text-xs text-[#536258]">{business.retellPhoneNumber ?? 'No assigned number'}</p>
       <p className="mt-1 text-xs text-[#536258]">State: {business.provisioningState ?? business.provisioningStatus}</p>
       {business.unusedNumber7Days ? <p className="mt-2 text-xs font-semibold text-[#a3432d]" data-testid={`unused-number-${business.id}`}>No recorded calls in 7+ days — review in provider dashboard</p> : null}

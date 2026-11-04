@@ -3,6 +3,8 @@ import type { BillingSnapshot } from "@workspace/api-zod";
 import { config, BillingError, addMonths, addBusinessDays, billingUrl, cancellationDate, planFor, usagePeriod, type BillingState, type PlanId } from "./policy";
 import { ensurePlanPrices } from "./stripeClient";
 import type { BillingStore, BillingTransaction } from "./store";
+import { recordOperationalFailure } from "../lib/operationalFailures";
+import { runNotificationOutboxNow } from "../lib/notificationService";
 
 export type SubscriptionData = {
   id: string; customer: string | { id: string }; status: string; start_date?: number;
@@ -115,7 +117,7 @@ export class BillingService {
     return outcome.response;
   }
   async refresh(businessId: number) {
-    return this.store.transact(businessId, async tx => {
+    const refreshed = await this.store.transact(businessId, async tx => {
       const s = tx.state, now = this.now(), period = usagePeriod(s, now);
       const count = await tx.countCalls(period.start, period.end);
       const limit = s.plan ? planFor(s.plan).callLimit : null;
@@ -131,6 +133,41 @@ export class BillingService {
       }
       return { account: { ...s }, usage: { count, limit, ...period } };
     });
+    const business = await this.store.business(businessId);
+    if (!business) return refreshed;
+    const periodKey = refreshed.usage.start.slice(0, 10);
+    let alertQueued = false;
+    const queueReview = async (kind: "past-due" | "over-limit", summary: string, body: string) => {
+      const eventKey = `billing:${kind}:${businessId}:${periodKey}`;
+      const inserted = await recordOperationalFailure({
+        eventKey,
+        source: "billing_review",
+        summary,
+        details: summary,
+        businessId,
+        businessName: business.businessName,
+        founderPush: {
+          eventKey,
+          title: "Billing account needs review",
+          body: `${business.businessName}: ${body} No automatic account or plan change was made.`,
+          deepLink: `/admin/businesses/${businessId}`,
+        },
+      });
+      alertQueued ||= inserted;
+    };
+    if (refreshed.account.status === "past_due" && refreshed.account.graceEndsAt
+      && this.now().getTime() >= Date.parse(refreshed.account.graceEndsAt)) {
+      await queueReview(
+        "past-due",
+        "Account is past due beyond the grace period",
+        "Payment remains past due beyond the grace period.",
+      );
+    }
+    if (refreshed.usage.limit !== null && refreshed.usage.count > refreshed.usage.limit) {
+      await queueReview("over-limit", "Call allowance exceeded", "The plan call allowance has been exceeded.");
+    }
+    if (alertQueued) void runNotificationOutboxNow().catch(() => undefined);
+    return refreshed;
   }
   async snapshot(businessId: number): Promise<BillingSnapshot> {
     const business = await this.store.business(businessId);
@@ -255,6 +292,39 @@ export class BillingService {
       s.plan = planId; s.usageFlags = [];
       await tx.claimEvent(`upgrade:${s.subscriptionId}:${planId}:${this.now().getTime()}`, "owner.plan_upgrade",
         `Owner selected ${plan.label}; no per-call fee or setup fee added.`, this.now(), actor);
+      return { ...s };
+    });
+  }
+  async adminChangePlan(businessId: number, planId: PlanId, actor: string, reason: string | null) {
+    return this.store.transact(businessId, async tx => {
+      const s = tx.state;
+      if (planId === "startup" && !s.startupEligible)
+        throw new BillingError("Startup must be approved for this account before assignment.", 400);
+      if (!s.plan || !s.subscriptionId || s.status === "canceled")
+        throw new BillingError("This account has no active Stripe subscription.");
+      const previousPlan = s.plan;
+      if (previousPlan === planId) return { ...s };
+      await tx.prepareStripeBilling(planId);
+      const stripe = this.stripe();
+      const prices = await ensurePlanPrices(stripe, planId);
+      const subscription = await stripe.subscriptions.retrieve(s.subscriptionId) as unknown as SubscriptionData;
+      const item = subscription.items.data[0]?.id;
+      if (!item) throw new BillingError("Missing monthly subscription item");
+      await stripe.subscriptions.update(s.subscriptionId, {
+        items: [{ id: item, price: prices.monthly }],
+        proration_behavior: config.policy.upgradeProrationBehavior as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+        metadata: { corvlio_plan: planId },
+      });
+      s.plan = planId;
+      s.usageFlags = [];
+      const now = this.now();
+      await tx.claimEvent(
+        `admin-plan:${s.subscriptionId}:${planId}:${now.getTime()}`,
+        "admin.plan_change",
+        `Administrator changed the plan from ${previousPlan} to ${planId}.${reason ? ` Reason: ${reason.slice(0, 300)}.` : ""} No immediate prorated charge was requested.`,
+        now,
+        actor,
+      );
       return { ...s };
     });
   }
