@@ -122,6 +122,8 @@
   html { background: hsl(var(--background)); }
   body { @apply font-sans antialiased bg-background text-foreground; }
   button, a, input, select { -webkit-tap-highlight-color: transparent; }
+  /* iOS zooms the page when an input under 16px is focused; zoom itself stays enabled. */
+  @media (pointer: coarse) { input, textarea, select { font-size: 16px; } }
 }
 
 @layer components {
