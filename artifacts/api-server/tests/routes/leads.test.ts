@@ -1,5 +1,6 @@
 import express from "express";
 import { createServer, type Server } from "node:http";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
@@ -13,6 +14,8 @@ const fixture = vi.hoisted(() => ({
   selectCount: 0,
   limit: 0,
   offset: 0,
+  pageWhereSql: "",
+  aggregateWhereSql: "",
   fail: false,
   error: vi.fn(),
 }));
@@ -34,13 +37,15 @@ vi.mock("../../src/lib/businessDirectory", () => ({
 }));
 vi.mock("@workspace/db", async () => {
   const { leadsTable } = await import("../../../../lib/db/src/schema/leads");
+  const dialect = new PgDialect();
   const db = {
     select: () => {
       const selectIndex = fixture.selectCount++;
       if (selectIndex > 0) {
         return {
           from: () => ({
-            where: async () => {
+            where: async (condition: any) => {
+              fixture.aggregateWhereSql = dialect.sqlToQuery(condition).sql;
               if (fixture.fail) throw new Error("private database failure");
               return [fixture.aggregate];
             },
@@ -49,6 +54,7 @@ vi.mock("@workspace/db", async () => {
       }
 
       const pageQuery = {
+        showSpam: false,
         orderBy: () => pageQuery,
         limit: (limit: number) => {
           fixture.limit = limit;
@@ -57,12 +63,18 @@ vi.mock("@workspace/db", async () => {
         offset: async (offset: number) => {
           fixture.offset = offset;
           if (fixture.fail) throw new Error("private database failure");
-          return fixture.rows.slice(offset, offset + fixture.limit);
+          return fixture.rows.filter((row) => Boolean(row.isSpam) === pageQuery.showSpam)
+            .slice(offset, offset + fixture.limit);
         },
       };
       return {
         from: () => ({
-          where: () => pageQuery,
+          where: (condition: any) => {
+            const query = dialect.sqlToQuery(condition);
+            fixture.pageWhereSql = query.sql;
+            pageQuery.showSpam = query.params.includes(true);
+            return pageQuery;
+          },
         }),
       };
     },
@@ -92,6 +104,8 @@ beforeEach(() => {
   fixture.selectCount = 0;
   fixture.limit = 0;
   fixture.offset = 0;
+  fixture.pageWhereSql = "";
+  fixture.aggregateWhereSql = "";
   fixture.fail = false;
   fixture.rows = Array.from({ length: 5 }, (_, index) => ({
     id: index + 1,
@@ -107,6 +121,7 @@ beforeEach(() => {
     callbackNumber: null,
     availability: null,
     tradeIntakeAnswers: null,
+    isSpam: false,
     transcript: "private transcript",
     summary: "private summary",
   }));
@@ -155,6 +170,26 @@ describe("paginated owner lead list", () => {
     expect(third.body.leads.map((lead: { id: string }) => lead.id)).toEqual(["5"]);
     expect(third.body.hasMore).toBe(false);
     expect(fixture.offset).toBe(4);
+  });
+
+  it("hides spam leads and excludes them from normal summary counts", async () => {
+    fixture.rows[0].isSpam = true;
+    fixture.aggregate.totalLeads = "4";
+    fixture.aggregate.contactedLeads = "1";
+    const response = await request("/leads", "owner");
+    expect(response.body.leads.map((lead: { id: string }) => lead.id)).not.toContain("1");
+    expect(response.body.summary).toMatchObject({ totalLeads: 4, contactedLeads: 1 });
+    expect(fixture.pageWhereSql).toContain('"is_spam"');
+    expect(fixture.aggregateWhereSql).toContain('"is_spam"');
+  });
+
+  it("loads spam leads only when the owner opens the spam view", async () => {
+    fixture.rows[0].isSpam = true;
+    fixture.aggregate.totalLeads = "1";
+    fixture.aggregate.contactedLeads = "1";
+    const response = await request("/leads?showSpam=true", "owner");
+    expect(response.body.leads.map((lead: { id: string }) => lead.id)).toEqual(["1"]);
+    expect(response.body.summary.totalLeads).toBe(1);
   });
 
   it.each(["0", "-1", "1.5", "nope", "101"])("rejects invalid pagination value %s", async (value) => {

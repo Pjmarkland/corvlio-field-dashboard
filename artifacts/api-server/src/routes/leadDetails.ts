@@ -1,12 +1,21 @@
 import { getAuth } from "@clerk/express";
-import { FlagLeadInformationBody, GetLeadDetailResponse, UpdateLeadNotesBody } from "@workspace/api-zod";
+import { FlagLeadInformationBody, GetLeadDetailResponse, SetLeadSpamStatusBody, SetLeadSpamStatusResponse, UpdateLeadNotesBody } from "@workspace/api-zod";
 import { db, leadInfoFlagsTable, leadsTable, notificationEventsTable, retellCallRecordsTable } from "@workspace/db";
 import { and, eq, or } from "drizzle-orm";
 import { Router } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
+import { normalizeCallerNumber } from "../lib/callerNumber";
 import { deleteRetellCall } from "../lib/retellCallDeletion";
 
 const router = Router();
+
+function normalizeDetailStatus(value: string | null | undefined): "new" | "called_back" | "booked" | "closed" {
+  const status = (value ?? "").trim().toLowerCase();
+  if (status === "booked") return "booked";
+  if (status === "closed") return "closed";
+  if (["called_back", "contacted", "complete", "completed", "done"].includes(status)) return "called_back";
+  return "new";
+}
 
 export function parseLeadId(value: string): number | null {
   if (!/^[1-9]\d*$/.test(value)) return null;
@@ -36,7 +45,7 @@ export async function loadOwnedLead(leadId: number, businessId: number) {
     issue: lead.issueReason ?? "", address: lead.address ?? "",
     urgency: /urgent|high|emergency|same.day/.test(urgency) ? "urgent"
       : /low|flexible|can wait|whenever/.test(urgency) ? "low" : "normal",
-    status: /^(contacted|complete|completed|done)$/i.test(lead.status) ? "contacted" : "pending",
+    status: normalizeDetailStatus(lead.status),
     createdAt: lead.createdAt, contactedAt: lead.contactedAt,
     callerId: lead.callerId, callbackNumber: lead.callbackNumber,
     availability: lead.availability, transcript: lead.transcript,
@@ -44,9 +53,11 @@ export async function loadOwnedLead(leadId: number, businessId: number) {
     callStartedAt: record?.callStartedAt ?? null,
     durationMs: record?.durationMs ?? null,
     capturedUrgency: lead.urgencyLevel,
+    sentiment: lead.sentiment ?? null,
     recordingUrl: lead.recordingUrl ?? null,
     privateNotes: lead.privateNotes ?? null,
     contactedBy: lead.contactedBy ?? null,
+    isSpam: lead.isSpam,
   });
 }
 
@@ -92,6 +103,39 @@ router.patch("/leads/:leadId/notes", async (req, res): Promise<void> => {
   } catch (error) {
     req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Unable to save private lead notes");
     res.status(502).json({ error: "Unable to save private lead notes" });
+  }
+});
+
+router.patch("/leads/:leadId/spam", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  const id = parseLeadId(req.params.leadId);
+  if (id === null) { res.status(404).json({ error: "Lead not found" }); return; }
+  const input = SetLeadSpamStatusBody.strict().safeParse(req.body);
+  if (!input.success) { res.status(400).json({ error: "Spam status must be a boolean" }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.status(404).json({ error: "Lead not found" }); return; }
+    const [lead] = await db.select({
+      phoneNumber: leadsTable.phoneNumber,
+      callerId: leadsTable.callerId,
+      callbackNumber: leadsTable.callbackNumber,
+    }).from(leadsTable).where(ownedLeadFilter(id, business.id)).limit(1);
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    const callerNumber = input.data.isSpam
+      ? normalizeCallerNumber(lead.callerId)
+        ?? normalizeCallerNumber(lead.phoneNumber)
+        ?? normalizeCallerNumber(lead.callbackNumber)
+      : null;
+    const [updated] = await db.update(leadsTable).set({
+      isSpam: input.data.isSpam,
+      spamCallerNumber: callerNumber,
+    }).where(ownedLeadFilter(id, business.id)).returning({ id: leadsTable.id });
+    if (!updated) { res.status(404).json({ error: "Lead not found" }); return; }
+    res.json(SetLeadSpamStatusResponse.parse({ leadId: String(updated.id), isSpam: input.data.isSpam }));
+  } catch (error) {
+    req.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Unable to update lead spam status");
+    res.status(502).json({ error: "Unable to update lead spam status" });
   }
 });
 

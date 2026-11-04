@@ -1,5 +1,6 @@
 import { db, leadsTable, retellCallRecordsTable, notificationEventsTable } from "@workspace/db";
 import { and, desc, eq, gte, lte, isNull, sql } from "drizzle-orm";
+import { normalizeCallerNumber } from "./callerNumber";
 import { reconcileCall } from "./callReconciliation";
 import { enqueueWebPushDeliveries } from "./webPushService";
 
@@ -83,6 +84,17 @@ export async function persistAnalyzedCall(callId: string, leadInput: LeadInput, 
       },
       async ensureNotification(leadId) {
         if (!alertsEnabled) return false;
+        const callerNumber = normalizeCallerNumber(leadInput.callerId)
+          ?? normalizeCallerNumber(leadInput.phoneNumber)
+          ?? normalizeCallerNumber(leadInput.callbackNumber);
+        if (callerNumber) {
+          const [suppressedCaller] = await tx.select({ id: leadsTable.id }).from(leadsTable).where(and(
+            eq(leadsTable.businessId, leadInput.businessId),
+            eq(leadsTable.isSpam, true),
+            eq(leadsTable.spamCallerNumber, callerNumber),
+          )).limit(1);
+          if (suppressedCaller) return false;
+        }
         const name = leadInput.callerName || "Unknown caller";
         const inserted = await tx.insert(notificationEventsTable).values({
           businessId: String(leadInput.businessId), leadId: String(leadId),

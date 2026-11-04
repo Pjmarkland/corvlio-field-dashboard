@@ -51,9 +51,17 @@ function normalizeUrgency(value: string | null): "urgent" | "normal" | "low" {
 }
 
 function normalizeStatus(value: string | null): "pending" | "contacted" {
-  return ["contacted", "complete", "completed", "done"].includes((value ?? "").trim().toLowerCase())
+  return ["called_back", "booked", "closed", "contacted", "complete", "completed", "done"].includes((value ?? "").trim().toLowerCase())
     ? "contacted"
     : "pending";
+}
+
+function normalizeOwnerStatus(value: string | null): "new" | "called_back" | "booked" | "closed" {
+  const status = (value ?? "").trim().toLowerCase();
+  if (status === "booked") return "booked";
+  if (status === "closed") return "closed";
+  if (["called_back", "contacted", "complete", "completed", "done"].includes(status)) return "called_back";
+  return "new";
 }
 
 router.get("/leads", async (req, res): Promise<void> => {
@@ -71,10 +79,13 @@ router.get("/leads", async (req, res): Promise<void> => {
 
   const page = parsePaginationInteger(req.query.page, 1, Number.MAX_SAFE_INTEGER);
   const pageSize = parsePaginationInteger(req.query.pageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-  if (page === null || pageSize === null || !Number.isSafeInteger((page - 1) * pageSize)) {
+  const spamFilter = req.query.showSpam;
+  if (page === null || pageSize === null || !Number.isSafeInteger((page - 1) * pageSize)
+    || (spamFilter !== undefined && spamFilter !== "true" && spamFilter !== "false")) {
     res.status(400).json({ error: "Invalid pagination parameters" });
     return;
   }
+  const showSpam = spamFilter === "true";
 
   try {
     const business = await findBusinessByClerkUserId(userId);
@@ -94,7 +105,10 @@ router.get("/leads", async (req, res): Promise<void> => {
     }
 
     const timeZone = safeTimeZone(business.timeZone);
-    const leadFilter = eq(leadsTable.businessId, business.id);
+    const leadFilter = and(
+      eq(leadsTable.businessId, business.id),
+      eq(leadsTable.isSpam, showSpam),
+    );
     const [rows, [aggregate]] = await Promise.all([
       db
         .select({
@@ -120,7 +134,7 @@ router.get("/leads", async (req, res): Promise<void> => {
       db.select({
         totalLeads: count(),
         contactedLeads: sql<string>`COUNT(*) FILTER (
-          WHERE LOWER(TRIM(${leadsTable.status})) IN ('contacted', 'complete', 'completed', 'done')
+          WHERE LOWER(TRIM(${leadsTable.status})) IN ('called_back', 'booked', 'closed', 'contacted', 'complete', 'completed', 'done')
         )`,
         thisWeekLeads: sql<string>`COUNT(*) FILTER (
           WHERE ${leadsTable.createdAt} >=
@@ -217,9 +231,9 @@ router.patch("/leads/:leadId/status", async (req, res): Promise<void> => {
     const [updatedLead] = await db
       .update(leadsTable)
       .set({
-        status: body.data.status,
-        contactedAt: body.data.status === "contacted" ? new Date() : null,
-        contactedBy: body.data.status === "contacted" ? userId : null,
+        status: body.data.status === "pending" ? "new" : body.data.status === "contacted" ? "called_back" : body.data.status,
+        contactedAt: body.data.status === "pending" || body.data.status === "new" ? null : new Date(),
+        contactedBy: body.data.status === "pending" || body.data.status === "new" ? null : userId,
       })
       .where(and(
         eq(leadsTable.id, leadId),
@@ -238,7 +252,7 @@ router.patch("/leads/:leadId/status", async (req, res): Promise<void> => {
 
     res.json(UpdateLeadStatusResponse.parse({
       leadId: String(updatedLead.id),
-      status: normalizeStatus(updatedLead.status),
+      status: normalizeOwnerStatus(updatedLead.status),
       contactedAt: updatedLead.contactedAt,
     }));
   } catch (error) {

@@ -688,11 +688,12 @@ export const getLeadsQueryPageDefault = 1;
 export const getLeadsQueryPageSizeDefault = 25;
 export const getLeadsQueryPageSizeMax = 100;
 
-
+export const getLeadsQueryShowSpamDefault = false;
 
 export const GetLeadsQueryParams = zod.object({
   "page": zod.coerce.number().int().min(1).default(getLeadsQueryPageDefault),
-  "pageSize": zod.coerce.number().int().min(1).max(getLeadsQueryPageSizeMax).default(getLeadsQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().int().min(1).max(getLeadsQueryPageSizeMax).default(getLeadsQueryPageSizeDefault),
+  "showSpam": zod.coerce.boolean().default(getLeadsQueryShowSpamDefault)
 })
 
 
@@ -738,7 +739,7 @@ export const GetLeadsResponse = zod.object({
   "issue": zod.string(),
   "address": zod.string(),
   "urgency": zod.enum(['urgent', 'normal', 'low']),
-  "status": zod.enum(['pending', 'contacted']),
+  "status": zod.enum(['pending', 'contacted', 'new', 'called_back', 'booked', 'closed']),
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
 }))
@@ -771,7 +772,7 @@ export const GetLeadDetailResponse = zod.object({
   "issue": zod.string(),
   "address": zod.string(),
   "urgency": zod.enum(['urgent', 'normal', 'low']),
-  "status": zod.enum(['pending', 'contacted']),
+  "status": zod.enum(['pending', 'contacted', 'new', 'called_back', 'booked', 'closed']),
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
 }).and(zod.object({
@@ -780,9 +781,11 @@ export const GetLeadDetailResponse = zod.object({
   "callStartedAt": zod.coerce.date().nullable(),
   "durationMs": zod.number().min(getLeadDetailResponseTwoDurationMsMin).multipleOf(getLeadDetailResponseTwoDurationMsMultipleOf).nullable(),
   "capturedUrgency": zod.string().nullable(),
+  "sentiment": zod.string().nullable(),
   "recordingUrl": zod.string().nullable(),
   "privateNotes": zod.string().nullable(),
-  "contactedBy": zod.string().nullable()
+  "contactedBy": zod.string().nullable(),
+  "isSpam": zod.boolean()
 }))
 
 
@@ -856,7 +859,7 @@ export const UpdateLeadNotesResponse = zod.object({
   "issue": zod.string(),
   "address": zod.string(),
   "urgency": zod.enum(['urgent', 'normal', 'low']),
-  "status": zod.enum(['pending', 'contacted']),
+  "status": zod.enum(['pending', 'contacted', 'new', 'called_back', 'booked', 'closed']),
   "createdAt": zod.coerce.date(),
   "contactedAt": zod.coerce.date().nullable()
 }).and(zod.object({
@@ -865,10 +868,33 @@ export const UpdateLeadNotesResponse = zod.object({
   "callStartedAt": zod.coerce.date().nullable(),
   "durationMs": zod.number().min(updateLeadNotesResponseTwoDurationMsMin).multipleOf(updateLeadNotesResponseTwoDurationMsMultipleOf).nullable(),
   "capturedUrgency": zod.string().nullable(),
+  "sentiment": zod.string().nullable(),
   "recordingUrl": zod.string().nullable(),
   "privateNotes": zod.string().nullable(),
-  "contactedBy": zod.string().nullable()
+  "contactedBy": zod.string().nullable(),
+  "isSpam": zod.boolean()
 }))
+
+
+/**
+ * Hides marked leads and suppresses future alerts for the caller number; it does not block calls.
+ * @summary Mark or unmark an owned lead as spam
+ */
+
+
+
+export const SetLeadSpamStatusParams = zod.object({
+  "leadId": zod.coerce.string().min(1)
+})
+
+export const SetLeadSpamStatusBody = zod.object({
+  "isSpam": zod.boolean()
+})
+
+export const SetLeadSpamStatusResponse = zod.object({
+  "leadId": zod.string(),
+  "isSpam": zod.boolean()
+})
 
 
 /**
@@ -883,12 +909,12 @@ export const UpdateLeadStatusParams = zod.object({
 })
 
 export const UpdateLeadStatusBody = zod.object({
-  "status": zod.enum(['pending', 'contacted'])
+  "status": zod.enum(['pending', 'contacted', 'new', 'called_back', 'booked', 'closed'])
 })
 
 export const UpdateLeadStatusResponse = zod.object({
   "leadId": zod.string(),
-  "status": zod.enum(['pending', 'contacted']),
+  "status": zod.enum(['pending', 'contacted', 'new', 'called_back', 'booked', 'closed']),
   "contactedAt": zod.coerce.date().nullable()
 })
 

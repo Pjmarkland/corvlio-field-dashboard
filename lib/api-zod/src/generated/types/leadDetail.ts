@@ -22,9 +22,12 @@ export type LeadDetail = Lead & ({
   /** @nullable */
   capturedUrgency: string | null;
   /** @nullable */
+  sentiment: string | null;
+  /** @nullable */
   recordingUrl: string | null;
   /** @nullable */
   privateNotes: string | null;
   /** @nullable */
   contactedBy: string | null;
+  isSpam: boolean;
 });

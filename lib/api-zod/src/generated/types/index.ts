@@ -106,6 +106,8 @@ export * from './leadDetail';
 export * from './leadInformationFlagInput';
 export * from './leadInformationFlagResult';
 export * from './leadNotesInput';
+export * from './leadSpamStatusInput';
+export * from './leadSpamStatusResult';
 export * from './leadStatus';
 export * from './leadStatusResult';
 export * from './leadStatusResultStatus';

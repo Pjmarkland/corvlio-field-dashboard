@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 
 export const leadsTable = pgTable("leads", {
@@ -11,8 +11,11 @@ export const leadsTable = pgTable("leads", {
   phoneNumber: text("phone_number"),
   callerId: text("caller_id"),
   callbackNumber: text("callback_number"),
+  isSpam: boolean("is_spam").notNull().default(false),
+  spamCallerNumber: text("spam_caller_number"),
   transcript: text("transcript"),
   summary: text("summary"),
+  sentiment: text("sentiment"),
   recordingUrl: text("recording_url"),
   mediaRetentionCompletedAt: timestamp("media_retention_completed_at", { withTimezone: true }),
   privateNotes: text("private_notes"),
@@ -25,7 +28,10 @@ export const leadsTable = pgTable("leads", {
   contactedAt: timestamp("contacted_at", { withTimezone: true }),
   contactedBy: text("contacted_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("leads_retell_call_id_unique").on(table.retellCallId)]);
+}, (table) => [
+  uniqueIndex("leads_retell_call_id_unique").on(table.retellCallId),
+  index("leads_spam_caller_idx").on(table.businessId, table.spamCallerNumber),
+]);
 
 export type Lead = typeof leadsTable.$inferSelect;
 export type NewLead = typeof leadsTable.$inferInsert;

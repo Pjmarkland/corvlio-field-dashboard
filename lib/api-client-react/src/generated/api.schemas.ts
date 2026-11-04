@@ -695,6 +695,10 @@ export type LeadStatus = typeof LeadStatus[keyof typeof LeadStatus];
 export const LeadStatus = {
   pending: 'pending',
   contacted: 'contacted',
+  new: 'new',
+  called_back: 'called_back',
+  booked: 'booked',
+  closed: 'closed',
 } as const;
 
 export interface Lead {
@@ -733,16 +737,28 @@ export type LeadDetail = Lead & ({
   /** @nullable */
   capturedUrgency: string | null;
   /** @nullable */
+  sentiment: string | null;
+  /** @nullable */
   recordingUrl: string | null;
   /** @nullable */
   privateNotes: string | null;
   /** @nullable */
   contactedBy: string | null;
+  isSpam: boolean;
 });
 
 export interface LeadNotesInput {
   /** @maxLength 500 */
   privateNotes: string;
+}
+
+export interface LeadSpamStatusInput {
+  isSpam: boolean;
+}
+
+export interface LeadSpamStatusResult {
+  leadId: string;
+  isSpam: boolean;
 }
 
 export type WelcomeEntryNextPath = typeof WelcomeEntryNextPath[keyof typeof WelcomeEntryNextPath];
@@ -764,6 +780,10 @@ export type LeadStatusUpdateStatus = typeof LeadStatusUpdateStatus[keyof typeof 
 export const LeadStatusUpdateStatus = {
   pending: 'pending',
   contacted: 'contacted',
+  new: 'new',
+  called_back: 'called_back',
+  booked: 'booked',
+  closed: 'closed',
 } as const;
 
 export interface LeadStatusUpdate {
@@ -776,6 +796,10 @@ export type LeadStatusResultStatus = typeof LeadStatusResultStatus[keyof typeof 
 export const LeadStatusResultStatus = {
   pending: 'pending',
   contacted: 'contacted',
+  new: 'new',
+  called_back: 'called_back',
+  booked: 'booked',
+  closed: 'closed',
 } as const;
 
 export interface LeadStatusResult {
@@ -1853,6 +1877,7 @@ page?: number;
  * @maximum 100
  */
 pageSize?: number;
+showSpam?: boolean;
 };
 
 export type GetAdminInvoices200 = {

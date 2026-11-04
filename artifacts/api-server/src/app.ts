@@ -4,7 +4,6 @@ import { clerkDeletionWebhook } from "./routes/clerkWebhook";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
-import type { IncomingMessage } from "node:http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { retellMalformedJsonAlertHandler } from "./lib/retellWebhookAlerts";
@@ -16,6 +15,7 @@ import {
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
+import { captureWebhookRawBody, createRetellWebhookJsonParser } from "./middlewares/retellWebhookJson";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -47,11 +47,10 @@ app.use(cors(corsOptions));
 app.use(rejectUnexpectedOrigin);
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use("/api/webhooks/retell", publicWebhookRateLimit);
+app.use("/api/webhooks/retell", createRetellWebhookJsonParser());
 app.use(
   express.json({
-    verify: (req, _res, buffer) => {
-      (req as IncomingMessage & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
-    },
+    verify: captureWebhookRawBody,
   }),
 );
 app.use(express.urlencoded({ extended: true }));

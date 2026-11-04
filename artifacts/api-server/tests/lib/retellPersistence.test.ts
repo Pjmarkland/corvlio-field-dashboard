@@ -1,28 +1,60 @@
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({
   transaction: vi.fn(), update: vi.fn(), select: vi.fn(), insert: vi.fn(),
-  leads: { id: "id", retellCallId: "call_id" },
-  records: { retellCallId: "call_id" }, notifications: {},
+  inserted: [] as Array<{ table: unknown; values: unknown }>,
+  suppressedLeads: [] as Array<{ businessId: number; isSpam: boolean; spamCallerNumber: string }>,
 }));
-vi.mock("@workspace/db", () => ({
-  db: { transaction: mock.transaction }, leadsTable: mock.leads,
-  retellCallRecordsTable: mock.records, notificationEventsTable: mock.notifications,
+vi.mock("@workspace/db", async () => ({
+  ...await import("../../../../lib/db/src/schema/leads"),
+  ...await import("../../../../lib/db/src/schema/retellCallRecords"),
+  ...await import("../../../../lib/db/src/schema/notifications"),
+  db: { transaction: mock.transaction },
 }));
+import { leadsTable, notificationEventsTable, retellCallRecordsTable } from "@workspace/db";
 import { persistAnalyzedCall } from "../../src/lib/retellPersistence";
+const dialect = new PgDialect();
 let lead: Record<string, any>;
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.inserted = [];
+  mock.suppressedLeads = [];
   lead = { id: 1, businessId: 2, retellCallId: "test-call", callerName: "Sam", callerId: "+15550000001",
     callbackNumber: "+15550000002", phoneNumber: "+15550000002", issueReason: "Analyzed issue",
-    address: "12 Test St", summary: "Analyzed summary", status: "contacted", contactedAt: new Date() };
+    address: "12 Test St", summary: "Analyzed summary", status: "contacted", contactedAt: new Date(),
+    isSpam: false, spamCallerNumber: null };
   mock.select.mockImplementation(() => ({ from: (table: unknown) => ({
-    where: async () => table === mock.leads ? [lead] : [{ businessId: 2, leadId: 1 }],
+    where: (condition: unknown) => {
+      const query = dialect.sqlToQuery(condition as any);
+      if (table === leadsTable && query.sql.includes('"spam_caller_number"')) {
+        const result = mock.suppressedLeads.filter(row =>
+          row.businessId === query.params[0]
+          && row.isSpam
+          && row.spamCallerNumber === query.params[query.params.length - 1]);
+        return Object.assign(Promise.resolve(result), { limit: async () => result.slice(0, 1) });
+      }
+      if (table === leadsTable && query.sql.includes('"retell_call_id"')) {
+        const result = lead.retellCallId === query.params[0] ? [lead] : [];
+        return Object.assign(Promise.resolve(result), { limit: async (size: number) => result.slice(0, size) });
+      }
+      const result = table === leadsTable ? [lead]
+        : query.params[0] === "test-call" ? [{ businessId: 2, leadId: 1 }] : [];
+      return Object.assign(Promise.resolve(result), { limit: async (size: number) => result.slice(0, size) });
+    },
   }) }));
   mock.update.mockImplementation(() => ({ set: (changes: Record<string, unknown>) => ({ where: async () => { lead = { ...lead, ...changes }; } }) }));
-  mock.insert.mockImplementation(() => ({ values: () => ({
+  mock.insert.mockImplementation((table: unknown) => ({ values: (values: unknown) => {
+    mock.inserted.push({ table, values });
+    return {
+    returning: async () => {
+      if (table !== leadsTable) return [];
+      lead = { ...(values as Record<string, unknown>), id: 2, retellCallId: "new-call" };
+      return [lead];
+    },
     onConflictDoUpdate: async () => {},
     onConflictDoNothing: () => ({ returning: async () => [] }),
-  }) }));
+    };
+  } }));
   mock.transaction.mockImplementation(async (work) => work({
     execute: async () => {}, select: mock.select, update: mock.update, insert: mock.insert,
   }));
@@ -57,5 +89,22 @@ describe("ended/analyzed reconciliation enriches one lead without losing richer 
       callbackNumber: "+15550000002", address: "12 Test St", availability: "Tomorrow", transcript: "user: My pipe leaks",
       summary: "Sam needs help", status: "contacted" });
     expect(mock.update).toHaveBeenCalledOnce();
+  });
+
+  it("suppresses a future notification for a manually marked caller number", async () => {
+    mock.suppressedLeads = [{ businessId: 2, isSpam: true, spamCallerNumber: "+15550000001" }];
+    await persistAnalyzedCall("new-call", {
+      businessId: 2, callerId: "(555) 000-0001", phoneNumber: "(555) 000-0002",
+      callbackNumber: "(555) 000-0002", callerName: "Sam",
+    }, { businessId: 2, retellCallId: "new-call" }, true);
+    expect(mock.inserted.some(row => row.table === notificationEventsTable)).toBe(false);
+  });
+
+  it("does not suppress a caller because another business marked that number as spam", async () => {
+    mock.suppressedLeads = [{ businessId: 1, isSpam: true, spamCallerNumber: "+15550000001" }];
+    await persistAnalyzedCall("new-call", {
+      businessId: 2, callerId: "+15550000001", callerName: "Sam",
+    }, { businessId: 2, retellCallId: "new-call" }, true);
+    expect(mock.inserted.some(row => row.table === notificationEventsTable)).toBe(true);
   });
 });

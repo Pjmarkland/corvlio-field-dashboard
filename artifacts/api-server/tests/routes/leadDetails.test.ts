@@ -97,7 +97,8 @@ beforeEach(() => {
     phoneNumber: null, callbackNumber: null, callerId: null, issueReason: null,
     address: null, urgencyLevel: null, availability: null, transcript: null,
     summary: null, tradeIntakeAnswers: null, recordingUrl: null, privateNotes: null,
-    contactedBy: null, contactedAt: null, status: "new", createdAt: new Date("2026-10-10T00:00:00Z"),
+    contactedBy: null, contactedAt: null, isSpam: false, spamCallerNumber: null,
+    status: "new", createdAt: new Date("2026-10-10T00:00:00Z"),
   }));
   fixture.rows[1].callerName = "Other tenant secret";
   fixture.rows[1].privateNotes = "Owner B private notes";
@@ -112,10 +113,10 @@ async function request(path: string, user?: string, method = "GET", data?: any) 
   return { status: response.status, headers: response.headers, body: response.status === 204 ? null : await response.json() };
 }
 
-it("returns the owner's almost-empty lead plus existing linked call metadata", async () => {
+  it("returns the owner's almost-empty lead plus existing linked call metadata", async () => {
   const response = await request("/leads/101", "owner-a");
   expect(response.status).toBe(200);
-  expect(response.body).toMatchObject({ id: "101", name: "", status: "pending",
+    expect(response.body).toMatchObject({ id: "101", name: "", status: "new", sentiment: null,
     durationMs: 42000, callStartedAt: "2026-10-09T23:59:00.000Z", recordingUrl: null,
     privateNotes: null, contactedBy: null, capturedUrgency: null });
   expect(response.headers.get("cache-control")).toContain("no-store");
@@ -142,9 +143,23 @@ it("never joins call metadata from another business, even with a matching call I
 it("persists and clears plain-text private notes without changing intake or status", async () => {
   const value = '<img src=x onerror=alert(1)> private note';
   expect(await request("/leads/101/notes", "owner-a", "PATCH", { privateNotes: value }))
-    .toMatchObject({ status: 200, body: { privateNotes: value, status: "pending" } });
+    .toMatchObject({ status: 200, body: { privateNotes: value, status: "new" } });
   expect((await request("/leads/101", "owner-a")).body.privateNotes).toBe(value);
   expect((await request("/leads/101/notes", "owner-a", "PATCH", { privateNotes: "" })).body.privateNotes).toBeNull();
+});
+it("marks an owned lead as spam, stores a normalized caller number, and can undo it", async () => {
+  fixture.rows[0].callbackNumber = "+1 (555) 000-0002";
+  expect(await request("/leads/101/spam", "owner-a", "PATCH", { isSpam: true }))
+    .toMatchObject({ status: 200, body: { leadId: "101", isSpam: true } });
+  expect(fixture.rows[0]).toMatchObject({ isSpam: true, spamCallerNumber: "+15550000002" });
+  expect(await request("/leads/101/spam", "owner-a", "PATCH", { isSpam: false }))
+    .toMatchObject({ status: 200, body: { leadId: "101", isSpam: false } });
+  expect(fixture.rows[0]).toMatchObject({ isSpam: false, spamCallerNumber: null });
+});
+it("does not let another owner mark a lead as spam", async () => {
+  expect(await request("/leads/201/spam", "owner-a", "PATCH", { isSpam: true }))
+    .toMatchObject({ status: 404 });
+  expect(fixture.rows[1].isSpam).toBe(false);
 });
 it("flags only an owned lead and stores no caller data in the flag", async () => {
   expect(await request("/leads/101/flag", "owner-a", "POST", { reason: "Incorrect service area" }))
@@ -187,10 +202,15 @@ it("rejects oversized or forged notes fields", async () => {
 it("records contacted actor on the server and clears it when reopened", async () => {
   expect((await request("/leads/101/status", "owner-a", "PATCH", { status: "contacted" })).status).toBe(200);
   expect(fixture.rows[0].contactedBy).toBe("owner-a");
-  expect((await request("/leads/101", "owner-a")).body).toMatchObject({ status: "contacted", contactedBy: "owner-a" });
+    expect((await request("/leads/101", "owner-a")).body).toMatchObject({ status: "called_back", contactedBy: "owner-a" });
   await request("/leads/101/status", "owner-a", "PATCH", { status: "pending" });
-  expect(fixture.rows[0]).toMatchObject({ contactedBy: null, contactedAt: null });
+    expect(fixture.rows[0]).toMatchObject({ status: "new", contactedBy: null, contactedAt: null });
 });
+  it.each(["new", "called_back", "booked", "closed"])("persists owner call status %s", async status => {
+    const response = await request("/leads/101/status", "owner-a", "PATCH", { status });
+    expect(response).toMatchObject({ status: 200, body: { status } });
+    expect(fixture.rows[0].status).toBe(status);
+  });
 it("returns a safe error without leaking notes when storage is unavailable", async () => {
   fixture.fail = true;
   expect(await request("/leads/101", "owner-a")).toMatchObject({ status: 502, body: { error: "Unable to load lead detail" } });

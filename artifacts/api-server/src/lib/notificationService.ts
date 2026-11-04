@@ -312,9 +312,15 @@ async function processNotificationOutbox(): Promise<void> {
       // Increment attempts so events don't spin forever when no devices are
       // registered yet; they will be retried until MAX_DELIVERY_ATTEMPTS.
       const nextAttemptAt = new Date(now.getTime() + Math.pow(2, newAttempts) * 60_000);
+      const exhausted = newAttempts >= MAX_DELIVERY_ATTEMPTS;
       await tx
         .update(notificationEventsTable)
-        .set({ attempts: newAttempts, lastError: "No active iOS devices", nextAttemptAt })
+        .set({
+          status: exhausted ? "failed" : "queued",
+          attempts: newAttempts,
+          lastError: exhausted ? "No active iOS devices after retry limit" : "No active iOS devices",
+          nextAttemptAt,
+        })
         .where(eq(notificationEventsTable.id, event.id));
       return;
     }

@@ -58,6 +58,7 @@ vi.mock('@workspace/api-client-react', () => ({
   useGetLeads: vi.fn(),
   useGetNotificationStatus: vi.fn(),
   useUpdateLeadStatus: vi.fn(),
+  useSetLeadSpamStatus: () => ({ mutate: vi.fn(), isPending: false }),
   getGetLeadsQueryKey: () => ['/api/leads'],
   getGetNativeBusinessSetupStatusQueryKey: () => ['/api/businesses/native-onboard/status'],
   useGetNativeBusinessSetupStatus: vi.fn(),

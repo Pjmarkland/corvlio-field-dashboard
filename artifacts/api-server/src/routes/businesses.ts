@@ -250,8 +250,8 @@ router.get("/businesses/me/monthly-report", async (req, res): Promise<void> => {
        ), lead_stats AS (
          SELECT count(*)::int AS leads_captured,
            count(*) FILTER (WHERE COALESCE(urgency_level, '') ~* '(urgent|high|emergency|same.day)')::int AS urgent_leads,
-           count(*) FILTER (WHERE lower(status) IN ('contacted','complete','completed','done'))::int AS contacted_leads,
-           count(*) FILTER (WHERE lower(status) NOT IN ('contacted','complete','completed','done'))::int AS pending_leads
+           count(*) FILTER (WHERE lower(status) IN ('called_back','booked','closed','contacted','complete','completed','done'))::int AS contacted_leads,
+           count(*) FILTER (WHERE lower(status) NOT IN ('called_back','booked','closed','contacted','complete','completed','done'))::int AS pending_leads
          FROM leads l, bounds b
          WHERE l.business_id = $1 AND l.created_at >= timezone($2, b.local_start)
            AND l.created_at < timezone($2, b.local_end)

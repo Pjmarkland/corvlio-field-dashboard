@@ -12,4 +12,8 @@ export type LeadStatusResultStatus = typeof LeadStatusResultStatus[keyof typeof 
 export const LeadStatusResultStatus = {
   pending: 'pending',
   contacted: 'contacted',
+  new: 'new',
+  called_back: 'called_back',
+  booked: 'booked',
+  closed: 'closed',
 } as const;

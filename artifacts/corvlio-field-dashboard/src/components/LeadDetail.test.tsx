@@ -1,48 +1,87 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { LeadDetailView, copyText, formatCallTime, safeRecordingUrl } from './LeadDetail';
+import { LeadDetailView, copyText, formatCallTime, parseTranscriptMessages, safeRecordingUrl } from './LeadDetail';
 
 const state: { data?: unknown; isError?: boolean; error?: unknown } = {};
 const mutate = vi.fn();
 const flagMutate = vi.fn();
 const deleteMutate = vi.fn();
+const spamMutate = vi.fn();
+const billing = { smsAvailable: true };
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isLoaded: true, user: { id: 'u1', fullName: 'Sam Roe' } }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ setQueryData: vi.fn(), invalidateQueries: vi.fn() }) }));
 vi.mock('wouter', () => ({ Link: ({ href, children, ...p }: { href: string; children: React.ReactNode }) => <a href={href} {...p}>{children}</a>, useLocation: () => ['/leads/L1', vi.fn()] }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetLeadDetailQueryKey: (id: string) => [`/api/leads/${id}`],
   getGetLeadsQueryKey: () => ['/api/leads'],
+  getGetBillingAvailabilityQueryKey: () => ['/api/billing/availability'],
+  useGetBillingAvailability: () => ({ data: billing }),
   useGetLeadDetail: () => ({ data: state.data, isLoading: false, isError: !!state.isError, error: state.error, refetch: vi.fn() }),
   useUpdateLeadNotes: () => ({ mutate }),
+  useSetLeadSpamStatus: () => ({ mutate: spamMutate, isPending: false }),
   useFlagLeadInformation: () => ({ mutate: flagMutate, isPending: false }),
   useDeleteOwnedLead: () => ({ mutate: deleteMutate, isPending: false }),
 }));
 
 const base = { id: 'L1', name: '', phone: '', issue: '', address: '', urgency: 'normal', status: 'pending', createdAt: 'bad', contactedAt: null,
-  callStartedAt: null, durationMs: null, capturedUrgency: null, recordingUrl: null, privateNotes: null, contactedBy: null };
+  callStartedAt: null, durationMs: null, capturedUrgency: null, recordingUrl: null, privateNotes: null, contactedBy: null, isSpam: false };
 const view = () => render(<LeadDetailView leadId="L1" onStatus={vi.fn()} savingLeadId={null} />);
 const type = (v: string) => fireEvent.change(screen.getByTestId('input-notes'), { target: { value: v } });
 
 describe('LeadDetailView', () => {
-  beforeEach(() => { state.data = base; state.isError = false; mutate.mockReset(); flagMutate.mockReset(); deleteMutate.mockReset(); });
+  beforeEach(() => { state.data = base; state.isError = false; billing.smsAvailable = true; mutate.mockReset(); flagMutate.mockReset(); deleteMutate.mockReset(); spamMutate.mockReset(); });
   it('renders a blank lead safely', () => {
     view();
-    expect(screen.getByTestId('text-detail-name').textContent).toBe('Unknown caller');
-    expect(screen.getByTestId('text-detail-status').textContent).toBe('Needs response');
+    expect(screen.queryByTestId('text-detail-name')).toBeNull();
+    expect(screen.getByTestId('text-call-details-title').textContent).toBe('Call details');
+    expect((screen.getByTestId('select-call-status') as HTMLSelectElement).value).toBe('new');
     expect(screen.queryByTestId('badge-urgency')).toBeNull();
     expect(screen.queryByTestId('section-transcript')).toBeNull();
     expect(screen.queryByTestId('button-detail-call-L1')).toBeNull();
+    expect(screen.queryByTestId('field-caller-phone')).toBeNull();
+    expect(screen.queryByTestId('button-delete-lead')).toBeNull();
   });
-  it('shows full detail as plain text with collapsed transcript', () => {
-    state.data = { ...base, name: 'Ann', phone: '+15550101', address: '1 Pier', urgency: 'urgent', capturedUrgency: 'Emergency', summary: '<img src=x onerror=alert(1)>', transcript: 'agent: hi', recordingUrl: 'https://x.test/a.mp3' };
+  it('shows the five detail cards, keeps transcript collapsed, and renders chat plus recording when expanded', () => {
+    state.data = { ...base, name: 'Ann', phone: '+15550101', issue: 'Pipe is leaking', address: '1 Pier', availability: 'Weekdays after 2', urgency: 'urgent', capturedUrgency: 'Emergency', status: 'booked', sentiment: 'Positive', summary: '<img src=x onerror=alert(1)>', transcript: 'agent: Hi there\nuser: I need a plumber', recordingUrl: 'https://x.test/a.mp3', durationMs: 75_000 };
     const { container } = view();
-    expect(screen.getByTestId('badge-urgency').textContent).toBe('URGENT');
+    expect(screen.getByTestId('badge-urgency').textContent).toBe('Urgent');
+    expect(screen.getByTestId('text-detail-issue').textContent).toBe('Pipe is leaking');
     expect(screen.getByTestId('text-summary').textContent).toBe('<img src=x onerror=alert(1)>');
+    expect(screen.getByTestId('text-sentiment').textContent).toBe('Positive');
+    expect(screen.queryByTestId('text-detail-title')).toBeNull();
+    expect(screen.getByTestId('text-caller-phone').textContent).toBe('+15550101');
+    expect(screen.getByTestId('link-address-map').textContent).toContain('1 Pier');
+    expect(screen.getByTestId('text-availability').textContent).toBe('Weekdays after 2');
+    expect(screen.getByTestId('text-call-length').textContent).toBe('1m 15s');
+    expect((screen.getByTestId('select-call-status') as HTMLSelectElement).value).toBe('booked');
+    expect(screen.getByTestId('button-detail-call-L1').textContent).toContain('Call back');
+    expect(screen.getByTestId('button-detail-text-L1').textContent).toContain('Text');
+    expect(screen.queryByTestId('button-delete-lead')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
+    expect(screen.queryByTestId('audio-recording')).toBeNull();
+    expect(screen.queryByTestId('transcript-messages')).toBeNull();
+    fireEvent.click(screen.getByTestId('button-toggle-transcript'));
     expect(screen.getByTestId('audio-recording').getAttribute('preload')).toBe('none');
-    expect(screen.queryByTestId('text-transcript')).toBeNull();
-    fireEvent.click(screen.getByText('Expand transcript'));
-    expect(screen.getByTestId('text-transcript').textContent).toBe('agent: hi');
+    expect(screen.getByTestId('transcript-message-0').textContent).toContain('AI');
+    expect(screen.getByTestId('transcript-message-1').textContent).toContain('Caller');
+    expect(screen.getByTestId('transcript-message-1').className).toContain('justify-end');
+  });
+  it('does not repeat an issue as the AI summary or intake details', () => {
+    state.data = { ...base, issue: 'Leaking pipe', summary: '  leaking   pipe ', tradeIntakeAnswers: 'LEAKING PIPE' };
+    view();
+    expect(screen.getByTestId('text-detail-issue').textContent).toBe('Leaking pipe');
+    expect(screen.queryByTestId('section-issue-summary')).toBeNull();
+    expect(screen.queryByTestId('field-intake')).toBeNull();
+  });
+  it('hides Text when SMS is unavailable and updates the call status from the selector', () => {
+    billing.smsAvailable = false;
+    state.data = { ...base, phone: '+15550101' };
+    const onStatus = vi.fn();
+    render(<LeadDetailView leadId="L1" onStatus={onStatus} savingLeadId={null} />);
+    expect(screen.getByTestId('button-detail-call-L1').textContent).toContain('Call back');
+    expect(screen.queryByTestId('button-detail-text-L1')).toBeNull();
+    fireEvent.change(screen.getByTestId('select-call-status'), { target: { value: 'booked' } });
+    expect(onStatus).toHaveBeenCalledWith('L1', 'booked');
   });
   it('saves notes explicitly', () => {
     view();
@@ -66,13 +105,22 @@ describe('LeadDetailView', () => {
     fireEvent.click(screen.getByTestId('button-submit-flag'));
     expect(flagMutate).toHaveBeenCalledWith({ leadId: 'L1', data: { reason: 'Caller gave a different address' } }, expect.anything());
   });
-  it('requires owner confirmation before deleting a lead', () => {
-    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('does not show a delete action to the owner on this page', () => {
     view();
-    fireEvent.click(screen.getByTestId('button-delete-lead'));
-    expect(confirmation).toHaveBeenCalled();
-    expect(deleteMutate).toHaveBeenCalledWith({ leadId: 'L1' }, expect.anything());
-    confirmation.mockRestore();
+    expect(screen.queryByTestId('button-delete-lead')).toBeNull();
+    expect(deleteMutate).not.toHaveBeenCalled();
+  });
+  it('lets the owner mark spam and exposes an undo action on the same detail page', () => {
+    const { rerender } = view();
+    fireEvent.click(screen.getByTestId('button-toggle-spam'));
+    expect(spamMutate).toHaveBeenCalledWith({ leadId: 'L1', data: { isSpam: true } }, expect.anything());
+    act(() => {
+      state.data = { ...base, isSpam: true };
+      spamMutate.mock.calls[0][1].onSuccess();
+    });
+    rerender(<LeadDetailView leadId="L1" onStatus={vi.fn()} savingLeadId={null} />);
+    expect(screen.getByTestId('text-spam-status').textContent).toContain('calls are not blocked');
+    expect(screen.getByTestId('button-toggle-spam').textContent).toContain('Undo spam');
   });
   it('shows not found without data', () => {
     state.data = undefined; state.isError = true; state.error = { status: 404 };
@@ -83,6 +131,12 @@ describe('LeadDetailView', () => {
     expect(formatCallTime('nope')).toBeNull();
     expect(safeRecordingUrl('javascript:alert(1)')).toBeNull();
     expect(safeRecordingUrl('http://x.test/a')).toBeNull();
+  });
+  it('parses transcript roles into AI-left and caller-right messages', () => {
+    expect(parseTranscriptMessages('agent: Hi\nuser: Hello')).toEqual([
+      { speaker: 'ai', text: 'Hi' },
+      { speaker: 'caller', text: 'Hello' },
+    ]);
   });
   it('rejects credentialed recording urls', () => {
     expect(safeRecordingUrl('https://u:p@x.test/a')).toBeNull();

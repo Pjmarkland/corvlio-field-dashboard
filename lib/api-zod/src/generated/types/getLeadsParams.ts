@@ -16,4 +16,5 @@ page?: number;
  * @maximum 100
  */
 pageSize?: number;
+showSpam?: boolean;
 };

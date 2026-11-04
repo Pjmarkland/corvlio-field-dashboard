@@ -24,6 +24,10 @@ const RETELL_ALERT_COPY: Partial<Record<string, (endpoint: RetellWebhookEndpoint
     summary: `Retell ${endpoint} webhook rejected: malformed payload`,
     details: "A webhook payload could not be parsed or validated.",
   }),
+  payload_too_large: (endpoint) => ({
+    summary: `Retell ${endpoint} webhook rejected: payload too large`,
+    details: "A webhook exceeded the configured request size limit and was rejected before processing.",
+  }),
   unmatched_business: (endpoint) => ({
     summary: `Retell ${endpoint} event could not be matched to a business`,
     details: "The event did not match a configured business number. Review webhook routing.",

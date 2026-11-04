@@ -16,6 +16,7 @@
 - [Publish expression indexes](publish-expression-indexes.md) — use generated normalization columns and column-only indexes to avoid Publish truncating nested index expressions.
 - [Workspace package helper](workspace-package-helper.md) — the install helper may not target pnpm packages; do not bypass its limitation by putting server dependencies at the root.
 - [Private lead notes](private-lead-notes.md) — owner-written notes are internal business data, not caller intake or provider context.
+- [Manual spam handling](manual-spam-handling.md) — spam is owner-declared, hides the lead, and suppresses future alerts by caller number; never block calls automatically.
 - [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
 - [Billing policy boundary](billing-policy-boundary.md) — preserve the agreed billing rules and keep authorized live Stripe behind a separate default-off gate.
 - [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
@@ -29,3 +30,4 @@
 - [Native client setup boundary](native-client-setup-scope.md) — the native app is for Corvlio clients; keep plan assignment and activation in the web admin.
 - [SMS alert consent boundary](sms-alert-consent.md) — owner-only consent; keep sends off until A2P approval, required Twilio secrets, and signed HTTPS webhooks are ready.
 - [Browser push configuration](browser-push-configuration.md) — require explicit VAPID public/private keys and subject; admin readiness reports status without values.
+- [Owner lead status compatibility](owner-lead-status-compat.md) — keep precise detail statuses while preserving pending/contacted list behavior and legacy rows.

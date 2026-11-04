@@ -40,6 +40,7 @@ export function extractRetellLead(call: RetellCall) {
     tradeIntakeAnswers: analysisValue(data, "trade_intake_answers", "trade_questions", "intake_answers")
       ?.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 2).join("\n").slice(0, 2000) || null,
     transcript, summary,
+    sentiment: text(call.call_analysis?.user_sentiment) ?? analysisValue(data, "user_sentiment"),
     recordingUrl: safeRecordingUrl(call.recording_url),
   };
 }

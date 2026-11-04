@@ -10,7 +10,7 @@ describe("voice lead extraction compatibility", () => {
         reason_for_call:"Ask about Corvlio",appointment_booked:true,"User Sentiment":"Positive"},
     }});
     expect(lead).toMatchObject({callerName:"Sales caller",phoneNumber:"+12025550198",
-      issueReason:"Ask about Corvlio",summary:"Sales question",address:null,urgencyLevel:null});
+      issueReason:"Ask about Corvlio",summary:"Sales question",sentiment:"Positive",address:null,urgencyLevel:null});
     expect(extractRetellLead({call_analysis:{custom_analysis_data:{appointment_booked:false}}}))
       .toMatchObject({callerName:null,phoneNumber:null,issueReason:null,address:null});
   });

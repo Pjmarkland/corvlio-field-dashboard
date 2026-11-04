@@ -195,6 +195,28 @@ describe("notification retry cost controls", () => {
     expect(lockClient.query).toHaveBeenLastCalledWith("SELECT pg_advisory_unlock(542317, $1)", [1]);
   });
 
+  it("marks an event failed when its final retry finds no active devices", async () => {
+    event.attempts = 2;
+    devices = [];
+    await runNotificationOutboxNow();
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(writes).toContainEqual(expect.objectContaining({
+      status: "failed",
+      attempts: 3,
+      lastError: "No active iOS devices after retry limit",
+    }));
+  });
+
+  it("keeps no-device events queued before the retry limit", async () => {
+    devices = [];
+    await runNotificationOutboxNow();
+    expect(writes).toContainEqual(expect.objectContaining({
+      status: "queued",
+      attempts: 1,
+      lastError: "No active iOS devices",
+    }));
+  });
+
   it("destroys the connection rather than returning a session with a leaked lock", async () => {
     lockClient.query.mockImplementation(async (query: string) => {
       if (query.includes("unlock")) throw new Error("connection lost");

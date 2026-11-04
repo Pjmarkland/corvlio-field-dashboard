@@ -74,7 +74,7 @@ export async function loadOwnerProfile(clerkUserId: string | null): Promise<Owne
 
 function getLeadCounts(leads: AdminLead[], now: number) {
   const staleCutoff = now - 24 * 60 * 60 * 1000;
-  const uncontacted = leads.filter((lead) => lead.status !== "contacted");
+  const uncontacted = leads.filter((lead) => !isContactedStatus(lead.status));
   const stale = uncontacted.filter((lead) => lead.createdAt.getTime() <= staleCutoff);
   const responseTimes = leads
     .filter((lead) => lead.contactedAt !== null)
@@ -95,6 +95,10 @@ function getLeadCounts(leads: AdminLead[], now: number) {
       ? Math.round(responseTimes.reduce((sum, duration) => sum + duration, 0) / responseTimes.length)
       : null,
   };
+}
+
+function isContactedStatus(value: string) {
+  return ["called_back", "booked", "closed", "contacted", "complete", "completed", "done"].includes(value.trim().toLowerCase());
 }
 
 function summarizeBusiness(
@@ -242,7 +246,7 @@ export async function getAdminOverview() {
     Date.now(),
   );
   const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const uncontacted = data.leads.filter((lead) => lead.status !== "contacted");
+  const uncontacted = data.leads.filter((lead) => !isContactedStatus(lead.status));
 
   return GetAdminOverviewResponse.parse({
     metrics: {
@@ -372,7 +376,7 @@ export async function getAdminActivity() {
     listRecentOperationalFailures(),
   ]);
   const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const uncontacted = leadCounts.filter((lead) => lead.status !== "contacted");
+  const uncontacted = leadCounts.filter((lead) => !isContactedStatus(lead.status));
 
   return GetAdminActivityResponse.parse({
     businessCount: businesses.length,

@@ -460,6 +460,12 @@ paths:
             minimum: 1
             maximum: 100
             default: 25
+        - name: showSpam
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: Business lead workspace
@@ -590,6 +596,42 @@ paths:
           description: Lead not found
         "502":
           description: Notes could not be saved
+  /leads/{leadId}/spam:
+    patch:
+      operationId: setLeadSpamStatus
+      tags: [leads]
+      security:
+        - clerkSession: []
+      summary: Mark or unmark an owned lead as spam
+      description: Hides marked leads and suppresses future alerts for the caller number; it does not block calls.
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadSpamStatusInput"
+      responses:
+        "200":
+          description: Updated spam status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadSpamStatusResult"
+        "400":
+          description: Invalid spam status
+        "401":
+          description: Authentication required
+        "404":
+          description: Lead not found
+        "502":
+          description: Spam status could not be saved
   /leads/{leadId}/status:
     patch:
       operationId: updateLeadStatus
@@ -1919,7 +1961,7 @@ components:
           enum: [urgent, normal, low]
         status:
           type: string
-          enum: [pending, contacted]
+          enum: [pending, contacted, new, called_back, booked, closed]
         createdAt:
           type: string
           format: date-time
@@ -1954,13 +1996,17 @@ components:
               minimum: 0
             capturedUrgency:
               type: [string, "null"]
+            sentiment:
+              type: [string, "null"]
             recordingUrl:
               type: [string, "null"]
             privateNotes:
               type: [string, "null"]
             contactedBy:
               type: [string, "null"]
-          required: [callStartedAt, durationMs, capturedUrgency, recordingUrl, privateNotes, contactedBy]
+            isSpam:
+              type: boolean
+          required: [callStartedAt, durationMs, capturedUrgency, sentiment, recordingUrl, privateNotes, contactedBy, isSpam]
     LeadNotesInput:
       type: object
       additionalProperties: false
@@ -1969,6 +2015,21 @@ components:
           type: string
           maxLength: 500
       required: [privateNotes]
+    LeadSpamStatusInput:
+      type: object
+      additionalProperties: false
+      properties:
+        isSpam:
+          type: boolean
+      required: [isSpam]
+    LeadSpamStatusResult:
+      type: object
+      properties:
+        leadId:
+          type: string
+        isSpam:
+          type: boolean
+      required: [leadId, isSpam]
     WelcomeEntry:
       type: object
       properties:
@@ -1984,7 +2045,7 @@ components:
       properties:
         status:
           type: string
-          enum: [pending, contacted]
+          enum: [pending, contacted, new, called_back, booked, closed]
       required:
         - status
     LeadStatusResult:
@@ -1994,7 +2055,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, contacted]
+          enum: [pending, contacted, new, called_back, booked, closed]
         contactedAt:
           type: [string, "null"]
           format: date-time

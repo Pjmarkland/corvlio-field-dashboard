@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { BusinessTypeField, Field, PresetChoiceField, SampleBusinessHelper } from './onboarding';
+import { BusinessTypeField, Field, OnboardingProgress, PresetChoiceField, SampleBusinessHelper } from './onboarding';
 import { ServicesNotOfferedWarning, ServicesOfferedPrompt } from '@/components/WebsiteOnboardingPreview';
 import { applySampleBusiness, initialForm } from './onboardingSample';
 import { requiredAgentFields } from './onboardingWebsite';
@@ -11,6 +11,15 @@ const toneChoices = [
   { value: 'Warm, calm, and neighborly. Ask one question at a time, listen carefully, and never guess at prices or arrival times.', label: 'Warm & neighborly' },
   { value: 'Professional and concise.', label: 'Professional & concise' },
 ];
+
+describe('onboarding progress', () => {
+  it('shows the current step and remaining steps without changing the form flow', () => {
+    render(<OnboardingProgress currentStep={3} totalSteps={6} />);
+    expect(screen.getByTestId('onboarding-progress').textContent).toContain('Step 3 of 6');
+    expect(screen.getByTestId('onboarding-progress').textContent).toContain('3 steps remaining');
+    expect(screen.getByTestId('onboarding-progress').querySelector('[style]')?.getAttribute('style')).toContain('50%');
+  });
+});
 
 describe('sample business onboarding helper', () => {
   it('previews the fictional call without applying sample details or submitting setup', () => {

@@ -61,9 +61,9 @@ describe('Admin dashboard switching', () => {
     mount();
     const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map(link => link.textContent)).toEqual(['Today', 'Completed', 'Stats', 'Settings', 'Founder Console']);
-    expect(links[4].getAttribute('href')).toBe('/admin');
-    fireEvent.click(links[4]);
+    expect(links.map(link => link.textContent)).toEqual(['Today', 'Completed', 'Spam', 'Stats', 'Settings', 'Founder Console']);
+    expect(links[5].getAttribute('href')).toBe('/admin');
+    fireEvent.click(links[5]);
     expect(screen.getByTestId('link-admin-back-dashboard').getAttribute('href')).toBe('/dashboard');
     for (const [label, href] of [['Overview', '/admin'], ['Lead activity', '/admin/activity'], ['SMS alerts', '/admin/sms'], ['Invoices', '/admin/invoices'], ['Settings', '/admin/settings']]) {
       expect(within(screen.getByRole('navigation', { name: 'Founder console navigation' })).getByRole('link', { name: label }).getAttribute('href')).toBe(href);
@@ -82,7 +82,7 @@ describe('Admin dashboard switching', () => {
     state.query = { isSuccess, isError };
     const view = mount();
     expect(screen.queryByRole('link', { name: 'Founder Console' })).toBeNull();
-    expect(screen.getByRole('navigation', { name: 'Mobile navigation' }).classList.contains('grid-cols-4')).toBe(true);
+    expect(screen.getByRole('navigation', { name: 'Mobile navigation' }).classList.contains('grid-cols-5')).toBe(true);
     view.unmount();
     mount('/admin');
     expect(screen.queryByRole('link', { name: 'Back to dashboard' })).toBeNull();

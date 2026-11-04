@@ -88,6 +88,7 @@ import {
   MessageSquare,
   Phone,
   Settings as SettingsIcon,
+  ShieldAlert,
   ShieldCheck,
   Signal,
   Sparkles,
@@ -100,6 +101,7 @@ import '@/index.css';
 
 type Urgency = 'urgent' | 'normal' | 'low';
 type LeadStatus = 'pending' | 'contacted';
+type OwnerCallStatus = 'new' | 'called_back' | 'booked' | 'closed';
 type Lead = {
   id: string;
   name: string;
@@ -115,7 +117,7 @@ type Lead = {
   availability?: string | null;
   tradeIntakeAnswers?: string | null;
 };
-type StatusHandler = (id: string, status: LeadStatus) => void;
+type StatusHandler = (id: string, status: LeadStatus | OwnerCallStatus) => void;
 const LEAD_PAGE_SIZE = 25;
 const EMPTY_LEAD_SUMMARY: LeadWorkspace['summary'] = {
   totalLeads: 0,
@@ -264,6 +266,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
   const nav = [
     { href: '/dashboard', label: 'Today', icon: Home, count: pendingCount },
     { href: '/completed', label: 'Completed', icon: CheckCircle2 },
+    { href: '/spam', label: 'Spam', icon: ShieldAlert },
     { href: '/stats', label: 'Stats', icon: Signal },
     { href: '/settings', label: 'Settings', icon: SettingsIcon },
     ...(adminAccess && !native ? [{ href: '/admin', label: 'Founder Console', icon: ShieldCheck }] : []),
@@ -298,7 +301,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
         </div> : null}
       </aside>
 
-      <main className="pb-24 md:ml-[248px] md:pb-8">
+      <main className={`pb-24 md:ml-[248px] md:pb-8 ${location.startsWith('/leads/') ? 'bg-gray-100' : ''}`}>
         <header style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }} className="sticky top-0 z-10 border-b border-sidebar-border bg-sidebar px-4 pb-3 text-sidebar-foreground backdrop-blur-md sm:px-8 md:border-border/80 md:bg-background/95 md:px-10 md:text-foreground">
           <div className="mx-auto flex max-w-[1160px] items-center justify-between">
             <div className="md:hidden">
@@ -317,7 +320,7 @@ export function AppShell({ children, leads, businessName, onboardingConfirmation
         <div className="mx-auto max-w-[1160px] px-4 py-6 sm:px-8 md:px-10 md:py-10">{!native && location === '/dashboard' && businessName && !isInternal && invoices.data && (!invoices.data.plan || invoices.data.status === 'legacy') ? <BusinessWelcomeCard businessName={businessName} confirmation={onboardingConfirmation ?? null} /> : null}{children}</div>
       </main>
 
-      <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess && !native ? 'grid-cols-5' : 'grid-cols-4'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
+      <nav className={`safe-bottom fixed inset-x-0 bottom-0 z-20 grid ${adminAccess && !native ? 'grid-cols-6' : 'grid-cols-5'} border-t border-border bg-card/95 px-1 pt-2 backdrop-blur-md md:hidden`} aria-label="Mobile navigation">
         {nav.map(({ href, label, icon: Icon, count }) => {
           const active = location === href || (href === '/dashboard' && location.startsWith('/leads/'));
           return <Link key={href} href={href} data-testid={`link-mobile-${label.toLowerCase()}`} className={`relative flex min-h-14 flex-col items-center gap-1 text-[10px] font-semibold ${active ? 'text-primary' : 'text-muted-foreground'}`}><span className={`grid h-7 w-10 place-items-center rounded-xl ${active ? 'bg-primary/15' : ''}`}><Icon size={19} strokeWidth={active ? 2.5 : 1.8} /></span><span>{label}</span>{count ? <span className="absolute left-1/2 top-0 ml-1 grid h-4 min-w-4 -translate-y-0.5 place-items-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">{count}</span> : null}</Link>;
@@ -467,6 +470,33 @@ export function CompletedPage({ leads, summary, hasMore, onLoadMore, isLoadingMo
     ? <p role="status" className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">Some completed leads are on later pages. Load more to view them.</p>
     : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground"><Phone size={28} /></div><h2 className="text-xl font-800 tracking-[-0.03em]">Your call history starts here</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">When you call or text a new lead, they’ll move here automatically. Nothing gets lost between jobs.</p><Link href="/dashboard" data-testid="link-empty-go-today" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">See today’s leads <ArrowUpRight size={16} /></Link></div>;
   return <><PageHeading eyebrow="History" title="Completed calls" description="A quick record of the people you’ve already reached." /><div className="mb-5 flex items-center gap-2 rounded-xl bg-secondary/65 px-4 py-3 text-sm text-secondary-foreground"><CheckCircle2 size={17} /><span><strong>{summary.contactedLeads}</strong> contacted lead{summary.contactedLeads === 1 ? '' : 's'} in your history</span></div>{completed.length ? <div className="space-y-3">{completed.map((lead, index) => <div key={lead.id} className="animate-rise-in" style={{ animationDelay: `${index * 60}ms` }}><LeadCard lead={lead} onStatus={onStatus} saving={savingLeadId === lead.id} /></div>)}</div> : emptyState}<LoadMoreLeadsButton hasMore={hasMore} isLoading={isLoadingMore} onLoadMore={onLoadMore} testId="button-load-more-completed" /></>;
+}
+
+function SpamPage() {
+  const query = useInfiniteQuery({
+    queryKey: [...getGetLeadsQueryKey({ showSpam: true }), 'spam-inbox'],
+    queryFn: ({ pageParam, signal }) => getLeads(
+      { page: pageParam, pageSize: LEAD_PAGE_SIZE, showSpam: true },
+      { signal },
+    ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.page + 1 : undefined,
+  });
+  const leads = query.data?.pages.flatMap((page) => page.leads) ?? [];
+  return <>
+    <PageHeading eyebrow="Review" title="Spam leads" description="These leads are hidden from your active lists. Calls are still allowed. Open one to restore it." />
+    {query.isPending ? <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">Loading spam leads…</p>
+      : query.isError ? <p role="alert" className="rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive">Spam leads could not be loaded. Try again.</p>
+      : leads.length ? <div className="space-y-2">{leads.map((lead) => <Link key={lead.id} href={`/leads/${lead.id}`} state={{ from: '/spam' }} data-testid={`link-spam-lead-${lead.id}`} className="block rounded-xl border border-border bg-card p-4 hover:border-primary/40">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><p className="truncate text-sm font-bold">{displayName(lead.name)}</p><p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{displayIssue(lead.issue)}</p></div>
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{relativeTime(lead.createdAt)}</span>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">{displayPhone(lead.callbackNumber || lead.phone)} · Select to review or undo</p>
+      </Link>)}</div>
+      : <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center"><ShieldAlert size={24} className="mx-auto text-muted-foreground" /><h2 className="mt-3 text-lg font-bold">No spam leads</h2><p className="mt-2 text-sm text-muted-foreground">Leads you mark as spam will appear here, where you can restore them.</p></div>}
+    <LoadMoreLeadsButton hasMore={Boolean(query.hasNextPage)} isLoading={query.isFetchingNextPage} onLoadMore={() => void query.fetchNextPage()} testId="button-load-more-spam" />
+  </>;
 }
 
 export function DetailPage({ onStatus, savingLeadId }: { leads?: Lead[]; onStatus: StatusHandler; savingLeadId: string | null }) {
@@ -736,7 +766,19 @@ function Router({ refreshLeads, leads, summary, hasMore, onLoadMore, isLoadingMo
   // Analytics can use this device's zone without saving it as a business fact.
   const timeZone = savedTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [location] = useLocation();
-  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}><ErrorBoundary resetKey={location}><Switch><Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><OwnerInvoicePanel /><HomePage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} /><Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route><Route path="/stats" component={() => <StatsPage summary={summary} timeZone={timeZone} />} /><Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} /><Route component={NotFound} /></Switch></ErrorBoundary></AppShell>;
+  return <AppShell leads={leads} businessName={businessName} onboardingConfirmation={onboardingConfirmation}>
+    <ErrorBoundary resetKey={location}>
+      <Switch>
+        <Route path="/dashboard" component={() => <PullToRefresh onRefresh={refreshLeads}><InstallHint native={Capacitor.isNativePlatform()} /><OwnerInvoicePanel /><HomePage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} />
+        <Route path="/completed" component={() => <PullToRefresh onRefresh={refreshLeads}><CompletedPage leads={leads} summary={summary} hasMore={hasMore} onLoadMore={onLoadMore} isLoadingMore={isLoadingMore} onStatus={onStatus} savingLeadId={savingLeadId} /></PullToRefresh>} />
+        <Route path="/spam" component={() => <SpamPage />} />
+        <Route path="/leads/:id"><DetailPage onStatus={onStatus} savingLeadId={savingLeadId} /></Route>
+        <Route path="/stats" component={() => <StatsPage summary={summary} timeZone={timeZone} />} />
+        <Route path="/settings" component={() => <SettingsPage businessName={businessName} retellPhoneNumber={retellPhoneNumber} />} />
+        <Route component={NotFound} />
+      </Switch>
+    </ErrorBoundary>
+  </AppShell>;
 }
 
 export function UnconfiguredAccountScreen({
@@ -880,13 +922,14 @@ function LeadDataRouter() {
     setSavingLeadId(id);
     void updateStatus.mutateAsync({ leadId: id, data: { status } })
       .then((result) => {
+        const listStatus: LeadStatus = result.status === 'new' || result.status === 'pending' ? 'pending' : 'contacted';
         queryClient.setQueryData<InfiniteData<LeadWorkspace, number>>(getGetLeadsQueryKey(), (current) => current
           ? {
               ...current,
               pages: current.pages.map((page) => ({
                 ...page,
                 leads: page.leads.map((lead) => lead.id === result.leadId
-                  ? { ...lead, status: result.status, contactedAt: result.contactedAt }
+                  ? { ...lead, status: listStatus, contactedAt: result.contactedAt }
                   : lead),
               })),
             }
@@ -894,7 +937,10 @@ function LeadDataRouter() {
         void queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey(), exact: true });
         void queryClient.invalidateQueries({ queryKey: getGetLeadDetailQueryKey(id) });
         toast({
-          title: status === 'contacted' ? 'Lead marked contacted' : 'Lead reopened',
+          title: status === 'booked' ? 'Lead marked booked'
+            : status === 'closed' ? 'Lead closed'
+            : status === 'called_back' || status === 'contacted' ? 'Lead marked contacted'
+            : 'Lead reopened',
           description: 'Status updated.',
         });
       })
@@ -1033,7 +1079,51 @@ function ClerkQueryCacheInvalidator() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }} routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryCacheInvalidator /><PushDeepLinkListener /><TooltipProvider><Switch><Route path="/" component={HomeRedirect} /><Route path="/welcome" component={WelcomeRoute} /><Route path="/onboarding" component={OnboardingRoute} /><Route path="/privacy" component={PrivacyPage} /><Route path="/terms" component={TermsPage} /><Route path="/client-agreement" component={ClientAgreementPage} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} /><Route path="/admin/invoices" component={AdminInvoicesRoute} /><Route path="/admin/billing" component={AdminBillingRoute} /><Route path="/admin/sms" component={AdminSmsRoute} /><Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} /><Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} /><Route path="/admin/health-check" component={AdminHealthCheckRoute} /><Route path="/billing" component={BillingRoute} /><Route path="/admin/activity" component={AdminActivityRoute} /><Route path="/admin" component={AdminOverviewRoute} /><Route path="/dashboard" component={AuthenticatedRouter} /><Route path="/completed" component={AuthenticatedRouter} /><Route path="/leads/:id" component={AuthenticatedRouter} /><Route path="/stats" component={AuthenticatedRouter} /><Route path="/settings" component={AuthenticatedRouter} /><Route component={NotFound} /></Switch><Toaster /></TooltipProvider></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={clerkAppearance}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }}
+    routerPush={(to) => setLocation(stripBase(to))}
+    routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  >
+    <QueryClientProvider client={queryClient}>
+      <ClerkQueryCacheInvalidator />
+      <PushDeepLinkListener />
+      <TooltipProvider>
+        <Switch>
+          <Route path="/" component={HomeRedirect} />
+          <Route path="/welcome" component={WelcomeRoute} />
+          <Route path="/onboarding" component={OnboardingRoute} />
+          <Route path="/privacy" component={PrivacyPage} />
+          <Route path="/terms" component={TermsPage} />
+          <Route path="/client-agreement" component={ClientAgreementPage} />
+          <Route path="/sign-in/*?" component={SignInPage} />
+          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} />
+          <Route path="/admin/invoices" component={AdminInvoicesRoute} />
+          <Route path="/admin/billing" component={AdminBillingRoute} />
+          <Route path="/admin/sms" component={AdminSmsRoute} />
+          <Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} />
+          <Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} />
+          <Route path="/admin/health-check" component={AdminHealthCheckRoute} />
+          <Route path="/billing" component={BillingRoute} />
+          <Route path="/admin/activity" component={AdminActivityRoute} />
+          <Route path="/admin" component={AdminOverviewRoute} />
+          <Route path="/dashboard" component={AuthenticatedRouter} />
+          <Route path="/completed" component={AuthenticatedRouter} />
+          <Route path="/spam" component={AuthenticatedRouter} />
+          <Route path="/leads/:id" component={AuthenticatedRouter} />
+          <Route path="/stats" component={AuthenticatedRouter} />
+          <Route path="/settings" component={AuthenticatedRouter} />
+          <Route component={NotFound} />
+        </Switch>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ClerkProvider>;
 }
 
 function App() {

@@ -72,6 +72,8 @@ import type {
   LeadInformationFlagInput,
   LeadInformationFlagResult,
   LeadNotesInput,
+  LeadSpamStatusInput,
+  LeadSpamStatusResult,
   LeadStatusResult,
   LeadStatusUpdate,
   LeadWorkspace,
@@ -1975,6 +1977,79 @@ export const useUpdateLeadNotes = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateLeadNotesMutationOptions(options));
+    }
+
+export const getSetLeadSpamStatusUrl = (leadId: string,) => {
+
+
+
+
+  return `/api/leads/${leadId}/spam`
+}
+
+/**
+ * Hides marked leads and suppresses future alerts for the caller number; it does not block calls.
+ * @summary Mark or unmark an owned lead as spam
+ */
+export const setLeadSpamStatus = async (leadId: string,
+    leadSpamStatusInput: LeadSpamStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<LeadSpamStatusResult> => {
+
+  return customFetch<LeadSpamStatusResult>(getSetLeadSpamStatusUrl(leadId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(leadSpamStatusInput)
+  }
+);}
+
+
+
+
+
+export const getSetLeadSpamStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setLeadSpamStatus>>, TError,{leadId: string;data: BodyType<LeadSpamStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setLeadSpamStatus>>, TError,{leadId: string;data: BodyType<LeadSpamStatusInput>}, TContext> => {
+
+const mutationKey = ['setLeadSpamStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setLeadSpamStatus>>, {leadId: string;data: BodyType<LeadSpamStatusInput>}> = (props) => {
+          const {leadId,data} = props ?? {};
+
+          return  setLeadSpamStatus(leadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetLeadSpamStatusMutationResult = NonNullable<Awaited<ReturnType<typeof setLeadSpamStatus>>>
+    export type SetLeadSpamStatusMutationBody = BodyType<LeadSpamStatusInput>
+    export type SetLeadSpamStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark or unmark an owned lead as spam
+ */
+export const useSetLeadSpamStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setLeadSpamStatus>>, TError,{leadId: string;data: BodyType<LeadSpamStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setLeadSpamStatus>>,
+        TError,
+        {leadId: string;data: BodyType<LeadSpamStatusInput>},
+        TContext
+      > => {
+      return useMutation(getSetLeadSpamStatusMutationOptions(options));
     }
 
 export const getUpdateLeadStatusUrl = (leadId: string,) => {

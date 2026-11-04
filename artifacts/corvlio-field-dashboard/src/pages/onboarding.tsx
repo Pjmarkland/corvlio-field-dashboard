@@ -374,10 +374,46 @@ export function NativeOnboardingForm() {
   return <OnboardingForm nativeMode />;
 }
 
+export function OnboardingProgress({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
+  const total = Math.max(1, totalSteps);
+  const current = Math.min(total, Math.max(1, currentStep));
+  const remaining = total - current;
+  return <div className="rounded-xl border border-border bg-card px-4 py-3 lg:col-span-2" data-testid="onboarding-progress" role="status">
+    <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+      <span>Step {current} of {total}</span>
+      <span className="text-muted-foreground">{remaining} steps remaining</span>
+    </div>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+      <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${(current / total) * 100}%` }} />
+    </div>
+  </div>;
+}
+
 function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [activeSetupStep, setActiveSetupStep] = useState(1);
+  const totalSetupSteps = nativeMode ? 4 : 6;
+  useEffect(() => {
+    const form = document.querySelector<HTMLElement>('[data-testid="form-onboarding"]');
+    if (!form) return;
+    const updateStep = () => {
+      const sections = Array.from(form.querySelectorAll<HTMLElement>('[data-onboarding-step]'));
+      if (sections.length === 0) return;
+      const marker = Math.max(120, window.innerHeight * 0.32);
+      const passed = sections.filter((section) => section.getBoundingClientRect().top <= marker);
+      const current = passed[passed.length - 1] ?? sections[0];
+      setActiveSetupStep(Number(current.dataset.onboardingStep) || 1);
+    };
+    updateStep();
+    window.addEventListener('scroll', updateStep, { passive: true });
+    window.addEventListener('resize', updateStep);
+    return () => {
+      window.removeEventListener('scroll', updateStep);
+      window.removeEventListener('resize', updateStep);
+    };
+  }, [nativeMode]);
   const { data: billingAvailability } = useGetBillingAvailability();
   const smsAvailable = billingAvailability?.smsAvailable === true;
   const { revoke } = usePushNotifications(user?.id);
@@ -718,8 +754,9 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
           }}
           data-testid="form-onboarding"
         >
+          <OnboardingProgress currentStep={activeSetupStep} totalSteps={totalSetupSteps} />
           <div className="space-y-4">
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+            <section data-onboarding-step="1" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={BriefcaseBusiness} eyebrow="01 · Your business" title="Start with the territory you know best." description="This gives the AI receptionist a clear frame for every new conversation." tone="blue" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field id="businessName" label="Business name" value={form.businessName} onChange={(value) => updateField('businessName', value)} placeholder="Northline Electric + HVAC" required />
@@ -825,7 +862,7 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
               </div> : null}
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+            <section data-onboarding-step="2" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
               <SectionHeading icon={Wrench} eyebrow="02 · The work" title="Set the boundaries before calls begin." description="Clear limits help the receptionist qualify the right jobs without making promises your team cannot keep." tone="warm" />
               <div className="space-y-5">
                 <Field id="servicesOffered" label="Services offered" value={form.servicesOffered} onChange={(value) => updateField('servicesOffered', value)} placeholder="Residential heating and cooling repairs, installation, and preventive maintenance." multiline rows={3} hint="List the work you actually provide; leave unconfirmed details blank." required error={requiredError('servicesOffered')} showError={Boolean(requiredError('servicesOffered'))} />
@@ -846,7 +883,7 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-receptionist-boundaries">
+            <section data-onboarding-step="3" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-receptionist-boundaries">
               <SectionHeading icon={ShieldCheck} eyebrow="03 · Availability and promises" title="Set clear limits for the receptionist." description="These choices prevent unsupported emergency-service and appointment promises." tone="green" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block text-xs font-semibold">Do you take 24/7 emergency calls? <span className="text-primary">*</span>
@@ -871,13 +908,13 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                 {!nativeMode ? <Field id="emergencyContact" label="Additional emergency / after-hours notes" value={form.emergencyContact} onChange={(value) => updateField('emergencyContact', value)} placeholder="Optional details for the owner’s follow-up." multiline rows={3} /> : null}
               </div>
             </section>
-            {nativeMode ? <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-native-hours">
+            {nativeMode ? <section data-onboarding-step="4" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7" data-testid="section-native-hours">
               <SectionHeading icon={Clock3} eyebrow="03 · Business hours" title="Set your hours and time zone." description="These details help the receptionist avoid saying you’re open when you’re not." tone="green" />
               <div className="grid gap-5 sm:grid-cols-2">
                 <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank={false} />
               </div>
             </section> : <>
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+              <section data-onboarding-step="4" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
                 <SectionHeading icon={FileCheck2} eyebrow="03 · Your promise" title="Make the follow-through unmistakable." description="These details turn a captured lead into a conversation that already feels informed." tone="green" />
                 <div className="grid gap-5 sm:grid-cols-2">
                     <PresetChoiceField id="responseTime" label="Typical response time commitment" value={form.responseTime} onChange={(value) => updateField('responseTime', value)} options={responseTimeOptions} multiline hint="Choose the commitment you can meet consistently, or enter a custom one." resetKey={sampleResetKey} />
@@ -887,7 +924,7 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
+              <section data-onboarding-step="5" className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_0_hsl(214_32%_85%)] sm:p-7">
                 <SectionHeading icon={Headphones} eyebrow="04 · When to reach you" title="Keep the handoff human." description="Tell us when an owner can step in, and where urgent callers should go after hours." tone="muted" />
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field id="ownerAvailability" label="Owner availability" value={form.ownerAvailability} onChange={(value) => updateField('ownerAvailability', value)} placeholder="Mon–Fri, 7am–5pm. I review new leads between jobs." multiline rows={4} />
@@ -895,7 +932,7 @@ function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
                   <BusinessCoverageFields prefix="onboarding" values={form} onChange={(key, value) => updateField(key, value)} allowBlank />
                 </div>
               </section>
-              <section className="rounded-2xl border border-border bg-card p-5 sm:p-7" data-testid="section-plan">
+              <section data-onboarding-step="6" className="rounded-2xl border border-border bg-card p-5 sm:p-7" data-testid="section-plan">
                 <PlanPicker value={chosenPlan} onChange={setChosenPlan} age={startupAge} onAge={setStartupAge} />
               </section>
             </>}
