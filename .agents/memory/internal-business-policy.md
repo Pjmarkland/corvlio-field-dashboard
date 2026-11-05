@@ -9,6 +9,12 @@ Corvlio's own sales line belongs to an internal business with real lead capture 
 
 **How to apply:** Preserve the distinction between internal businesses and samples. Adding billing features must keep internal businesses excluded at both the API and worker boundaries. Retell agent IDs are supplied by the owner; never invent one or change the provider merely to fill a local field.
 
+Admin live-payment verification must use a separate checkout and admin-owned test record. It must not create a Stripe Customer or mutate any business billing state, including the internal Corvlio account.
+
+**Why:** The owner needs to verify live Stripe payments without converting the internal sales workspace into a billed client or triggering activation.
+
+**How to apply:** Keep admin test Checkout and webhook handling outside the ordinary business billing service and provisioning path.
+
 The existing Corvlio sales number's Retell routing and shared-agent configuration must remain unchanged until the owner explicitly approves a cutover. Attaching the number in the app changes its phone-to-business lookup; if its per-number pre-call webhook already points to this app, that mapping can immediately change live call variables. Verify the current route read-only before creating the mapping.
 
 **Why:** the user explicitly limited this work to building the ability and requested no changes to the number's current agent or the live shared agent.

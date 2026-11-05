@@ -3,8 +3,8 @@ import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { isVerifiedAdminUser, requireAdmin } from "../middlewares/requireAdmin";
-import { billingEnabled } from "../billing/stripeClient";
-import { billingService } from "../billing/runtime";
+import { billingEnabled, configuredBillingMode } from "../billing/stripeClient";
+import { adminLivePaymentTestService, billingService } from "../billing/runtime";
 import { billingStore } from "../billing/store";
 import { BillingError, billingGate } from "../billing/policy";
 import { readNativeBillingSummary } from "../billing/nativeSummary";
@@ -53,6 +53,10 @@ const enabled = (_req: Request, res: Response, next: NextFunction) => {
   if (!billingEnabled()) { res.sendStatus(404); return; }
   next();
 };
+const livePaymentTestEnabled = (_req: Request, res: Response, next: NextFunction) => {
+  if (!billingEnabled() || configuredBillingMode() !== "live") { res.sendStatus(404); return; }
+  next();
+};
 router.use("/billing", enabled);
 router.use("/admin/billing", enabled, requireAdmin);
 const emptyInput = z.object({}).strict();
@@ -99,6 +103,34 @@ router.get("/admin/billing", async (_req, res): Promise<void> => {
     const businesses = await billingStore.businesses();
     res.json(await Promise.all(businesses.map(b => billingService.snapshot(b.id, true))));
   } catch { res.status(503).json({ error: "Billing is temporarily unavailable" }); }
+});
+router.post("/admin/billing/live-payment-test", livePaymentTestEnabled, async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const adminUserId = getAuth(req).userId;
+  if (!adminUserId) { res.sendStatus(401); return; }
+  if (!emptyInput.safeParse(req.body ?? {}).success) {
+    res.status(400).json({ error: "Invalid live payment test request" });
+    return;
+  }
+  try {
+    res.status(201).json(await adminLivePaymentTestService.createCheckout(adminUserId));
+  } catch (error) {
+    res.status(error instanceof BillingError ? error.status : 503)
+      .json({ error: error instanceof BillingError ? error.message : "The live payment test could not be started." });
+  }
+});
+router.get("/admin/billing/live-payment-test/:testId", livePaymentTestEnabled, async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const adminUserId = getAuth(req).userId;
+  if (!adminUserId) { res.sendStatus(401); return; }
+  const params = z.object({ testId: z.string().uuid() }).safeParse(req.params);
+  if (!params.success) { res.sendStatus(400); return; }
+  try {
+    res.json(await adminLivePaymentTestService.getStatus(params.data.testId, adminUserId));
+  } catch (error) {
+    res.status(error instanceof BillingError ? error.status : 503)
+      .json({ error: error instanceof BillingError ? error.message : "The live payment test status could not be loaded." });
+  }
 });
 router.patch("/admin/billing/:businessId/startup", async (req, res): Promise<void> => {
   const id = z.coerce.number().int().positive().safeParse(req.params.businessId);

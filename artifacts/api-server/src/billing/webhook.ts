@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
 import { billingEnabled, configuredBillingMode, getBillingStripe } from "./stripeClient";
-import { billingService } from "./runtime";
+import { adminLivePaymentTestService, billingService } from "./runtime";
 import { recordRetellSystemAlert } from "../lib/retellSystemAlerts";
 
 async function alertStripeWebhookFailure(
@@ -39,7 +39,14 @@ export async function billingWebhook(req: Request, res: Response): Promise<void>
     res.sendStatus(401);
     return;
   }
-  try { res.json(await billingService.webhook(event)); }
+  try {
+    const adminTestResult = await adminLivePaymentTestService.handleWebhook(event);
+    if (adminTestResult) {
+      res.json(adminTestResult);
+      return;
+    }
+    res.json(await billingService.webhook(event));
+  }
   catch {
     // No payload, signature, card detail, credential or provider error gets logged.
     req.log?.error({ eventId: event.id, eventType: event.type }, "Stripe billing event failed; Stripe may retry");

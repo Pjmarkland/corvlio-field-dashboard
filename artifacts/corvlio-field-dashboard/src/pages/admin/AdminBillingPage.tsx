@@ -2,8 +2,9 @@ import { Redirect } from 'wouter';
 import { Capacitor } from '@capacitor/core';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  getGetAdminBillingQueryKey, getGetBillingEnforcementQueryKey,
+  getGetAdminBillingQueryKey, getGetAdminLivePaymentTestStatusQueryKey, getGetBillingEnforcementQueryKey,
   useCheckAdminBillingReadiness, useConfirmManualInvoiceOverdue,
+  useCreateAdminLivePaymentTestCheckout, useGetAdminLivePaymentTestStatus,
   useGetAdminBilling, useGetBillingEnforcement, useReinstateBillingAccount,
   useSetBillingEnforcementMode, useSetBillingEnforcementOverride, useSetStartupEligibility,
 } from '@workspace/api-client-react';
@@ -17,13 +18,27 @@ export default function AdminBillingPage() {
 }
 
 function WebAdminBillingPage() {
-  const { enabled, settled } = useBillingAvailability();
+  const { enabled, settled, mode } = useBillingAvailability();
   if (!settled) return null;
-  return <Content billingEnabled={enabled} />;
+  return <Content billingEnabled={enabled} liveBillingEnabled={enabled && mode === 'live'} />;
 }
 
-function Content({ billingEnabled }: { billingEnabled: boolean }) {
+function Content({ billingEnabled, liveBillingEnabled }: { billingEnabled: boolean; liveBillingEnabled: boolean }) {
   const client = useQueryClient();
+  const locationSearch = typeof window === 'undefined' ? '' : window.location.search;
+  const search = new URLSearchParams(locationSearch);
+  const liveTestId = search.get('adminLivePaymentTestId');
+  const checkoutCanceled = search.get('checkout') === 'canceled';
+  const createLivePaymentTest = useCreateAdminLivePaymentTestCheckout();
+  const livePaymentTestStatus = useGetAdminLivePaymentTestStatus(liveTestId ?? '', { query: {
+    queryKey: getGetAdminLivePaymentTestStatusQueryKey(liveTestId ?? ''),
+    enabled: liveBillingEnabled && Boolean(liveTestId) && !checkoutCanceled,
+    retry: false,
+    refetchInterval: query => {
+      const status = query.state.data?.status;
+      return query.state.data?.webhookReceived || status === 'expired' || status === 'failed' ? false : 2500;
+    },
+  } });
   const enforcement = useGetBillingEnforcement({ query: {
     queryKey: getGetBillingEnforcementQueryKey(), retry: false, refetchInterval: 30_000,
   } });
@@ -83,8 +98,37 @@ function Content({ billingEnabled }: { billingEnabled: boolean }) {
               })}</tbody>
             </table>
           </div>;
+  const livePaymentTestMessage = checkoutCanceled
+    ? 'Checkout was canceled; no payment was recorded.'
+    : livePaymentTestStatus.data?.status === 'paid' && livePaymentTestStatus.data.webhookReceived
+      ? 'Paid — webhook received.'
+      : livePaymentTestStatus.data?.status === 'expired'
+        ? 'Checkout expired; no payment was recorded.'
+        : livePaymentTestStatus.data?.status === 'failed'
+          ? 'Checkout could not be created.'
+          : livePaymentTestStatus.isError
+            ? 'The test result could not be loaded.'
+            : 'Waiting for payment and Stripe webhook confirmation.';
 
   return <AdminShell title={title} eyebrow={eyebrow} action={<span data-testid="badge-admin-billing-mode" className="rounded-full bg-[#e3eee5] px-3 py-1 text-xs font-bold text-[#2c6b56]">{billingEnabled ? 'Billing on' : 'Billing off'}</span>}>
+    {liveBillingEnabled ? <section className="mb-5 rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5" data-testid="panel-admin-live-payment-test">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-bold">Live payment test</h2>
+          <p className="mt-1 max-w-3xl text-sm text-[#66736c]">Runs a one-time $3 Checkout tied to your verified admin account. It does not create or change a business billing account and includes no setup fee.</p>
+        </div>
+        <button type="button" data-testid="button-run-admin-live-payment-test"
+          disabled={createLivePaymentTest.isPending}
+          onClick={() => createLivePaymentTest.mutate(undefined, {
+            onSuccess: result => window.location.assign(result.url),
+          })}
+          className="min-h-11 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-white disabled:opacity-50">
+          {createLivePaymentTest.isPending ? 'Opening Stripe Checkout…' : 'Run $3 live payment test'}
+        </button>
+      </div>
+      {createLivePaymentTest.isError ? <p role="alert" className="mt-3 text-sm text-[#aa573f]">{errorText(createLivePaymentTest.error)}</p> : null}
+      {liveTestId ? <p role="status" data-testid="text-admin-live-payment-test-result" className="mt-3 text-sm font-semibold text-[#526159]">{livePaymentTestMessage}</p> : null}
+    </section> : null}
     <section className="mb-6 space-y-5" data-testid="panel-billing-enforcement">
       <div className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

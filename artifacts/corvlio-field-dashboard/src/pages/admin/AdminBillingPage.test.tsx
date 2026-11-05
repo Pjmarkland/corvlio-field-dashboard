@@ -9,13 +9,19 @@ const m = vi.hoisted(() => ({
   reinstate: vi.fn(),
   confirm: vi.fn(),
   readinessData: null as any,
+  createLivePaymentTest: vi.fn(),
+  livePaymentTestStatus: null as any,
+  billingAvailability: { enabled: true, settled: true, mode: 'live' as 'live' | 'test' | 'off' },
 }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false } }));
 vi.mock('wouter', () => ({ Redirect: ({ to }: { to: string }) => <div>{to}</div> }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@workspace/api-client-react', () => ({
   getGetAdminBillingQueryKey: () => ['admin-billing'],
+  getGetAdminLivePaymentTestStatusQueryKey: (testId: string) => ['admin-live-payment-test', testId],
   getGetBillingEnforcementQueryKey: () => ['billing-enforcement'],
+  useCreateAdminLivePaymentTestCheckout: () => ({ mutate: m.createLivePaymentTest, isPending: false, isError: false, error: null }),
+  useGetAdminLivePaymentTestStatus: () => ({ data: m.livePaymentTestStatus, isLoading: false, isError: false }),
   useCheckAdminBillingReadiness: () => ({ mutate: vi.fn(), isPending: false, isError: false, data: m.readinessData }),
   useGetAdminBilling: () => ({ data: m.data, isLoading: false, isError: false, refetch: vi.fn() }),
   useSetStartupEligibility: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
@@ -38,7 +44,7 @@ vi.mock('@workspace/api-client-react', () => ({
   useReinstateBillingAccount: () => ({ mutate: m.reinstate, isPending: false, isError: false }),
   useConfirmManualInvoiceOverdue: () => ({ mutate: m.confirm, isPending: false, isError: false }),
 }));
-vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => ({ enabled: true, settled: true }) }));
+vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: () => m.billingAvailability }));
 vi.mock('./AdminShared', () => ({
   AdminShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
   AdminEmpty: () => <p>No data</p>,
@@ -52,6 +58,10 @@ import AdminBillingPage from './AdminBillingPage';
 beforeEach(() => {
   vi.clearAllMocks();
   m.readinessData = null;
+  m.createLivePaymentTest = vi.fn();
+  m.livePaymentTestStatus = null;
+  m.billingAvailability = { enabled: true, settled: true, mode: 'live' };
+  window.history.replaceState({}, '', '/admin/billing');
   m.data = [{
     businessId: 3,
     businessName: 'Admin Test Business',
@@ -114,6 +124,34 @@ describe('admin billing page', () => {
     render(<AdminBillingPage />);
     expect(screen.getByText('Present (live restricted)')).toBeTruthy();
     expect(screen.queryByText(/rk_live_/)).toBeNull();
+  });
+
+  it('offers the $3 checkout only while Stripe live billing is enabled and shows webhook completion', () => {
+    const first = render(<AdminBillingPage />);
+    const button = screen.getByTestId('button-run-admin-live-payment-test');
+    expect(button.textContent).toBe('Run $3 live payment test');
+    fireEvent.click(button);
+    expect(m.createLivePaymentTest).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      onSuccess: expect.any(Function),
+    }));
+    first.unmount();
+
+    m.billingAvailability = { enabled: true, settled: true, mode: 'test' };
+    const { unmount } = render(<AdminBillingPage />);
+    expect(screen.queryByTestId('button-run-admin-live-payment-test')).toBeNull();
+    unmount();
+
+    m.billingAvailability = { enabled: true, settled: true, mode: 'live' };
+    m.livePaymentTestStatus = {
+      testId: 'test-run',
+      status: 'paid',
+      webhookReceived: true,
+      createdAt: '2026-11-05T00:00:00.000Z',
+      paidAt: '2026-11-05T00:01:00.000Z',
+    };
+    window.history.replaceState({}, '', '/admin/billing?adminLivePaymentTestId=test-run');
+    render(<AdminBillingPage />);
+    expect(screen.getByTestId('text-admin-live-payment-test-result').textContent).toBe('Paid — webhook received.');
   });
 
   it('submits the selected enforcement mode and account-specific actions', () => {

@@ -1564,6 +1564,22 @@ paths:
       operationId: getAdminBilling
       responses:
         "200": {description: Admin billing, content: {application/json: {schema: {type: array, items: {$ref: "#/components/schemas/BillingSnapshot"}}}}}
+  /admin/billing/live-payment-test:
+    post:
+      operationId: createAdminLivePaymentTestCheckout
+      security:
+        - clerkSession: []
+      responses:
+        "201": {description: Admin-only one-time $3 live test Checkout, content: {application/json: {schema: {$ref: "#/components/schemas/AdminLivePaymentTestCheckout"}}}}
+  /admin/billing/live-payment-test/{testId}:
+    get:
+      operationId: getAdminLivePaymentTestStatus
+      security:
+        - clerkSession: []
+      parameters:
+        - {in: path, name: testId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Admin-owned live test payment and webhook result, content: {application/json: {schema: {$ref: "#/components/schemas/AdminLivePaymentTestStatus"}}}}
   /admin/billing/readiness-check:
     post:
       operationId: checkAdminBillingReadiness
@@ -2082,6 +2098,21 @@ components:
         sms: {$ref: "#/components/schemas/OwnerSmsReadiness"}
         webPush: {$ref: "#/components/schemas/WebPushReadiness"}
       required: [enabled, mode, reason, liveModeOptIn, runningInProduction, secretKeyPresent, secretKeyMode, webhookSecretPresent, webhookSecretValid, publicApiBaseValid, webhookUrl, webhookReachable, sms, webPush]
+    AdminLivePaymentTestCheckout:
+      type: object
+      properties:
+        testId: {type: string, format: uuid}
+        url: {type: string, format: uri}
+      required: [testId, url]
+    AdminLivePaymentTestStatus:
+      type: object
+      properties:
+        testId: {type: string, format: uuid}
+        status: {type: string, enum: [creating, pending, paid, expired, failed]}
+        webhookReceived: {type: boolean}
+        createdAt: {type: string, format: date-time}
+        paidAt: {type: [string, "null"], format: date-time}
+      required: [testId, status, webhookReceived, createdAt, paidAt]
     WebPushReadiness:
       type: object
       properties:

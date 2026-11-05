@@ -2225,6 +2225,25 @@ export const GetAdminBillingResponseItem = zod.object({
 export const GetAdminBillingResponse = zod.array(GetAdminBillingResponseItem)
 
 
+export const CreateAdminLivePaymentTestCheckoutResponse = zod.object({
+  "testId": zod.uuid(),
+  "url": zod.url()
+})
+
+
+export const GetAdminLivePaymentTestStatusParams = zod.object({
+  "testId": zod.uuid()
+})
+
+export const GetAdminLivePaymentTestStatusResponse = zod.object({
+  "testId": zod.uuid(),
+  "status": zod.enum(['creating', 'pending', 'paid', 'expired', 'failed']),
+  "webhookReceived": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "paidAt": zod.coerce.date().nullable()
+})
+
+
 export const CheckAdminBillingReadinessResponse = zod.object({
   "enabled": zod.boolean(),
   "mode": zod.enum(['off', 'test', 'live']),

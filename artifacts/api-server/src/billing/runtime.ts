@@ -1,4 +1,5 @@
 import { BillingService } from "./service";
+import { adminLivePaymentTestService } from "./adminLivePaymentTest";
 import { billingStore } from "./store";
 import { configuredBillingMode, getBillingStripe } from "./stripeClient";
 import { provisionPaidBusinesses } from "../invoicing/worker";
@@ -16,3 +17,5 @@ export const billingService = new BillingService(
   activeMode,
   businessId => provisionPaidBusinesses([businessId]),
 );
+
+export { adminLivePaymentTestService };

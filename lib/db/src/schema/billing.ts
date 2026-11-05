@@ -34,3 +34,18 @@ export const billingNoticesTable = pgTable("billing_notices", {
   nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export type AdminLivePaymentTestStatus = "creating" | "pending" | "paid" | "expired" | "failed";
+export const adminLivePaymentTestsTable = pgTable("admin_live_payment_tests", {
+  id: text("id").primaryKey(),
+  adminUserId: text("admin_user_id").notNull(),
+  stripeSessionId: text("stripe_session_id"),
+  status: text("status").$type<AdminLivePaymentTestStatus>().notNull(),
+  stripeEventId: text("stripe_event_id"),
+  stripeEventType: text("stripe_event_type"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+}, table => [
+  uniqueIndex("admin_live_payment_test_session_unique").on(table.stripeSessionId),
+  uniqueIndex("admin_live_payment_test_event_unique").on(table.stripeEventId),
+]);

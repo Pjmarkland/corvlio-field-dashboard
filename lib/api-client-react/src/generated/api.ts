@@ -38,6 +38,8 @@ import type {
   AdminFirstClientChecklistUpdateInput,
   AdminFlaggedLeadsResponse,
   AdminHealthCheck,
+  AdminLivePaymentTestCheckout,
+  AdminLivePaymentTestStatus,
   AdminOverview,
   AdminResolveLeadFlagResult,
   AdminResolveSystemAlertResponse,
@@ -5602,6 +5604,142 @@ export function useGetAdminBilling<TData = Awaited<ReturnType<typeof getAdminBil
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAdminBillingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAdminLivePaymentTestCheckoutUrl = () => {
+
+
+
+
+  return `/api/admin/billing/live-payment-test`
+}
+
+export const createAdminLivePaymentTestCheckout = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminLivePaymentTestCheckout> => {
+
+  return customFetch<AdminLivePaymentTestCheckout>(getCreateAdminLivePaymentTestCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateAdminLivePaymentTestCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>, TError,void, TContext> => {
+
+const mutationKey = ['createAdminLivePaymentTestCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>, void> = () => {
+
+
+          return  createAdminLivePaymentTestCheckout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdminLivePaymentTestCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>>
+
+    export type CreateAdminLivePaymentTestCheckoutMutationError = ErrorType<unknown>
+
+    export const useCreateAdminLivePaymentTestCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAdminLivePaymentTestCheckout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateAdminLivePaymentTestCheckoutMutationOptions(options));
+    }
+
+export const getGetAdminLivePaymentTestStatusUrl = (testId: string,) => {
+
+
+
+
+  return `/api/admin/billing/live-payment-test/${testId}`
+}
+
+export const getAdminLivePaymentTestStatus = async (testId: string, options?: Parameters<typeof customFetch>[1]): Promise<AdminLivePaymentTestStatus> => {
+
+  return customFetch<AdminLivePaymentTestStatus>(getGetAdminLivePaymentTestStatusUrl(testId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminLivePaymentTestStatusQueryKey = (testId: string,) => {
+    return [
+    `/api/admin/billing/live-payment-test/${testId}`
+    ] as const;
+    }
+
+
+export const getGetAdminLivePaymentTestStatusQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>, TError = ErrorType<unknown>>(testId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminLivePaymentTestStatusQueryKey(testId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>> = ({ signal }) => getAdminLivePaymentTestStatus(testId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: testId !== null && testId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminLivePaymentTestStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>>
+export type GetAdminLivePaymentTestStatusQueryError = ErrorType<unknown>
+
+
+
+export function useGetAdminLivePaymentTestStatus<TData = Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>, TError = ErrorType<unknown>>(
+ testId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminLivePaymentTestStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminLivePaymentTestStatusQueryOptions(testId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

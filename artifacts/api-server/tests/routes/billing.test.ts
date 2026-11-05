@@ -8,6 +8,12 @@ const m = vi.hoisted(() => ({
   enabled: true, mode: "test" as "test" | "live" | "off", signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
   isVerifiedAdminUser: vi.fn(),
   resume: vi.fn(), checkout: vi.fn(), upgrade: vi.fn(), portal: vi.fn(), eligibility: vi.fn(), businesses: vi.fn(),
+  adminLivePaymentTest: {
+    createCheckout: vi.fn(),
+    getStatus: vi.fn(),
+    handleWebhook: vi.fn(),
+  },
+  findBusiness: vi.fn(async (user: string) => user === "owner-a" ? { id: 1 } : user === "owner-b" ? { id: 2 } : null),
 }));
 vi.mock("../../src/billing/nativeSummary", () => ({ readNativeBillingSummary: m.nativeSummary }));
 vi.mock("../../src/billing/stripeClient", () => ({
@@ -17,14 +23,14 @@ vi.mock("../../src/billing/stripeClient", () => ({
 vi.mock("../../src/billing/runtime", () => ({ billingService: {
   webhook: m.process, snapshot: m.snapshot, cancel: m.cancel, resume: m.resume,
   checkout: m.checkout, upgrade: m.upgrade, portal: m.portal, startupEligibility: m.eligibility,
-} }));
+}, adminLivePaymentTestService: m.adminLivePaymentTest }));
 vi.mock("../../src/lib/retellSystemAlerts", () => ({
   recordRetellSystemAlert: m.recordAlert,
 }));
 vi.mock("../../src/billing/store", () => ({ billingStore: { businesses: m.businesses } }));
 vi.mock("@clerk/express", () => ({ getAuth: (req: express.Request) => ({ userId: req.get("x-test-owner") ?? null }) }));
 vi.mock("../../src/lib/businessDirectory", () => ({
-  findBusinessByClerkUserId: async (user: string) => user === "owner-a" ? { id: 1 } : user === "owner-b" ? { id: 2 } : null,
+  findBusinessByClerkUserId: m.findBusiness,
 }));
 vi.mock("../../src/middlewares/requireAdmin", () => ({
   requireAdmin: (req: express.Request, res: express.Response, next: express.NextFunction) => req.get("x-test-admin") === "yes" ? next() : res.sendStatus(404),
@@ -50,6 +56,15 @@ beforeEach(() => {
   m.recordAlert.mockResolvedValue(undefined);
   m.snapshot.mockImplementation(async id => ({ businessId: id }));
   m.isVerifiedAdminUser.mockResolvedValue(false);
+  m.adminLivePaymentTest.createCheckout.mockResolvedValue({ testId: "00000000-0000-4000-8000-000000000001", url: "https://checkout.stripe.com/live-test" });
+  m.adminLivePaymentTest.getStatus.mockResolvedValue({
+    testId: "00000000-0000-4000-8000-000000000001",
+    status: "paid",
+    webhookReceived: true,
+    createdAt: "2026-11-05T00:00:00.000Z",
+    paidAt: "2026-11-05T00:01:00.000Z",
+  });
+  m.adminLivePaymentTest.handleWebhook.mockResolvedValue(null);
   m.cancel.mockResolvedValue({ cancelAt: "2026-11-09T10:00:00Z" });
   m.process.mockResolvedValue({ processed: true });
   m.businesses.mockResolvedValue([{ id: 1 }, { id: 2 }]);
@@ -167,6 +182,41 @@ describe("billing authorization and feature flag", () => {
     expect(admin.status).toBe(200);
     expect(m.checkout).toHaveBeenCalledWith(1, "live-test-3");
   });
+  it("creates the admin live test only in live mode and keeps it outside owner billing", async () => {
+    const path = `${base}/admin/billing/live-payment-test`;
+    const body = JSON.stringify({});
+    m.mode = "test";
+    expect((await fetch(path, { method: "POST", headers: { ...ownerHeaders, "x-test-admin": "yes" }, body })).status).toBe(404);
+    expect(m.adminLivePaymentTest.createCheckout).not.toHaveBeenCalled();
+
+    m.mode = "live";
+    expect((await fetch(path, { method: "POST", headers: ownerHeaders, body })).status).toBe(404);
+    expect(m.adminLivePaymentTest.createCheckout).not.toHaveBeenCalled();
+
+    const response = await fetch(path, {
+      method: "POST", headers: { ...ownerHeaders, "x-test-admin": "yes" }, body,
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      testId: "00000000-0000-4000-8000-000000000001",
+      url: "https://checkout.stripe.com/live-test",
+    });
+    expect(m.adminLivePaymentTest.createCheckout).toHaveBeenCalledWith("owner-a");
+    expect(m.checkout).not.toHaveBeenCalled();
+    expect(m.findBusiness).not.toHaveBeenCalled();
+  });
+  it("returns only the requesting admin's live test result", async () => {
+    m.mode = "live";
+    const testId = "00000000-0000-4000-8000-000000000001";
+    const path = `${base}/admin/billing/live-payment-test/${testId}`;
+    expect((await fetch(path, { headers: ownerHeaders })).status).toBe(404);
+    expect(m.adminLivePaymentTest.getStatus).not.toHaveBeenCalled();
+
+    const response = await fetch(path, { headers: { ...ownerHeaders, "x-test-admin": "yes" } });
+    expect(response.status).toBe(200);
+    expect((await response.json()).webhookReceived).toBe(true);
+    expect(m.adminLivePaymentTest.getStatus).toHaveBeenCalledWith(testId, "owner-a");
+  });
   it("keeps readiness admin-only and available while billing is off", async () => {
     m.enabled = false;
     expect((await fetch(`${base}/admin/billing/readiness-check`, { method: "POST", headers: ownerHeaders })).status).toBe(404);
@@ -224,6 +274,23 @@ describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {
     const live = payload.replace('"livemode":false', '"livemode":true');
     expect((await send(live, sign(live))).status).toBe(200);
     expect(m.process).toHaveBeenCalledTimes(1);
+  });
+  it("records admin live payment test events separately from business billing", async () => {
+    m.mode = "live";
+    const testEvent = {
+      id: "evt_admin_live_test",
+      type: "checkout.session.completed",
+      livemode: true,
+      created: 1791626400,
+      data: { object: {} },
+    } as unknown as Stripe.Event;
+    m.signature.mockReturnValueOnce(testEvent);
+    m.adminLivePaymentTest.handleWebhook.mockResolvedValueOnce({ processed: true });
+    const response = await send(payload, sign());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ processed: true });
+    expect(m.adminLivePaymentTest.handleWebhook).toHaveBeenCalledWith(testEvent);
+    expect(m.process).not.toHaveBeenCalled();
   });
   it("returns retryable 503 when persistence fails", async () => {
     m.process.mockRejectedValue(new Error("offline mocked DB failure"));

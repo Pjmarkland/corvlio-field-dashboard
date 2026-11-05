@@ -570,6 +570,31 @@ export interface BillingReadiness {
   webPush: WebPushReadiness;
 }
 
+export interface AdminLivePaymentTestCheckout {
+  testId: string;
+  url: string;
+}
+
+export type AdminLivePaymentTestStatusStatus = typeof AdminLivePaymentTestStatusStatus[keyof typeof AdminLivePaymentTestStatusStatus];
+
+
+export const AdminLivePaymentTestStatusStatus = {
+  creating: 'creating',
+  pending: 'pending',
+  paid: 'paid',
+  expired: 'expired',
+  failed: 'failed',
+} as const;
+
+export interface AdminLivePaymentTestStatus {
+  testId: string;
+  status: AdminLivePaymentTestStatusStatus;
+  webhookReceived: boolean;
+  createdAt: string;
+  /** @nullable */
+  paidAt: string | null;
+}
+
 export interface AdminRetellWebhookUrls {
   configured: boolean;
   /** @nullable */

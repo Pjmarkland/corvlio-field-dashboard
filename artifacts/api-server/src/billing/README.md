@@ -37,6 +37,11 @@ shown to admins; it never changes the subscription automatically.
   payment and has no Retell number, the existing activation flow may purchase
   and provision one. Use a controlled business whose activation you intend to
   complete. A business can complete this test payment only once.
+- Founder Console → Billing also has a verified-admin-only “Run $3 live payment
+  test” action when live billing is enabled. This separate Checkout is tied to
+  the admin identity, creates no Stripe Customer, and records its webhook in an
+  isolated admin-test record; it does not change a business billing account,
+  activate a business, or run provisioning.
 - New businesses use emailed invoices while Stripe is off. When Stripe is enabled,
   new businesses are assigned to Stripe billing; existing manual accounts remain
   on emailed invoices. Checkout refuses all manual-mode businesses until an
