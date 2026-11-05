@@ -28,3 +28,16 @@ readiness while preserving collection of unpaid balances and financial records.
 webhook. Exercise destructive deletion only on disposable test identities; never
 use an admin, internal owner, or existing client. Review Apple policy separately
 before claiming App Store compliance.
+
+Account deletion must also remove support submissions, push registration
+credentials, owner SMS history, and business-linked alert/audit content. Retained
+invoice and balance records should use a generic deleted-account name while
+preserving the financial ledger and the minimum provider references needed for
+cleanup.
+
+**Why:** The user asked to remove or anonymize all account-linked data while the
+existing deletion policy requires retaining accounting records and provider
+cleanup references.
+
+**How to apply:** Include every new business- or identity-scoped data store in
+deletion cleanup, retry guards, tests, and the public retention explanation.

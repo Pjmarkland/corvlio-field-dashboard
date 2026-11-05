@@ -169,24 +169,25 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
           ? `Billing provider reports ${String(billingState?.status)}; review its invoice history.`
           : "",
       ].filter(Boolean).join(" ");
-      const invoiceBusinessName = invoices[0]?.business_name ?? business.business_name ?? "Deleted account";
       await client.query(
         `INSERT INTO operational_failures
           (event_key,source,summary,details,business_id,business_name)
          VALUES ($1,'account_deletion_balance','Outstanding balance after account deletion',$2,NULL,$3)
          ON CONFLICT (event_key) DO NOTHING`,
-        [`account-deletion-balance:${business.id}`, details, invoiceBusinessName],
+        [`account-deletion-balance:${business.id}`, details, "Deleted account"],
       );
       balanceAlertQueued = true;
     }
     await client.query("INSERT INTO account_deletions (clerk_user_id, business_ids) VALUES ($1, $2::int[]) ON CONFLICT DO NOTHING", [userId, ids]);
-    // Devices are unregistered first; delivery attempts cascade from devices/events.
-    await client.query("DELETE FROM notification_devices WHERE clerk_user_id = $1", [userId]);
+    // Remove device and browser push credentials before their delivery history.
+    await client.query("DELETE FROM notification_devices WHERE clerk_user_id = $1 OR business_id = ANY($2::text[])", [userId, ids.map(String)]);
+    await client.query("DELETE FROM web_push_subscriptions WHERE clerk_user_id = $1 OR business_id = ANY($2::int[])", [userId, ids]);
     for (const table of ["notification_events", "notification_seen_leads", "notification_poll_state"]) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::text[])`, [ids.map(String)]);
     }
     for (const table of ["billing_notices", "operational_failures",
-      "owner_demo_calls", "retell_pending_calls", "retell_call_records", "leads"]) {
+      "business_admin_events", "owner_demo_calls", "owner_sms_messages", "retell_pending_calls",
+      "retell_system_alerts", "retell_call_records", "support_requests", "leads"]) {
       await client.query(`DELETE FROM ${table} WHERE business_id = ANY($1::int[])`, [ids]);
     }
     // Keep the financial event ledger, but detach its owner actor and business FK.
@@ -195,6 +196,8 @@ export async function removeOwnedAppData(userId: string, deps = defaults) {
     await client.query("DELETE FROM provisioning_attempts WHERE clerk_user_id = $1 OR business_id = ANY($2::int[])", [userId, ids]);
     // Remove pending invoice/reminder jobs before removing their invoices.
     await client.query("DELETE FROM invoice_emails WHERE invoice_id IN (SELECT id FROM manual_invoices WHERE business_id=ANY($1::int[]))",[ids]);
+    // Keep the accounting ledger and payment references, but remove the business name snapshot.
+    await client.query("UPDATE manual_invoices SET business_name='Deleted account' WHERE business_id = ANY($1::int[])", [ids]);
     await client.query("DELETE FROM email_health_attempts WHERE actor_user_id=$1",[userId]);
     await client.query("DELETE FROM businesses WHERE clerk_user_id = $1 AND id = ANY($2::int[])", [userId, ids]);
     await client.query("COMMIT");

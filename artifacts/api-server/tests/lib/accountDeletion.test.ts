@@ -27,6 +27,9 @@ function fixture() {
     if (sql.startsWith("INSERT INTO pending_billing_cancellations")) state.cancellations.push(args);
     if (sql.startsWith("INSERT INTO operational_failures")) state.operationalAlerts.push(args);
     if (sql.startsWith("INSERT INTO account_deletions")) state.job = "pending";
+    if (sql.startsWith("UPDATE manual_invoices SET business_name")) {
+      state.invoices = state.invoices.map(invoice => ({ ...invoice, business_name: "Deleted account" }));
+    }
     if (sql.startsWith("DELETE FROM leads") && fail) throw new Error("Simulated database failure");
     if (sql.startsWith("DELETE FROM businesses")) state.deleted = true;
     if (sql.startsWith("UPDATE pending_billing_cancellations SET status='completed'")) {
@@ -53,19 +56,29 @@ describe("account deletion safety", () => {
     expect(f.calls.some(c=>c.sql.startsWith("DELETE"))).toBe(false);
     expect(f.deleteUser).not.toHaveBeenCalled();
   });
-  it("removes reminder jobs but retains bookkeeping invoices and payment references",async()=>{
+  it("anonymizes retained invoices and balance alerts while retaining accounting references",async()=>{
     const f=fixture();
     f.state.invoices=[{id:23,business_id:7,business_name:"Demo repair",monthly_cents:5000,setup_cents:2500,
       paid_at:null,payment_reference:"cash receipt 123"}];
     await deleteAccount("user_owner",f.deps);
+    expect(f.state.invoices[0].business_name).toBe("Deleted account");
     expect(f.state.invoices[0].payment_reference).toBe("cash receipt 123");
+    expect(f.calls.some(c => c.sql.startsWith("UPDATE manual_invoices SET business_name='Deleted account'"))).toBe(true);
     expect(f.calls.some(c=>c.sql.startsWith("DELETE FROM invoice_emails"))).toBe(true);
     expect(f.calls.some(c=>c.sql.startsWith("DELETE FROM manual_invoices"))).toBe(false);
     expect(f.state.operationalAlerts).toEqual([
-      expect.arrayContaining(["account-deletion-balance:7", expect.any(String), "Demo repair"]),
+      expect.arrayContaining(["account-deletion-balance:7", expect.any(String), "Deleted account"]),
     ]);
     expect(f.calls.some(c=>c.sql.startsWith("UPDATE billing_events SET business_id = NULL"))).toBe(true);
     expect(f.calls.some(c=>c.sql.startsWith("DELETE FROM billing_accounts"))).toBe(true);
+  });
+  it("removes support content, push credentials, and business-scoped operational records", async () => {
+    const f = fixture();
+    await deleteAccount("user_owner", f.deps);
+    for (const table of ["notification_devices", "web_push_subscriptions", "support_requests",
+      "owner_sms_messages", "retell_system_alerts", "business_admin_events"]) {
+      expect(f.calls.some(c => c.sql.startsWith(`DELETE FROM ${table}`))).toBe(true);
+    }
   });
   it("removes reminder and email test history before identity deletion",async()=>{
     const f=fixture();await deleteAccount("user_owner",f.deps);
