@@ -43,6 +43,7 @@ import { WebPushSettingsRow } from '@/components/WebPushSettingsRow';
 import { usePushDeepLink } from '@/hooks/usePushDeepLink';
 import { useSignOut } from '@/hooks/useSignOut';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
+import { getNativeApiBaseUrl, getNativeClerkProxyUrl } from '@/lib/nativeConfig';
 import {
   clearOnboardingConfirmation,
   readOnboardingConfirmation,
@@ -136,7 +137,10 @@ const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
 );
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const nativeApiBaseUrl = getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL);
+const clerkProxyUrl = Capacitor.isNativePlatform()
+  ? getNativeClerkProxyUrl(import.meta.env.VITE_CLERK_PROXY_URL, nativeApiBaseUrl)
+  : import.meta.env.VITE_CLERK_PROXY_URL;
 
 if (!clerkPubKey) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in environment.');
@@ -1091,41 +1095,87 @@ function ClerkRoutes() {
     routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
   >
     <QueryClientProvider client={queryClient}>
-      <ClerkQueryCacheInvalidator />
-      <PushDeepLinkListener />
-      <TooltipProvider>
-        <Switch>
-          <Route path="/" component={HomeRedirect} />
-          <Route path="/welcome" component={WelcomeRoute} />
-          <Route path="/onboarding" component={OnboardingRoute} />
-          <Route path="/privacy" component={PrivacyPage} />
-          <Route path="/terms" component={TermsPage} />
-          <Route path="/support" component={SupportPage} />
-          <Route path="/client-agreement" component={ClientAgreementPage} />
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
-          <Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} />
-          <Route path="/admin/invoices" component={AdminInvoicesRoute} />
-          <Route path="/admin/billing" component={AdminBillingRoute} />
-          <Route path="/admin/sms" component={AdminSmsRoute} />
-          <Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} />
-          <Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} />
-          <Route path="/admin/health-check" component={AdminHealthCheckRoute} />
-          <Route path="/billing" component={BillingRoute} />
-          <Route path="/admin/activity" component={AdminActivityRoute} />
-          <Route path="/admin" component={AdminOverviewRoute} />
-          <Route path="/dashboard" component={AuthenticatedRouter} />
-          <Route path="/completed" component={AuthenticatedRouter} />
-          <Route path="/spam" component={AuthenticatedRouter} />
-          <Route path="/leads/:id" component={AuthenticatedRouter} />
-          <Route path="/stats" component={AuthenticatedRouter} />
-          <Route path="/settings" component={AuthenticatedRouter} />
-          <Route component={NotFound} />
-        </Switch>
-        <Toaster />
-      </TooltipProvider>
+      <NativeClerkStartupGate>
+        <ClerkQueryCacheInvalidator />
+        <PushDeepLinkListener />
+        <TooltipProvider>
+          <Switch>
+            <Route path="/" component={HomeRedirect} />
+            <Route path="/welcome" component={WelcomeRoute} />
+            <Route path="/onboarding" component={OnboardingRoute} />
+            <Route path="/privacy" component={PrivacyPage} />
+            <Route path="/terms" component={TermsPage} />
+            <Route path="/support" component={SupportPage} />
+            <Route path="/client-agreement" component={ClientAgreementPage} />
+            <Route path="/sign-in/*?" component={SignInPage} />
+            <Route path="/sign-up/*?" component={SignUpPage} />
+            <Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} />
+            <Route path="/admin/invoices" component={AdminInvoicesRoute} />
+            <Route path="/admin/billing" component={AdminBillingRoute} />
+            <Route path="/admin/sms" component={AdminSmsRoute} />
+            <Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} />
+            <Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} />
+            <Route path="/admin/health-check" component={AdminHealthCheckRoute} />
+            <Route path="/billing" component={BillingRoute} />
+            <Route path="/admin/activity" component={AdminActivityRoute} />
+            <Route path="/admin" component={AdminOverviewRoute} />
+            <Route path="/dashboard" component={AuthenticatedRouter} />
+            <Route path="/completed" component={AuthenticatedRouter} />
+            <Route path="/spam" component={AuthenticatedRouter} />
+            <Route path="/leads/:id" component={AuthenticatedRouter} />
+            <Route path="/stats" component={AuthenticatedRouter} />
+            <Route path="/settings" component={AuthenticatedRouter} />
+            <Route component={NotFound} />
+          </Switch>
+          <Toaster />
+        </TooltipProvider>
+      </NativeClerkStartupGate>
     </QueryClientProvider>
   </ClerkProvider>;
+}
+
+function NativeClerkStartupGate({ children }: { children: ReactNode }) {
+  const { isLoaded } = useUser();
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || isLoaded) {
+      setTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setTimedOut(true), 20000);
+    return () => window.clearTimeout(timer);
+  }, [isLoaded]);
+
+  if (!Capacitor.isNativePlatform() || isLoaded) return children;
+
+  return (
+    <main
+      role={timedOut ? 'alert' : 'status'}
+      aria-live={timedOut ? 'assertive' : 'polite'}
+      className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
+    >
+      <div className="max-w-sm">
+        <h1 className="text-lg font-semibold">
+          {timedOut ? 'Can’t connect to sign-in' : 'Connecting securely…'}
+        </h1>
+        <p className="mt-2 text-sm text-white/75">
+          {timedOut
+            ? 'Check your internet connection, then retry.'
+            : 'Please wait while Corvlio checks your account.'}
+        </p>
+        {timedOut ? (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 min-h-11 rounded-xl bg-white px-5 text-sm font-semibold text-[#071527]"
+          >
+            Retry
+          </button>
+        ) : null}
+      </div>
+    </main>
+  );
 }
 
 function App() {

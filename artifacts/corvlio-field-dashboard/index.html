@@ -25,7 +25,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main role="status" aria-live="polite" style="display:flex;min-height:100vh;align-items:center;justify-content:center;background:#071527;padding:24px;color:white;font-family:system-ui,sans-serif;text-align:center">
+        Loading Corvlio Field Desk…
+      </main>
+    </div>
+    <script src="/startup-watchdog.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ import type { CorsOptions } from "cors";
 import type { RequestHandler } from "express";
 
 const CAPACITOR_ORIGINS = new Set([
+  "capacitor://localhost",
   "http://localhost",
   "https://localhost",
 ]);

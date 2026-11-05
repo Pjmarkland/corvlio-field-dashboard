@@ -1,14 +1,16 @@
 import './lib/nativeClerkCookieBridge';
+import { useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
 
-import App from './App';
-import { ErrorBoundary } from '@/components/error-boundary';
+import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
+import { getNativeApiBaseUrl } from '@/lib/nativeConfig';
 
 import './index.css';
 
 const LEGACY_LEADS_STORAGE_KEY = 'corvlio-leads-v1';
+const native = Capacitor.isNativePlatform();
 
 try {
   localStorage.removeItem(LEGACY_LEADS_STORAGE_KEY);
@@ -20,11 +22,8 @@ try {
 // Web builds stay on same-origin cookies and relative /api/… paths.
 // Native Capacitor builds need an absolute API origin and an explicit bearer
 // token because the WebView has no session cookie.
-if (Capacitor.isNativePlatform()) {
-  const nativeApiBase = import.meta.env.VITE_NATIVE_API_BASE_URL as string | undefined;
-  if (nativeApiBase) {
-    setBaseUrl(nativeApiBase);
-  }
+if (native) {
+  setBaseUrl(getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL));
 
   // window.Clerk is the Clerk JS SDK singleton, available after ClerkProvider
   // mounts. The getter is invoked lazily on every fetch so it always returns
@@ -41,7 +40,7 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
-if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator && import.meta.env.PROD) {
+if (!native && 'serviceWorker' in navigator && import.meta.env.PROD) {
   let reloadingForUpdate = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloadingForUpdate) return;
@@ -57,13 +56,90 @@ if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator && import.meta
     });
 }
 
-createRoot(document.getElementById('root')!, {
+function StartupLoading() {
+  return (
+    <main
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
+    >
+      <p className="text-sm font-medium">Loading Corvlio Field Desk…</p>
+    </main>
+  );
+}
+
+function StartupFailure({ error, resetError }: ErrorFallbackProps) {
+  return (
+    <main
+      role="alert"
+      className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
+    >
+      <div className="max-w-sm">
+        <h1 className="text-lg font-semibold">Corvlio couldn’t start</h1>
+        <p className="mt-2 text-sm text-white/75">
+          Check your connection and try again. If the problem continues, contact support.
+        </p>
+        {import.meta.env.DEV ? (
+          <p className="mt-2 break-words text-xs text-white/55">{error.message}</p>
+        ) : null}
+        <button
+          type="button"
+          onClick={resetError}
+          className="mt-5 min-h-11 rounded-xl bg-white px-5 text-sm font-semibold text-[#071527]"
+        >
+          Retry
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function AppBootstrap() {
+  const [LoadedApp, setLoadedApp] = useState<ComponentType | null>(null);
+  const [startupError, setStartupError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void import('./App')
+      .then(({ default: App }) => {
+        if (!active) return;
+        setLoadedApp(() => App);
+        (window as Window & { corvlioStartupComplete?: () => void })
+          .corvlioStartupComplete?.();
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setStartupError(
+          error instanceof Error ? error : new Error('The app could not load.'),
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (startupError) {
+    return (
+      <StartupFailure
+        error={startupError}
+        resetError={() => window.location.reload()}
+      />
+    );
+  }
+  if (!LoadedApp) return native ? <StartupLoading /> : null;
+  return <LoadedApp />;
+}
+
+const root = createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
   onCaughtError: () => {
     console.error("Unexpected dashboard render error");
   },
-}).render(
-  <ErrorBoundary>
-    <App />
+});
+
+root.render(
+  <ErrorBoundary FallbackComponent={StartupFailure}>
+    <AppBootstrap />
   </ErrorBoundary>,
 );

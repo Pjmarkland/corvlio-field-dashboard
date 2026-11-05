@@ -14,7 +14,7 @@ const config: CapacitorConfig = {
     // Comment this out before producing a production build.
     // url: process.env.CAPACITOR_DEV_URL,
     cleartext: false,
-    iosScheme: 'https',
+    iosScheme: 'capacitor',
   },
   plugins: {
     PushNotifications: {
