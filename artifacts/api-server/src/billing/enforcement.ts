@@ -10,7 +10,7 @@ import {
   manualInvoicesTable,
   pool,
 } from "@workspace/db";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { addBusinessDays } from "./policy";
 import { billingEnabled, getBillingStripe } from "./stripeClient";
@@ -86,6 +86,7 @@ function asStringId(value: string | { id: string } | null | undefined): string |
 type InvoiceWithPaymentData = Stripe.Invoice & {
   subscription?: string | { id: string } | null;
   payment_intent?: string | { id: string } | null;
+  paid?: boolean;
   payments?: {
     has_more?: boolean;
     data?: Array<{
@@ -156,7 +157,7 @@ export async function verifyStripeInvoiceStillPastDue(
 
     if (invoice.id !== candidate.invoiceId
       || invoice.status !== "open"
-      || invoice.paid !== false
+      || (invoice.paid !== undefined && invoice.paid !== false)
       || typeof invoice.amount_remaining !== "number"
       || invoice.amount_remaining <= 0
       || invoiceCustomerId !== candidate.stripeCustomerId
@@ -373,6 +374,10 @@ async function suspend(candidate: EnforcementCandidate): Promise<boolean> {
     if (await readModeInTransaction(tx) !== "enforce") return false;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${BUSINESS_LOCK_NAMESPACE}, ${candidate.businessId})`);
     if (!await candidateStillCurrent(tx, candidate)) return false;
+    // Recheck provider state after acquiring final database locks and immediately
+    // before writing the suspension. Any provider error leaves service active.
+    if (candidate.source === "stripe"
+      && (!billingEnabled() || !await verifyStripeInvoiceStillPastDue(candidate))) return false;
 
     const reason = reasonFor(candidate);
     const recorded = await recordEvent(tx, candidate, {
@@ -418,7 +423,15 @@ async function suspend(candidate: EnforcementCandidate): Promise<boolean> {
 async function readMode(): Promise<BillingEnforcementMode> {
   const [settings] = await db.select().from(billingEnforcementSettingsTable)
     .where(eq(billingEnforcementSettingsTable.id, SETTINGS_ID)).limit(1);
-  return settings ? modeOrOff(settings.mode) : "dry_run";
+  return settings ? modeOrOff(settings.mode) : "off";
+}
+
+export async function getBillingEnforcementMode(): Promise<BillingEnforcementMode> {
+  try {
+    return await readMode();
+  } catch {
+    return "off";
+  }
 }
 
 async function listCandidates(): Promise<EnforcementCandidate[]> {
@@ -431,6 +444,11 @@ async function listCandidates(): Promise<EnforcementCandidate[]> {
       JOIN billing_accounts ba ON ba.business_id=b.id
       WHERE b.billing_mode='stripe' AND b.is_internal=false AND b.is_sample=false
         AND b.billing_enforcement_suspended_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM billing_enforcement_events e
+          WHERE e.business_id=b.id AND e.source='stripe' AND e.invoice_id=ba.state->>'failureInvoiceId'
+            AND e.action='reinstated'
+        )
     `),
     pool.query<{
       id: number; business_id: number; business_name: string; never_auto_suspend: boolean;
@@ -443,6 +461,11 @@ async function listCandidates(): Promise<EnforcementCandidate[]> {
       WHERE i.paid_at IS NULL AND i.overdue_confirmed_at IS NOT NULL
         AND b.billing_mode='manual' AND b.is_internal=false AND b.is_sample=false
         AND b.billing_enforcement_suspended_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM billing_enforcement_events e
+          WHERE e.business_id=b.id AND e.source='manual' AND e.invoice_id=i.id::text
+            AND e.action='reinstated'
+        )
     `),
   ]);
 
@@ -534,10 +557,24 @@ export async function getBillingEnforcementSettings() {
     .orderBy(desc(billingEnforcementEventsTable.createdAt))
     .limit(50);
   return {
-    mode: settings ? modeOrOff(settings.mode) : "dry_run" as const,
+    mode: settings ? modeOrOff(settings.mode) : "off" as const,
     updatedAt: settings?.updatedAt.toISOString() ?? null,
     updatedBy: settings?.updatedBy ?? null,
-    wouldSuspend: wouldSuspend.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
+    dryRunCandidates: wouldSuspend.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
+    auditLog: (await db.select({
+      id: billingEnforcementEventsTable.id,
+      businessId: billingEnforcementEventsTable.businessId,
+      businessName: billingEnforcementEventsTable.businessName,
+      source: billingEnforcementEventsTable.source,
+      invoiceId: billingEnforcementEventsTable.invoiceId,
+      action: billingEnforcementEventsTable.action,
+      actor: billingEnforcementEventsTable.actor,
+      reason: billingEnforcementEventsTable.reason,
+      details: billingEnforcementEventsTable.details,
+      createdAt: billingEnforcementEventsTable.createdAt,
+    }).from(billingEnforcementEventsTable)
+      .orderBy(desc(billingEnforcementEventsTable.createdAt))
+      .limit(100)).map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
   };
 }
 
@@ -782,10 +819,3 @@ export async function reinstateForPaidInvoice(
   });
 }
 
-export async function getManualInvoicePaidBusiness(invoiceId: number) {
-  const [row] = await db.select({ businessId: manualInvoicesTable.businessId })
-    .from(manualInvoicesTable)
-    .where(and(eq(manualInvoicesTable.id, invoiceId), isNull(manualInvoicesTable.paidAt)))
-    .limit(1);
-  return row?.businessId ?? null;
-}
