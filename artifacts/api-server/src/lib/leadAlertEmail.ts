@@ -35,7 +35,12 @@ export async function deliverLeadAlertEmails() {
         });
         if (!sent) throw new Error("Email channel or owner email is not configured");
         await recordLeadEmailAttempt(null);
-        await tx.update(notificationEventsTable).set({ emailStatus: "delivered", emailAttempts: attempts, emailLastError: null })
+        await tx.update(notificationEventsTable).set({
+          emailStatus: "delivered",
+          emailAttempts: attempts,
+          emailLastError: null,
+          emailDeliveredAt: new Date(),
+        })
           .where(eq(notificationEventsTable.id, event.id));
         return null;
       } catch (error) {

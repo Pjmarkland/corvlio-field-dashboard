@@ -2075,6 +2075,7 @@ export const AdminOperationalFailureSource = {
   pre_call_fallback: 'pre_call_fallback',
   post_call_webhook: 'post_call_webhook',
   lead_gmail_notification: 'lead_gmail_notification',
+  stripe_webhook: 'stripe_webhook',
   phone_provisioning: 'phone_provisioning',
 } as const;
 
@@ -2176,6 +2177,7 @@ export type AdminSystemAlertEndpoint = typeof AdminSystemAlertEndpoint[keyof typ
 export const AdminSystemAlertEndpoint = {
   'pre-call': 'pre-call',
   'post-call': 'post-call',
+  stripe: 'stripe',
 } as const;
 
 export type AdminSystemAlertStatus = typeof AdminSystemAlertStatus[keyof typeof AdminSystemAlertStatus];
@@ -2223,6 +2225,8 @@ export interface AdminHealthCheck {
   lastPreCallSuccessfulAt: string | null;
   /** @nullable */
   lastPostCallSuccessfulAt: string | null;
+  /** @nullable */
+  lastSuccessfulLeadEmailAt: string | null;
   /** @minimum 0 */
   openAlertCount: number;
   openAlerts: AdminSystemAlert[];

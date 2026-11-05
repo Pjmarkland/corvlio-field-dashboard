@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   nativeSummary: vi.fn(),
+  recordAlert: vi.fn(),
   enabled: true, mode: "test" as "test" | "live" | "off", signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
   isVerifiedAdminUser: vi.fn(),
   resume: vi.fn(), checkout: vi.fn(), upgrade: vi.fn(), portal: vi.fn(), eligibility: vi.fn(), businesses: vi.fn(),
@@ -17,6 +18,9 @@ vi.mock("../../src/billing/runtime", () => ({ billingService: {
   webhook: m.process, snapshot: m.snapshot, cancel: m.cancel, resume: m.resume,
   checkout: m.checkout, upgrade: m.upgrade, portal: m.portal, startupEligibility: m.eligibility,
 } }));
+vi.mock("../../src/lib/retellSystemAlerts", () => ({
+  recordRetellSystemAlert: m.recordAlert,
+}));
 vi.mock("../../src/billing/store", () => ({ billingStore: { businesses: m.businesses } }));
 vi.mock("@clerk/express", () => ({ getAuth: (req: express.Request) => ({ userId: req.get("x-test-owner") ?? null }) }));
 vi.mock("../../src/lib/businessDirectory", () => ({
@@ -43,6 +47,7 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 beforeEach(() => {
   vi.clearAllMocks(); m.enabled = true; m.mode = "test";
+  m.recordAlert.mockResolvedValue(undefined);
   m.snapshot.mockImplementation(async id => ({ businessId: id }));
   m.isVerifiedAdminUser.mockResolvedValue(false);
   m.cancel.mockResolvedValue({ cancelAt: "2026-11-09T10:00:00Z" });
@@ -194,10 +199,18 @@ describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {
   it("accepts valid signatures over the original Buffer", async () => {
     expect((await send(payload, sign())).status).toBe(200);
     expect(Buffer.isBuffer(m.signature.mock.calls[0]![0])).toBe(true); expect(m.process).toHaveBeenCalledTimes(1);
+    expect(m.recordAlert).not.toHaveBeenCalled();
   });
   it("returns 401 for missing or invalid signatures", async () => {
     expect((await send()).status).toBe(401); expect((await send(payload, "invalid")).status).toBe(401);
     expect(m.process).not.toHaveBeenCalled();
+    expect(m.recordAlert).toHaveBeenCalledTimes(2);
+    expect(m.recordAlert).toHaveBeenCalledWith(expect.objectContaining({
+      endpoint: "stripe",
+      category: "stripe_signature_rejected",
+      source: "stripe_webhook",
+      issueKey: "stripe:webhook:signature",
+    }));
   });
   it("returns 401 when signed bytes are changed", async () => {
     expect((await send(payload + " ", sign())).status).toBe(401); expect(m.process).not.toHaveBeenCalled();
@@ -213,11 +226,23 @@ describe("raw-body signed webhook (local HMAC only, no Stripe network)", () => {
     expect(m.process).toHaveBeenCalledTimes(1);
   });
   it("returns retryable 503 when persistence fails", async () => {
-    m.process.mockRejectedValueOnce(new Error("offline mocked DB failure"));
+    m.process.mockRejectedValue(new Error("offline mocked DB failure"));
     expect((await send(payload, sign())).status).toBe(503);
+    const retryPayload = payload.replace("evt_local", "evt_local_retry");
+    expect((await send(retryPayload, sign(retryPayload))).status).toBe(503);
+    const alertCalls = m.recordAlert.mock.calls.map(([input]) => input);
+    expect(alertCalls).toHaveLength(2);
+    expect(alertCalls[0].issueKey).toBe("stripe:webhook:processing:invoice.paid");
+    expect(alertCalls[0].issueKey).toBe(alertCalls[1].issueKey);
+    expect(alertCalls[0]).toMatchObject({
+      endpoint: "stripe",
+      category: "stripe_processing_error",
+      source: "stripe_webhook",
+    });
   });
   it("flag off does not verify signatures or process events", async () => {
     m.enabled = false; expect((await send(payload, sign())).status).toBe(404);
     expect(m.signature).not.toHaveBeenCalled(); expect(m.process).not.toHaveBeenCalled();
+    expect(m.recordAlert).not.toHaveBeenCalled();
   });
 });

@@ -107,6 +107,7 @@ beforeEach(() => {
   m.getHealthCheck.mockResolvedValue({
     lastPreCallSuccessfulAt: null,
     lastPostCallSuccessfulAt: null,
+    lastSuccessfulLeadEmailAt: null,
     openAlertCount: 0,
     openAlerts: [],
   });
@@ -191,6 +192,7 @@ describe("admin fallback phone settings routes", () => {
     m.getHealthCheck.mockResolvedValue({
       lastPreCallSuccessfulAt: "2026-11-03T11:00:00.000Z",
       lastPostCallSuccessfulAt: null,
+      lastSuccessfulLeadEmailAt: "2026-11-03T10:45:00.000Z",
       openAlertCount: 1,
       openAlerts: [alert],
     });
@@ -205,6 +207,7 @@ describe("admin fallback phone settings routes", () => {
     expect(await health.json()).toEqual({
       lastPreCallSuccessfulAt: "2026-11-03T11:00:00.000Z",
       lastPostCallSuccessfulAt: null,
+      lastSuccessfulLeadEmailAt: "2026-11-03T10:45:00.000Z",
       openAlertCount: 1,
       openAlerts: [alert],
     });

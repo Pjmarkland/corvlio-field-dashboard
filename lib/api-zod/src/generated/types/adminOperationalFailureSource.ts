@@ -13,5 +13,6 @@ export const AdminOperationalFailureSource = {
   pre_call_fallback: 'pre_call_fallback',
   post_call_webhook: 'post_call_webhook',
   lead_gmail_notification: 'lead_gmail_notification',
+  stripe_webhook: 'stripe_webhook',
   phone_provisioning: 'phone_provisioning',
 } as const;

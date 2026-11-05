@@ -167,6 +167,7 @@ afterAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("RETELL_API_KEY", "retell-unit-test-key");
+  vi.stubEnv("REQUIRE_RETELL_WEBHOOK_SIGNATURES", "false");
   mocks.persistAnalyzedCall.mockResolvedValue({ id: 101, notify: true });
   mocks.persistBlankCall.mockResolvedValue({ inserted: true, triggerStreakAlert: false, streakStartCallId: null });
   mocks.persistPendingRetellCall.mockResolvedValue(true);
@@ -387,6 +388,20 @@ describe("Retell webhook safety", () => {
     expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("without a signature"));
     expect(mocks.recordRetellSystemAlert).not.toHaveBeenCalled();
   });
+  it("can require pre-call signatures without changing the default rollout behavior", async () => {
+    vi.stubEnv("REQUIRE_RETELL_WEBHOOK_SIGNATURES", "true");
+    const response = await fetch(`${baseUrl}/webhooks/retell/pre-call`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ call_inbound: { to_number: "+14155550123" } }),
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.findBusinessByPhoneNumber).not.toHaveBeenCalled();
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:pre-call:invalid_signature",
+      endpoint: "pre-call",
+    }));
+  });
   it("verifies valid pre-call signatures against the exact raw bytes", async () => {
     const raw = '{ "call_inbound": { "to_number" : "+14155550123" } }';
     expect((await signedRequest("pre-call", raw)).status).toBe(200);
@@ -438,6 +453,20 @@ describe("Retell webhook safety", () => {
     expect(mocks.persistAnalyzedCall).toHaveBeenCalledOnce();
     expect(mocks.logWarn).toHaveBeenCalledWith(expect.stringContaining("without a signature"));
     expect(mocks.recordRetellSystemAlert).not.toHaveBeenCalled();
+  });
+  it("can require post-call signatures when the environment option is enabled", async () => {
+    vi.stubEnv("REQUIRE_RETELL_WEBHOOK_SIGNATURES", "TRUE");
+    const response = await fetch(`${baseUrl}/webhooks/retell/post-call`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '{"event":"call_analyzed"}',
+    });
+    expect(response.status).toBe(401);
+    expect(mocks.persistAnalyzedCall).not.toHaveBeenCalled();
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      issueKey: "retell:post-call:invalid_signature",
+      endpoint: "post-call",
+    }));
   });
   it("rejects present invalid post-call signatures", async () => {
     const raw = JSON.stringify({ event: "call_analyzed", call: {

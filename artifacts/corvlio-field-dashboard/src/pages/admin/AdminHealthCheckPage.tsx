@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Clock3, RefreshCw } from 'lucide-react';
+import { Activity, AlertTriangle, Clock3, Mail, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
 import {
   getGetAdminHealthCheckQueryKey,
@@ -31,7 +31,7 @@ export default function AdminHealthCheckPage() {
     eyebrow="Founder operations"
     action={<button type="button" onClick={() => void query.refetch()} disabled={query.isFetching} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1d8] px-3 text-xs font-bold text-[#52645a] disabled:opacity-60" data-testid="button-refresh-health-check"><RefreshCw size={14} className={query.isFetching ? 'animate-spin' : ''} />Refresh</button>}
   >
-    <section className="mb-9 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <section className="mb-9 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <AdminMetric
         label="Pre-call webhook"
         value={query.data.lastPreCallSuccessfulAt ? formatAdminDate(query.data.lastPreCallSuccessfulAt) : 'Not recorded'}
@@ -47,6 +47,15 @@ export default function AdminHealthCheckPage() {
         tone={query.data.lastPostCallSuccessfulAt ? 'moss' : 'coral'}
       />
       <AdminMetric
+        label="Last successful lead email"
+        value={query.data.lastSuccessfulLeadEmailAt ? formatAdminDate(query.data.lastSuccessfulLeadEmailAt) : 'Not recorded'}
+        detail={query.data.lastSuccessfulLeadEmailAt
+          ? `Delivered: ${formatAdminDate(query.data.lastSuccessfulLeadEmailAt)}`
+          : 'Tracking begins with newly delivered lead emails.'}
+        icon={Mail}
+        tone={query.data.lastSuccessfulLeadEmailAt ? 'moss' : 'neutral'}
+      />
+      <AdminMetric
         label="Open alerts"
         value={query.data.openAlertCount}
         detail={query.data.openAlertCount ? 'Review unresolved incidents below.' : 'No unresolved incidents.'}
@@ -59,7 +68,7 @@ export default function AdminHealthCheckPage() {
       <SectionHeading
         eyebrow="Needs attention"
         title="Open system alerts"
-        detail="Successful webhook times update only when the event is handled without an error."
+        detail="Webhook times update after successful processing. Lead-email time updates only after confirmed delivery."
         action={<Link href="/admin/system-alerts" data-testid="link-health-system-alerts" className="admin-link inline-flex min-h-10 items-center rounded-xl border border-[#d8e1d8] px-3 text-xs font-bold text-[#52645a]">View all alerts</Link>}
       />
       {query.data.openAlerts.length === 0

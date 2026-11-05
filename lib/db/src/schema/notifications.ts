@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  index,
   pgTable,
   primaryKey,
   serial,
@@ -63,6 +64,7 @@ export const notificationEventsTable = pgTable(
     emailAttempts: integer("email_attempts").notNull().default(0),
     emailNextAttemptAt: timestamp("email_next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
     emailLastError: text("email_last_error"),
+    emailDeliveredAt: timestamp("email_delivered_at", { withTimezone: true }),
     body: text("body").notNull(),
     deepLink: text("deep_link").notNull(),
     status: text("status").notNull().default("queued"),
@@ -77,6 +79,7 @@ export const notificationEventsTable = pgTable(
       table.businessId,
       table.leadId,
     ),
+    index("notification_events_email_delivery_idx").on(table.emailStatus, table.emailDeliveredAt),
   ],
 );
 

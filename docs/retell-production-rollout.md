@@ -53,11 +53,14 @@ before a future release. No KB was deleted.
 
 4. **Publish the backward-compatible app first, not the agent.**
    After approval, apply the additive schema changes to production through the
-   approved database migration flow and publish the app. Confirm production has
-   its existing Retell signature key, Gmail configuration and correct APNs
-   environment. The post-call endpoint must be public but require valid Retell
-   signatures. Confirm unsigned requests receive 401, and run signed synthetic
-   TEST events to verify exclusion without creating real leads or alerts.
+    approved database migration flow and publish the app. Confirm production has
+    its existing Retell signature key, Gmail configuration and correct APNs
+    environment. Missing Retell signatures remain accepted by default for rollout
+    compatibility. Only after confirming genuine signature coverage for both
+    pre-call and post-call senders, set `REQUIRE_RETELL_WEBHOOK_SIGNATURES=true`
+    in production; then both public webhook routes reject unsigned requests with
+    401. Run signed synthetic TEST events to verify exclusion without creating
+    real leads or alerts.
    Confirm both legacy and canonical analysis fields remain supported.
    Demo dialing is intentionally development-only and remains 404 in production.
 

@@ -61,6 +61,7 @@ describe('Retell admin monitoring pages', () => {
       data: {
         lastPreCallSuccessfulAt: '2026-11-03T11:30:00.000Z',
         lastPostCallSuccessfulAt: null,
+        lastSuccessfulLeadEmailAt: '2026-11-03T11:15:00.000Z',
         openAlertCount: 1,
         openAlerts: [openAlert],
       },
@@ -88,6 +89,8 @@ describe('Retell admin monitoring pages', () => {
     render(<AdminHealthCheckPage />);
     expect(screen.getByRole('heading', { name: 'Health check' })).toBeTruthy();
     expect(screen.getByText('Last success: 2026-11-03T11:30:00.000Z')).toBeTruthy();
+    expect(screen.getByText('Last successful lead email')).toBeTruthy();
+    expect(screen.getByText('Delivered: 2026-11-03T11:15:00.000Z')).toBeTruthy();
     expect(screen.getByText('No successful webhook recorded yet')).toBeTruthy();
     expect(screen.getByTestId('health-open-alert-7')).toBeTruthy();
     expect(screen.getByTestId('link-health-system-alerts').getAttribute('href')).toBe('/admin/system-alerts');

@@ -12,6 +12,8 @@ export interface AdminHealthCheck {
   lastPreCallSuccessfulAt: Date | null;
   /** @nullable */
   lastPostCallSuccessfulAt: Date | null;
+  /** @nullable */
+  lastSuccessfulLeadEmailAt: Date | null;
   /** @minimum 0 */
   openAlertCount: number;
   openAlerts: AdminSystemAlert[];

@@ -1,5 +1,6 @@
 import {
   db,
+  notificationEventsTable,
   retellSystemAlertsTable,
   retellWebhookHealthTable,
 } from "@workspace/db";
@@ -13,9 +14,10 @@ import { getWebPushReadiness } from "./webPushService";
 import { runNotificationOutboxNow } from "./notificationService";
 import { logger } from "./logger";
 
-export type RetellWebhookEndpoint = "pre-call" | "post-call";
+export type SystemAlertEndpoint = "pre-call" | "post-call" | "stripe";
+export type RetellWebhookEndpoint = Exclude<SystemAlertEndpoint, "stripe">;
 const ALERT_WINDOW_MS = 15 * 60_000;
-const RETELL_ALERT_COPY: Partial<Record<string, (endpoint: RetellWebhookEndpoint) => { summary: string; details: string }>> = {
+const SYSTEM_ALERT_COPY: Partial<Record<string, (endpoint: SystemAlertEndpoint) => { summary: string; details: string }>> = {
   invalid_signature: (endpoint) => ({
     summary: `Retell ${endpoint} webhook rejected: invalid signature`,
     details: "A webhook signature check failed. Confirm the provider URL and signing configuration.",
@@ -44,10 +46,18 @@ const RETELL_ALERT_COPY: Partial<Record<string, (endpoint: RetellWebhookEndpoint
     summary: "Retell post-call processing failed",
     details: "A post-call event could not be processed. Review webhook health and server status.",
   }),
+  stripe_signature_rejected: () => ({
+    summary: "Stripe webhook signature rejected",
+    details: "A Stripe webhook failed signature, raw-body, or mode verification. Check the webhook signing configuration.",
+  }),
+  stripe_processing_error: () => ({
+    summary: "Stripe webhook processing failed",
+    details: "A verified Stripe event could not be processed. Stripe received a retryable error response.",
+  }),
 };
 
-function allowlistedRetellAlertText(endpoint: RetellWebhookEndpoint, category: string) {
-  const copy = RETELL_ALERT_COPY[category];
+function allowlistedSystemAlertText(endpoint: SystemAlertEndpoint, category: string) {
+  const copy = SYSTEM_ALERT_COPY[category];
   return {
     category: copy ? category : "webhook_error",
     ...(copy?.(endpoint) ?? {
@@ -59,11 +69,11 @@ function allowlistedRetellAlertText(endpoint: RetellWebhookEndpoint, category: s
 
 export type RetellSystemAlertInput = {
   issueKey: string;
-  endpoint: RetellWebhookEndpoint;
+  endpoint: SystemAlertEndpoint;
   category: string;
   summary: string;
   details: string;
-  source: Extract<OperationalFailureSource, "pre_call_fallback" | "post_call_webhook">;
+  source: Extract<OperationalFailureSource, "pre_call_fallback" | "post_call_webhook" | "stripe_webhook">;
   businessId?: number | null;
   businessName?: string | null;
   maskedCallerNumber?: string;
@@ -114,7 +124,7 @@ async function notifyOwner(input: RetellSystemAlertInput, eventKey: string): Pro
  */
 export async function recordRetellSystemAlert(input: RetellSystemAlertInput): Promise<void> {
   const issueKey = input.issueKey.trim().slice(0, 180);
-  const safeCopy = allowlistedRetellAlertText(input.endpoint, input.category);
+  const safeCopy = allowlistedSystemAlertText(input.endpoint, input.category);
   const safeInput = {
     ...input,
     category: safeCopy.category,
@@ -192,7 +202,7 @@ export async function recordRetellWebhookSuccess(endpoint: RetellWebhookEndpoint
 }
 
 function serializeAlert(alert: typeof retellSystemAlertsTable.$inferSelect) {
-  const safeCopy = allowlistedRetellAlertText(alert.endpoint, alert.category);
+  const safeCopy = allowlistedSystemAlertText(alert.endpoint, alert.category);
   return {
     id: alert.id,
     endpoint: alert.endpoint,
@@ -229,7 +239,7 @@ export async function getAdminRetellSystemAlerts() {
 }
 
 export async function getAdminRetellHealthCheck() {
-  const [healthRows, openAlerts, [openCount]] = await Promise.all([
+  const [healthRows, openAlerts, [openCount], [lastLeadEmail]] = await Promise.all([
     db.select().from(retellWebhookHealthTable),
     db
       .select()
@@ -241,11 +251,15 @@ export async function getAdminRetellHealthCheck() {
       .select({ count: sql<number>`count(*)::int` })
       .from(retellSystemAlertsTable)
       .where(isNull(retellSystemAlertsTable.resolvedAt)),
+    db.select({
+      emailDeliveredAt: sql<Date | null>`max(${notificationEventsTable.emailDeliveredAt})`,
+    }).from(notificationEventsTable).where(eq(notificationEventsTable.emailStatus, "delivered")),
   ]);
   const lastSuccess = new Map(healthRows.map((row) => [row.endpoint, row.lastSuccessfulAt.toISOString()]));
   return {
     lastPreCallSuccessfulAt: lastSuccess.get("pre-call") ?? null,
     lastPostCallSuccessfulAt: lastSuccess.get("post-call") ?? null,
+    lastSuccessfulLeadEmailAt: lastLeadEmail?.emailDeliveredAt?.toISOString() ?? null,
     openAlertCount: openCount?.count ?? 0,
     openAlerts: openAlerts.map(serializeAlert),
   };

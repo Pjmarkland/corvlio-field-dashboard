@@ -14,7 +14,7 @@ export const retellSystemAlertsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     issueKey: text("issue_key").notNull(),
-    endpoint: text("endpoint", { enum: ["pre-call", "post-call"] }).notNull(),
+    endpoint: text("endpoint", { enum: ["pre-call", "post-call", "stripe"] }).notNull(),
     category: text("category").notNull(),
     summary: text("summary").notNull(),
     details: text("details").notNull(),

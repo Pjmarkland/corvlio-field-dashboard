@@ -224,6 +224,12 @@ function recordPostCallFailure(
 router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
   const signature = req.get("x-retell-signature");
   if (signature === undefined) {
+    if (process.env.REQUIRE_RETELL_WEBHOOK_SIGNATURES?.trim().toLowerCase() === "true") {
+      await alertRejectedRetellWebhook("pre-call", "invalid_signature");
+      req.log.warn("Rejected unsigned Retell pre-call webhook because signatures are required");
+      res.status(401).json({ error: "Retell signature is required" });
+      return;
+    }
     req.log.warn("Accepted Retell pre-call webhook without a signature during rollout");
   } else if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
     await alertRejectedRetellWebhook("pre-call", "invalid_signature");
@@ -322,6 +328,12 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
 router.post("/webhooks/retell/post-call", async (req, res): Promise<void> => {
   const signature = req.get("x-retell-signature");
   if (signature === undefined) {
+    if (process.env.REQUIRE_RETELL_WEBHOOK_SIGNATURES?.trim().toLowerCase() === "true") {
+      await alertRejectedRetellWebhook("post-call", "invalid_signature");
+      req.log.warn("Rejected unsigned Retell post-call webhook because signatures are required");
+      res.status(401).json({ error: "Retell signature is required" });
+      return;
+    }
     req.log.warn("Accepted Retell post-call webhook without a signature during rollout");
   } else if (!req.rawBody || !isValidRetellSignature(req.rawBody, signature)) {
     await alertRejectedRetellWebhook("post-call", "invalid_signature");

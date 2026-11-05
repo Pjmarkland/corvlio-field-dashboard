@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => {
     lastSuccessfulAt: { name: "last_successful_at" },
     updatedAt: { name: "updated_at" },
   };
+  const notificationTable = {
+    emailStatus: { name: "email_status" },
+    emailDeliveredAt: { name: "email_delivered_at" },
+  };
   const builder = {
     values: vi.fn(),
     onConflictDoUpdate: vi.fn(),
@@ -25,8 +29,14 @@ const mocks = vi.hoisted(() => {
   return {
     alertTable,
     healthTable,
+    notificationTable,
     builder,
     dbInsert: vi.fn(() => builder),
+    dbSelect: vi.fn(),
+    healthRows: [] as Array<{ endpoint: string; lastSuccessfulAt: Date | null }>,
+    openAlerts: [] as Array<Record<string, unknown>>,
+    openCount: 0,
+    emailDeliveredAt: null as Date | null,
     returningAt: null as Date | null,
     returningNotify: true,
     recordOperationalFailure: vi.fn(),
@@ -39,9 +49,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@workspace/db", () => ({
-  db: { insert: mocks.dbInsert },
+  db: { insert: mocks.dbInsert, select: mocks.dbSelect },
   retellSystemAlertsTable: mocks.alertTable,
   retellWebhookHealthTable: mocks.healthTable,
+  notificationEventsTable: mocks.notificationTable,
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -69,7 +80,7 @@ vi.mock("../../src/lib/logger", () => ({
   logger: { error: mocks.loggerError, warn: mocks.loggerWarn },
 }));
 
-import { recordRetellSystemAlert } from "../../src/lib/retellSystemAlerts";
+import { getAdminRetellHealthCheck, recordRetellSystemAlert } from "../../src/lib/retellSystemAlerts";
 
 const alertInput = {
   issueKey: "retell:pre-call:business-lookup-timeout",
@@ -89,6 +100,24 @@ describe("Retell system alert notification throttling", () => {
     vi.clearAllMocks();
     mocks.returningAt = null;
     mocks.returningNotify = true;
+    mocks.healthRows = [];
+    mocks.openAlerts = [];
+    mocks.openCount = 0;
+    mocks.emailDeliveredAt = null;
+    mocks.dbSelect.mockImplementation((projection?: unknown) => ({
+      from: (table: unknown) => {
+        if (table === mocks.healthTable) return Promise.resolve(mocks.healthRows);
+        if (table === mocks.notificationTable) {
+          return { where: async () => [{ emailDeliveredAt: mocks.emailDeliveredAt }] };
+        }
+        if (projection) return { where: async () => [{ count: mocks.openCount }] };
+        return {
+          where: () => ({
+            orderBy: () => ({ limit: async () => mocks.openAlerts }),
+          }),
+        };
+      },
+    }));
     mocks.builder.returning.mockImplementation(async () => [{
       lastNotifiedAt: mocks.returningAt ?? new Date(),
       shouldNotify: mocks.returningNotify,
@@ -155,5 +184,60 @@ describe("Retell system alert notification throttling", () => {
     expect(mocks.recordOperationalFailure).toHaveBeenCalledOnce();
     expect(mocks.queueFounderPushNotification).not.toHaveBeenCalled();
     expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+  });
+
+  it("uses the same 15-minute dedupe window and admin email path for Stripe webhook errors", async () => {
+    const stripeInput = {
+      issueKey: "stripe:webhook:processing:invoice.paid",
+      endpoint: "stripe" as const,
+      category: "stripe_processing_error",
+      summary: "ignored caller-provided summary",
+      details: "ignored caller-provided details",
+      source: "stripe_webhook" as const,
+    };
+    await recordRetellSystemAlert(stripeInput);
+    const firstNotificationTime = new Date();
+    await flushDelivery();
+
+    const stored = mocks.builder.values.mock.calls[0]?.[0];
+    expect(stored).toMatchObject({
+      endpoint: "stripe",
+      category: "stripe_processing_error",
+      summary: "Stripe webhook processing failed",
+      details: "A verified Stripe event could not be processed. Stripe received a retryable error response.",
+    });
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledWith(expect.objectContaining({
+      source: "stripe_webhook",
+      summary: "Stripe webhook processing failed",
+    }));
+    expect(mocks.runNotificationOutboxNow).toHaveBeenCalledOnce();
+
+    mocks.returningAt = firstNotificationTime;
+    mocks.returningNotify = false;
+    await recordRetellSystemAlert(stripeInput);
+    await flushDelivery();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledOnce();
+
+    mocks.returningAt = new Date(firstNotificationTime.getTime() + 15 * 60_000);
+    mocks.returningNotify = true;
+    await recordRetellSystemAlert(stripeInput);
+    await flushDelivery();
+    expect(mocks.recordOperationalFailure).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns the last successful lead-email delivery time for the admin health check", async () => {
+    const preCallAt = new Date("2026-11-03T11:00:00.000Z");
+    const leadEmailAt = new Date("2026-11-03T11:15:00.000Z");
+    mocks.healthRows = [{ endpoint: "pre-call", lastSuccessfulAt: preCallAt }];
+    mocks.emailDeliveredAt = leadEmailAt;
+    mocks.openCount = 0;
+
+    await expect(getAdminRetellHealthCheck()).resolves.toMatchObject({
+      lastPreCallSuccessfulAt: preCallAt.toISOString(),
+      lastPostCallSuccessfulAt: null,
+      lastSuccessfulLeadEmailAt: leadEmailAt.toISOString(),
+      openAlertCount: 0,
+      openAlerts: [],
+    });
   });
 });

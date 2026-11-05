@@ -14,6 +14,7 @@ export type OperationalFailureSource =
   | "pre_call_fallback"
   | "post_call_webhook"
   | "lead_gmail_notification"
+  | "stripe_webhook"
   | "phone_provisioning"
   | "account_deletion_balance"
   | "account_deletion_billing"
@@ -39,6 +40,7 @@ const FAILURE_SUMMARY_FALLBACK: Record<OperationalFailureSource, string> = {
   pre_call_fallback: "Retell pre-call service needs attention",
   post_call_webhook: "Retell post-call service needs attention",
   lead_gmail_notification: "Owner email delivery needs attention",
+  stripe_webhook: "Stripe webhook needs attention",
   phone_provisioning: "Business phone provisioning needs attention",
   account_deletion_balance: "Account deletion balance cleanup needs attention",
   account_deletion_billing: "Account deletion billing cleanup needs attention",
@@ -71,6 +73,10 @@ const FAILURE_SUMMARY_ALLOWLIST: Record<OperationalFailureSource, Record<string,
     "Owner lead email blocked by Gmail configuration": "Owner lead email configuration needs attention",
     "Owner lead notification failed after five delivery attempts": "Owner lead email delivery failed after retries",
     "Admin Gmail test failed": "Admin email test failed",
+  },
+  stripe_webhook: {
+    "Stripe webhook signature rejected": "Stripe webhook signature rejected",
+    "Stripe webhook processing failed": "Stripe webhook processing failed",
   },
   phone_provisioning: {
     "Business phone-number provisioning is pending": "Business phone-number provisioning is pending",
@@ -110,6 +116,7 @@ const FAILURE_DETAILS: Record<OperationalFailureSource, string> = {
   pre_call_fallback: "An inbound call used a fallback response. Review webhook health and business routing.",
   post_call_webhook: "A call event needs review. Check webhook health and lead processing.",
   lead_gmail_notification: "Lead email delivery needs review. Check the configured email channel and sending limits.",
+  stripe_webhook: "A Stripe webhook was rejected or could not be processed. Review billing webhook status.",
   phone_provisioning: "Phone-number provisioning is incomplete. Review the pending business setup.",
   account_deletion_balance: "A balance cleanup remains pending after account deletion. Review payment status.",
   account_deletion_billing: "A billing cleanup remains pending after account deletion. Review payment status.",

@@ -15,7 +15,7 @@ import { deliverLeadAlertEmails } from "../../src/lib/leadAlertEmail";
 let event: Record<string, any>, business: Record<string, unknown>;
 beforeEach(() => {
   vi.clearAllMocks(); m.writes = [];
-  event = { id: 1, businessId: "7", leadId: "9", emailStatus: "queued", emailAttempts: 0, emailNextAttemptAt: new Date(0) };
+  event = { id: 1, businessId: "7", leadId: "9", emailStatus: "queued", emailAttempts: 0, emailNextAttemptAt: new Date(0), emailDeliveredAt: null };
   business = { id: 7, ownerEmail: "owner@example.test", leadAlertsEnabled: true, isSample: false };
   m.select.mockImplementation(() => ({ from: table => ({ where: () => {
     const rows = table === m.tables.events ? [event] : table === m.tables.business ? [business] : [{
@@ -49,6 +49,7 @@ describe("persisted immediate email outbox", () => {
       ownerEmail: "owner@example.test", callerName: "Sam", phoneNumber: "+15551230001", issue: "Pipe leak",
     });
     expect(event.emailStatus).toBe("delivered");
+    expect(event.emailDeliveredAt).toBeInstanceOf(Date);
   });
   it.each([{ leadAlertsEnabled: false }, { isSample: true }])("does not send disabled or sample-business alerts", async changes => {
     Object.assign(business, changes); await deliverLeadAlertEmails();

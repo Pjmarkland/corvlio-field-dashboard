@@ -1801,7 +1801,7 @@ export const getAdminSystemAlertsResponseOpenCountMultipleOf = 1;
 export const GetAdminSystemAlertsResponse = zod.object({
   "alerts": zod.array(zod.object({
   "id": zod.number().min(1).multipleOf(getAdminSystemAlertsResponseAlertsItemIdMultipleOf),
-  "endpoint": zod.enum(['pre-call', 'post-call']),
+  "endpoint": zod.enum(['pre-call', 'post-call', 'stripe']),
   "category": zod.string(),
   "summary": zod.string(),
   "details": zod.string(),
@@ -1851,10 +1851,11 @@ export const getAdminHealthCheckResponseOpenAlertsItemOccurrenceCountMultipleOf 
 export const GetAdminHealthCheckResponse = zod.object({
   "lastPreCallSuccessfulAt": zod.coerce.date().nullable(),
   "lastPostCallSuccessfulAt": zod.coerce.date().nullable(),
+  "lastSuccessfulLeadEmailAt": zod.coerce.date().nullable(),
   "openAlertCount": zod.number().min(getAdminHealthCheckResponseOpenAlertCountMin).multipleOf(getAdminHealthCheckResponseOpenAlertCountMultipleOf),
   "openAlerts": zod.array(zod.object({
   "id": zod.number().min(1).multipleOf(getAdminHealthCheckResponseOpenAlertsItemIdMultipleOf),
-  "endpoint": zod.enum(['pre-call', 'post-call']),
+  "endpoint": zod.enum(['pre-call', 'post-call', 'stripe']),
   "category": zod.string(),
   "summary": zod.string(),
   "details": zod.string(),
@@ -1915,7 +1916,7 @@ export const GetAdminActivityResponse = zod.object({
   "operationalFailures": zod.array(zod.object({
   "alertBlocked": zod.boolean().optional(),
   "id": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemIdMultipleOf),
-  "source": zod.enum(['pre_call_fallback', 'post_call_webhook', 'lead_gmail_notification', 'phone_provisioning']),
+  "source": zod.enum(['pre_call_fallback', 'post_call_webhook', 'lead_gmail_notification', 'stripe_webhook', 'phone_provisioning']),
   "summary": zod.string(),
   "details": zod.string(),
   "businessId": zod.number().multipleOf(getAdminActivityResponseOperationalFailuresItemBusinessIdMultipleOf).nullable(),

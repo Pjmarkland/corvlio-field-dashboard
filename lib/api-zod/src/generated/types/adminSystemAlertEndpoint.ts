@@ -12,4 +12,5 @@ export type AdminSystemAlertEndpoint = typeof AdminSystemAlertEndpoint[keyof typ
 export const AdminSystemAlertEndpoint = {
   'pre-call': 'pre-call',
   'post-call': 'post-call',
+  stripe: 'stripe',
 } as const;

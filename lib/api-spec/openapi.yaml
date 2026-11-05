@@ -3832,7 +3832,7 @@ components:
           multipleOf: 1
         source:
           type: string
-          enum: [pre_call_fallback, post_call_webhook, lead_gmail_notification, phone_provisioning]
+          enum: [pre_call_fallback, post_call_webhook, lead_gmail_notification, stripe_webhook, phone_provisioning]
         summary:
           type: string
         details:
@@ -3869,7 +3869,7 @@ components:
       additionalProperties: false
       properties:
         id: { type: number, multipleOf: 1, minimum: 1 }
-        endpoint: { type: string, enum: [pre-call, post-call] }
+        endpoint: { type: string, enum: [pre-call, post-call, stripe] }
         category: { type: string }
         summary: { type: string }
         details: { type: string }
@@ -3916,9 +3916,10 @@ components:
       properties:
         lastPreCallSuccessfulAt: { type: [string, "null"], format: date-time }
         lastPostCallSuccessfulAt: { type: [string, "null"], format: date-time }
+        lastSuccessfulLeadEmailAt: { type: [string, "null"], format: date-time }
         openAlertCount: { type: number, multipleOf: 1, minimum: 0 }
         openAlerts:
           type: array
           items: { $ref: "#/components/schemas/AdminSystemAlert" }
-      required: [lastPreCallSuccessfulAt, lastPostCallSuccessfulAt, openAlertCount, openAlerts]
+      required: [lastPreCallSuccessfulAt, lastPostCallSuccessfulAt, lastSuccessfulLeadEmailAt, openAlertCount, openAlerts]
 
