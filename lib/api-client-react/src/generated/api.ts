@@ -28,6 +28,8 @@ import type {
   AdminBusinessFallbackPhoneUpdate,
   AdminBusinessFallbackRouting,
   AdminBusinessPlanInput,
+  AdminBusinessRetellPhoneNumber,
+  AdminBusinessRetellPhoneNumberUpdate,
   AdminBusinessSuspensionInput,
   AdminBusinessSuspensionStatus,
   AdminCallQuality,
@@ -4056,6 +4058,78 @@ export const useUpdateAdminBusinessSuspension = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateAdminBusinessSuspensionMutationOptions(options));
+    }
+
+export const getUpdateAdminBusinessRetellPhoneNumberUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/businesses/${businessId}/retell-phone-number`
+}
+
+/**
+ * @summary Assign or change a business Retell phone number
+ */
+export const updateAdminBusinessRetellPhoneNumber = async (businessId: number,
+    adminBusinessRetellPhoneNumberUpdate: AdminBusinessRetellPhoneNumberUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminBusinessRetellPhoneNumber> => {
+
+  return customFetch<AdminBusinessRetellPhoneNumber>(getUpdateAdminBusinessRetellPhoneNumberUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminBusinessRetellPhoneNumberUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminBusinessRetellPhoneNumberMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>, TError,{businessId: number;data: BodyType<AdminBusinessRetellPhoneNumberUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>, TError,{businessId: number;data: BodyType<AdminBusinessRetellPhoneNumberUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminBusinessRetellPhoneNumber'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>, {businessId: number;data: BodyType<AdminBusinessRetellPhoneNumberUpdate>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  updateAdminBusinessRetellPhoneNumber(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminBusinessRetellPhoneNumberMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>>
+    export type UpdateAdminBusinessRetellPhoneNumberMutationBody = BodyType<AdminBusinessRetellPhoneNumberUpdate>
+    export type UpdateAdminBusinessRetellPhoneNumberMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign or change a business Retell phone number
+ */
+export const useUpdateAdminBusinessRetellPhoneNumber = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>, TError,{businessId: number;data: BodyType<AdminBusinessRetellPhoneNumberUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminBusinessRetellPhoneNumber>>,
+        TError,
+        {businessId: number;data: BodyType<AdminBusinessRetellPhoneNumberUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminBusinessRetellPhoneNumberMutationOptions(options));
     }
 
 export const getGetAdminSupportRequestsUrl = () => {

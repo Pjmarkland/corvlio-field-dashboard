@@ -17,6 +17,8 @@ export * from './adminBusinessFallbackPhoneUpdate';
 export * from './adminBusinessFallbackRouting';
 export * from './adminBusinessPlanInput';
 export * from './adminBusinessPlanInputPlan';
+export * from './adminBusinessRetellPhoneNumber';
+export * from './adminBusinessRetellPhoneNumberUpdate';
 export * from './adminBusinessSummary';
 export * from './adminBusinessSummaryAccountStatus';
 export * from './adminBusinessSummaryChosenPlan';

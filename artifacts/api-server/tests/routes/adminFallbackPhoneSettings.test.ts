@@ -7,14 +7,24 @@ const m = vi.hoisted(() => ({
   saveDefault: vi.fn(),
   returning: vi.fn(),
   dbUpdate: vi.fn(),
+  dbTransaction: vi.fn(),
+  txExecute: vi.fn(),
+  txInsert: vi.fn(),
+  txInsertValues: vi.fn(),
   getSystemAlerts: vi.fn(),
   getHealthCheck: vi.fn(),
   resolveSystemAlert: vi.fn(),
 }));
 
 vi.mock("@workspace/db", () => ({
-  businessesTable: { id: "businesses.id", fallbackPhoneNumber: "businesses.fallback_phone_number" },
-  db: { update: m.dbUpdate },
+  businessesTable: {
+    id: "businesses.id",
+    fallbackPhoneNumber: "businesses.fallback_phone_number",
+    retellPhoneNumber: "businesses.retell_phone_number",
+    retellPhoneNormalized: "businesses.retell_phone_normalized",
+  },
+  businessAdminEventsTable: {},
+  db: { update: m.dbUpdate, transaction: m.dbTransaction },
   leadInfoFlagsTable: {},
   leadsTable: {},
   pool: { query: vi.fn() },
@@ -24,6 +34,7 @@ vi.mock("drizzle-orm", () => ({
   desc: vi.fn(),
   eq: vi.fn(),
   isNull: vi.fn(),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings: [...strings], values }),
 }));
 vi.mock("../../src/lib/adminData", () => ({
   getAdminActivity: vi.fn(),
@@ -62,7 +73,10 @@ vi.mock("../../src/lib/usPhoneNumber", () => ({
   },
 }));
 vi.mock("../../src/middlewares/requireAdmin", () => ({
-  requireAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireAdmin: (_req: unknown, res: { locals: Record<string, unknown> }, next: () => void) => {
+    res.locals.adminUserId = "verified-admin";
+    next();
+  },
 }));
 
 import router from "../../src/routes/admin";
@@ -95,6 +109,13 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.dbTransaction.mockImplementation((callback: (tx: unknown) => Promise<unknown>) => callback({
+    execute: m.txExecute,
+    insert: m.txInsert,
+  }));
+  m.txExecute.mockResolvedValue({ rows: [] });
+  m.txInsert.mockImplementation(() => ({ values: m.txInsertValues }));
+  m.txInsertValues.mockResolvedValue(undefined);
   m.getDefault.mockResolvedValue("+18634463029");
   m.saveDefault.mockImplementation(async (phoneNumber: string) => phoneNumber);
   m.dbUpdate.mockImplementation(() => ({
@@ -115,6 +136,72 @@ beforeEach(() => {
 });
 
 describe("admin fallback phone settings routes", () => {
+  it("rejects non-E.164 Retell numbers before touching the database", async () => {
+    const response = await fetch(`${baseUrl}/admin/businesses/44/retell-phone-number`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ retellPhoneNumber: "+1 (435) 324-5513" }),
+    });
+    expect(response.status).toBe(400);
+    expect(m.dbTransaction).not.toHaveBeenCalled();
+  });
+
+  it("updates an assigned number only after the UI confirmation and records before/after values", async () => {
+    m.txExecute
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 44, retellPhoneNumber: null }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const response = await fetch(`${baseUrl}/admin/businesses/44/retell-phone-number`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ retellPhoneNumber: "+14353245513" }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      businessId: 44,
+      retellPhoneNumber: "+14353245513",
+      changed: true,
+    });
+    expect(m.txInsertValues).toHaveBeenCalledWith(expect.objectContaining({
+      businessId: 44,
+      actorUserId: "verified-admin",
+      action: "retell_phone_number_changed",
+      previousValue: null,
+      newValue: "+14353245513",
+    }));
+  });
+
+  it("refuses a number already assigned to another business without writing an audit event", async () => {
+    m.txExecute
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 44, retellPhoneNumber: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 12 }] });
+    const response = await fetch(`${baseUrl}/admin/businesses/44/retell-phone-number`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ retellPhoneNumber: "+14353245513" }),
+    });
+    expect(response.status).toBe(409);
+    expect(m.txExecute).toHaveBeenCalledTimes(3);
+    expect(m.txInsertValues).not.toHaveBeenCalled();
+  });
+
+  it("returns a conflict if the database unique index catches a concurrent assignment", async () => {
+    m.txExecute
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 44, retellPhoneNumber: null }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(Object.assign(new Error("unique constraint"), { code: "23505" }));
+    const response = await fetch(`${baseUrl}/admin/businesses/44/retell-phone-number`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ retellPhoneNumber: "+14353245513" }),
+    });
+    expect(response.status).toBe(409);
+    expect(m.txInsertValues).not.toHaveBeenCalled();
+  });
+
   it("serves the prefilled global default", async () => {
     const response = await fetch(`${baseUrl}/admin/fallback-phone-settings`);
     expect(response.status).toBe(200);

@@ -76,7 +76,7 @@ const OTHER_DYNAMIC_VARIABLE_KEYS = [
   "allowed_promise_policy",
   "receptionist_tone_style", "receptionist_tone_guidance", "intake_trade", "trade_question_1", "trade_question_2",
   "business_hours", "time_zone", "current_local_time", "business_is_open", "next_opening", "transfer_available",
-  "business_name",
+  "business_name", "business_match_status", "unmatched_number_instructions",
   "fallback_phone_number",
   "business_type",
   "service_area",
@@ -224,6 +224,24 @@ describe("Retell webhook safety", () => {
     mocks.getDefaultFallbackPhoneNumber.mockResolvedValueOnce("+12025550123");
     const result = await requestPreCall();
     expect(result.body.call_inbound.dynamic_variables.fallback_phone_number).toBe("+12025550123");
+  });
+
+  it("identifies Corvlio and offers message-taking when the called number is unmatched", async () => {
+    mocks.findBusinessByPhoneNumber.mockResolvedValueOnce(undefined);
+    const result = await requestPreCall();
+    expect(result.status).toBe(200);
+    expect(result.body.call_inbound.dynamic_variables.business_name).toBe("Corvlio");
+    expect(result.body.call_inbound.dynamic_variables.business_match_status).toBe("unmatched");
+    expect(result.body.call_inbound.dynamic_variables.unmatched_number_instructions).toContain(
+      "Identify yourself as Corvlio's AI receptionist",
+    );
+    expect(result.body.call_inbound.dynamic_variables.unmatched_number_instructions).toContain(
+      "caller's name, best callback number, and message",
+    );
+    expect(mocks.recordRetellSystemAlert).toHaveBeenCalledWith(expect.objectContaining({
+      category: "unmatched_business",
+      source: "pre_call_fallback",
+    }));
   });
 
   it("bounds a stalled lookup to 3.5 seconds, returns generic variables, and handles a late rejection", async () => {
@@ -627,7 +645,8 @@ describe("Retell pre-call dynamic variables", () => {
     expect(Object.keys(dynamicVariables).sort()).toEqual(
       ["agent_name", ...OTHER_DYNAMIC_VARIABLE_KEYS].sort(),
     );
-    expect(dynamicVariables.business_name).toBe("our team");
+    expect(dynamicVariables.business_name).toBe("Corvlio");
+    expect(dynamicVariables.business_match_status).toBe("unmatched");
     expect(mocks.findBusinessByPhoneNumber).toHaveBeenCalledWith("+14155550999");
   });
 });

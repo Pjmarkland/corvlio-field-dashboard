@@ -1239,6 +1239,35 @@ paths:
         "400": {description: "Invalid status, business ID, or suspension reason"}
         "404": {description: Business not found}
         "502": {description: Account status could not be updated}
+  /admin/businesses/{businessId}/retell-phone-number:
+    patch:
+      operationId: updateAdminBusinessRetellPhoneNumber
+      tags: [admin]
+      security:
+        - clerkSession: []
+      summary: Assign or change a business Retell phone number
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminBusinessRetellPhoneNumberUpdate"
+      responses:
+        "200":
+          description: Business Retell number updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessRetellPhoneNumber"
+        "400": {description: Invalid business ID or E.164 phone number}
+        "404": {description: Business not found}
+        "409": {description: Phone number is already assigned to another business}
+        "502": {description: Number could not be updated}
   /admin/support-requests:
     get:
       operationId: getAdminSupportRequests
@@ -3669,6 +3698,24 @@ components:
           type: [string, "null"]
           maxLength: 32
       required: [fallbackPhoneNumber]
+    AdminBusinessRetellPhoneNumberUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        retellPhoneNumber:
+          type: string
+          minLength: 3
+          maxLength: 16
+          pattern: "^\\+[1-9][0-9]{1,14}$"
+      required: [retellPhoneNumber]
+    AdminBusinessRetellPhoneNumber:
+      type: object
+      additionalProperties: false
+      properties:
+        businessId: {type: integer, minimum: 1}
+        retellPhoneNumber: {type: string, pattern: "^\\+[1-9][0-9]{1,14}$"}
+        changed: {type: boolean}
+      required: [businessId, retellPhoneNumber, changed]
     AdminBusinessFallbackRouting:
       type: object
       additionalProperties: false

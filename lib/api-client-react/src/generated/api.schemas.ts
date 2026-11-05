@@ -2038,6 +2038,23 @@ export interface AdminBusinessFallbackPhoneUpdate {
   fallbackPhoneNumber: string | null;
 }
 
+export interface AdminBusinessRetellPhoneNumberUpdate {
+  /**
+     * @minLength 3
+     * @maxLength 16
+     * @pattern ^\+[1-9][0-9]{1,14}$
+     */
+  retellPhoneNumber: string;
+}
+
+export interface AdminBusinessRetellPhoneNumber {
+  /** @minimum 1 */
+  businessId: number;
+  /** @pattern ^\+[1-9][0-9]{1,14}$ */
+  retellPhoneNumber: string;
+  changed: boolean;
+}
+
 export interface EmailHealthRecord {
   at: string;
   timestampExact: boolean;

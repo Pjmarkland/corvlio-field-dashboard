@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
 import { CheckCircle2, Clock3, ExternalLink, FileText, Globe2, Phone, Radio, UserRound } from 'lucide-react';
 import { useParams } from 'wouter';
-import { getGetAdminBusinessQueryKey, getGetAdminOverviewQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers, type AdminBusinessSummary } from '@workspace/api-client-react';
+import { getGetAdminBusinessQueryKey, getGetAdminOverviewQueryKey, useGetAdminBusiness, useUpdateAdminBusinessFallbackPhone, useUpdateAdminBusinessRetellPhoneNumber, useUpdateAdminManagedReports, type AdminBusinessDetail, type AdminLeadActivity, type AdminOnboardingAnswers, type AdminBusinessSummary } from '@workspace/api-client-react';
 
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { AdminAge, AdminEmpty, AdminError, AdminLoading, AdminMetric, AdminShell, AdminStatus, BackLink, SectionHeading, formatAdminDate, formatAdminDuration, formatAdminResponse } from './AdminShared';
 import FirstClientChecklistSection from './FirstClientChecklistSection';
+
+const E164_PHONE_NUMBER = /^\+[1-9]\d{1,14}$/;
+const E164_VALIDATION_MESSAGE = 'Enter a valid E.164 number, for example +14353245513.';
+type RetellPhoneNumberValues = { retellPhoneNumber: string };
 
 const ANSWER_FIELDS: Array<{ key: keyof AdminOnboardingAnswers; label: string }> = [
   { key: 'businessName', label: 'Business name' },
@@ -27,6 +34,131 @@ const ANSWER_FIELDS: Array<{ key: keyof AdminOnboardingAnswers; label: string }>
   { key: 'emergencyContactInfo', label: 'Emergency contact' },
   { key: 'businessWebsiteUrl', label: 'Business website' },
 ];
+
+function BusinessRetellPhoneNumberSettings({
+  businessId,
+  business,
+}: {
+  businessId: number;
+  business: AdminBusinessSummary;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useUpdateAdminBusinessRetellPhoneNumber();
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const form = useForm<RetellPhoneNumberValues>({
+    defaultValues: { retellPhoneNumber: business.retellPhoneNumber ?? '' },
+  });
+
+  useEffect(() => {
+    form.reset({ retellPhoneNumber: business.retellPhoneNumber ?? '' });
+    setConfirmation(null);
+  }, [business.retellPhoneNumber, form]);
+
+  const review = form.handleSubmit(({ retellPhoneNumber }) => {
+    setNotice(null);
+    if (!E164_PHONE_NUMBER.test(retellPhoneNumber)) {
+      form.setError('retellPhoneNumber', { type: 'validate', message: E164_VALIDATION_MESSAGE });
+      return;
+    }
+    if (retellPhoneNumber === business.retellPhoneNumber) {
+      setNotice({ type: 'error', message: 'That number is already assigned to this business.' });
+      return;
+    }
+    setConfirmation(retellPhoneNumber);
+  });
+
+  const confirmChange = () => {
+    if (!confirmation || mutation.isPending) return;
+    mutation.mutate(
+      { businessId, data: { retellPhoneNumber: confirmation } },
+      {
+        onSuccess: (result) => {
+          queryClient.setQueryData<AdminBusinessDetail>(
+            getGetAdminBusinessQueryKey(businessId),
+            (current) => current
+              ? { ...current, business: { ...current.business, retellPhoneNumber: result.retellPhoneNumber } }
+              : current,
+          );
+          void queryClient.invalidateQueries({ queryKey: getGetAdminOverviewQueryKey() });
+          setConfirmation(null);
+          setNotice({
+            type: 'success',
+            message: result.changed ? 'Retell number assignment saved and audited.' : 'That number is already assigned to this business.',
+          });
+        },
+        onError: (error) => {
+          const payload = error.data as unknown;
+          const serverMessage = payload && typeof payload === 'object'
+            && 'error' in payload && typeof payload.error === 'string' ? payload.error : null;
+          setConfirmation(null);
+          setNotice({
+            type: 'error',
+            message: error.status === 409
+              ? 'That number is already assigned to another business.'
+              : error.status === 400
+                ? 'Enter the number in E.164 format, such as +14353245513.'
+                : serverMessage ?? 'The Retell number could not be updated. Please try again.',
+          });
+        },
+      },
+    );
+  };
+
+  return <section className="admin-panel mb-7 rounded-2xl p-5" data-testid="section-retell-phone-number">
+    <div className="mb-4">
+      <p className="admin-label">Retell phone number</p>
+      <p className="mt-1 text-sm text-[#68766c]">Assign or change the E.164 number used to match this business’s Retell webhooks. This does not change the number’s routing in Retell.</p>
+    </div>
+    <Form {...form}>
+      <form onSubmit={review} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <FormField control={form.control} name="retellPhoneNumber" render={({ field }) => (
+          <FormItem className="min-w-0 flex-1">
+            <FormLabel>Business Retell number</FormLabel>
+            <FormControl>
+              <Input {...field} onChange={(event) => {
+                form.clearErrors('retellPhoneNumber');
+                setNotice(null);
+                field.onChange(event);
+              }} type="tel" inputMode="tel" autoComplete="tel" maxLength={16}
+                placeholder="+14353245513" data-testid="input-admin-retell-phone-number" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <button type="submit" disabled={mutation.isPending}
+          data-testid="button-review-retell-phone-number"
+          className="min-h-11 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-white disabled:opacity-50">
+          Review number
+        </button>
+      </form>
+    </Form>
+    {confirmation ? <div className="mt-4 rounded-xl border border-[#d8e3d9] bg-[#f1f6f0] p-4"
+      data-testid="panel-confirm-retell-phone-number">
+      <p className="font-semibold">Confirm this assignment</p>
+      <p className="mt-2 text-sm text-[#526158]">
+        {business.retellPhoneNumber ?? 'No number assigned'} → {confirmation}
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-[#68766c]">
+        This changes the app’s business lookup for this number. If Retell sends its webhooks here, future calls will use this business profile. Retell’s own phone routing will not be changed.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={mutation.isPending} onClick={() => setConfirmation(null)}
+          data-testid="button-cancel-retell-phone-number-change"
+          className="min-h-10 rounded-xl border border-[#d7dfd7] px-4 text-sm font-semibold disabled:opacity-50">
+          Cancel
+        </button>
+        <button type="button" disabled={mutation.isPending} onClick={confirmChange}
+          data-testid="button-confirm-retell-phone-number-change"
+          className="min-h-10 rounded-xl bg-[#244d3f] px-4 text-sm font-bold text-white disabled:opacity-50">
+          {mutation.isPending ? 'Saving…' : 'Confirm number change'}
+        </button>
+      </div>
+    </div> : null}
+    {notice ? <p role={notice.type === 'error' ? 'alert' : 'status'} className={`mt-3 text-sm ${notice.type === 'error' ? 'text-[#a3432d]' : 'text-[#2c6b56]'}`}
+      data-testid="text-retell-phone-number-notice">{notice.message}</p> : null}
+  </section>;
+}
 
 function SummaryHero({ detail }: { detail: AdminBusinessDetail }) {
   const { business } = detail;
@@ -248,6 +380,7 @@ export default function AdminBusinessPage() {
   return <AdminShell title={business.businessName} eyebrow="Business detail">
     <BackLink href="/admin">Back to overview</BackLink>
     <SummaryHero detail={data} />
+    <BusinessRetellPhoneNumberSettings businessId={businessId} business={business} />
     {!business.isInternal && !business.isSample ? <AccountControls businessId={businessId} business={business} refresh={() => {
       void queryClient.invalidateQueries({ queryKey: getGetAdminBusinessQueryKey(businessId) });
       void queryClient.invalidateQueries({ queryKey: getGetAdminOverviewQueryKey() });

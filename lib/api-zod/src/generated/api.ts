@@ -1648,6 +1648,38 @@ export const UpdateAdminBusinessSuspensionResponse = zod.object({
 
 
 /**
+ * @summary Assign or change a business Retell phone number
+ */
+
+
+
+export const UpdateAdminBusinessRetellPhoneNumberParams = zod.object({
+  "businessId": zod.coerce.number().int().min(1)
+})
+
+export const updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberMin = 3;
+export const updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberMax = 16;
+
+
+export const updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberRegExp = new RegExp('^\\+[1-9][0-9]{1,14}$');
+
+
+export const UpdateAdminBusinessRetellPhoneNumberBody = zod.object({
+  "retellPhoneNumber": zod.string().min(updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberMin).max(updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberMax).regex(updateAdminBusinessRetellPhoneNumberBodyRetellPhoneNumberRegExp)
+})
+
+
+export const updateAdminBusinessRetellPhoneNumberResponseRetellPhoneNumberRegExp = new RegExp('^\\+[1-9][0-9]{1,14}$');
+
+
+export const UpdateAdminBusinessRetellPhoneNumberResponse = zod.object({
+  "businessId": zod.int().min(1),
+  "retellPhoneNumber": zod.string().regex(updateAdminBusinessRetellPhoneNumberResponseRetellPhoneNumberRegExp),
+  "changed": zod.boolean()
+})
+
+
+/**
  * @summary List recent owner support requests
  */
 export const GetAdminSupportRequestsResponse = zod.object({

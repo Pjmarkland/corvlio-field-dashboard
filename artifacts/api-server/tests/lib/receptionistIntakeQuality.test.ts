@@ -44,7 +44,10 @@ describe("optional Retell business details", () => {
     const variables = dynamicVariables(null);
     for (const [, variable] of optionalDetails) expect(variables[variable]).toBe("");
     expect(variables.agent_name).toBe("Aria");
-    expect(variables.business_name).toBe("our team");
+    expect(variables.business_name).toBe("Corvlio");
+    expect(variables.business_match_status).toBe("unmatched");
+    expect(variables.unmatched_number_instructions).toContain("Corvlio's AI receptionist");
+    expect(variables.unmatched_number_instructions).toContain("caller's name, best callback number, and message");
   });
 });
 describe("tone, trade intake and honest call quality", () => {

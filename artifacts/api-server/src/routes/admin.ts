@@ -8,6 +8,9 @@ import {
   UpdateAdminBusinessFallbackPhoneParams,
   UpdateAdminBusinessFallbackPhoneBody,
   UpdateAdminBusinessFallbackPhoneResponse,
+  UpdateAdminBusinessRetellPhoneNumberParams,
+  UpdateAdminBusinessRetellPhoneNumberBody,
+  UpdateAdminBusinessRetellPhoneNumberResponse,
   GetAdminSystemAlertsResponse,
   ResolveAdminSystemAlertParams,
   ResolveAdminSystemAlertResponse,
@@ -205,6 +208,86 @@ router.patch("/admin/businesses/:businessId/fallback-phone", async (req, res): P
       "Business fallback phone setting could not be saved",
     );
     res.status(502).json({ error: "Business fallback phone setting could not be saved." });
+  }
+});
+
+router.patch("/admin/businesses/:businessId/retell-phone-number", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const params = UpdateAdminBusinessRetellPhoneNumberParams.safeParse(req.params);
+  const body = UpdateAdminBusinessRetellPhoneNumberBody.safeParse(req.body);
+  const actorUserId = res.locals.adminUserId;
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Enter a valid business ID and E.164 Retell phone number." });
+    return;
+  }
+  if (typeof actorUserId !== "string" || !actorUserId) {
+    res.sendStatus(401);
+    return;
+  }
+
+  const businessId = params.data.businessId;
+  const phoneNumber = body.data.retellPhoneNumber;
+  const normalized = phoneNumber.replace(/\D/g, "");
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(542313, ${businessId})`);
+      const locked = await tx.execute(sql`
+        SELECT id, retell_phone_number AS "retellPhoneNumber"
+        FROM businesses WHERE id=${businessId} FOR UPDATE
+      `);
+      const current = locked.rows[0] as { id: number; retellPhoneNumber: string | null } | undefined;
+      if (!current) return { kind: "not_found" as const };
+      if (current.retellPhoneNumber === phoneNumber) {
+        return { kind: "updated" as const, changed: false, retellPhoneNumber: phoneNumber };
+      }
+
+      const conflict = await tx.execute(sql`
+        SELECT id FROM businesses
+        WHERE retell_phone_normalized=${normalized} AND id <> ${businessId}
+        LIMIT 1
+      `);
+      if (conflict.rows.length) return { kind: "duplicate" as const };
+
+      await tx.execute(sql`
+        UPDATE businesses
+        SET retell_phone_number=${phoneNumber}, updated_at=now()
+        WHERE id=${businessId}
+      `);
+      await tx.insert(businessAdminEventsTable).values({
+        businessId,
+        actorUserId,
+        action: "retell_phone_number_changed",
+        previousValue: current.retellPhoneNumber,
+        newValue: phoneNumber,
+        reason: "Updated from the Founder Console business detail page.",
+      });
+      return { kind: "updated" as const, changed: true, retellPhoneNumber: phoneNumber };
+    });
+
+    if (outcome.kind === "not_found") {
+      res.status(404).json({ error: "Business not found." });
+      return;
+    }
+    if (outcome.kind === "duplicate") {
+      res.status(409).json({ error: "That Retell phone number is already assigned to another business." });
+      return;
+    }
+    res.json(UpdateAdminBusinessRetellPhoneNumberResponse.parse({
+      businessId,
+      retellPhoneNumber: outcome.retellPhoneNumber,
+      changed: outcome.changed,
+    }));
+  } catch (error) {
+    const candidate = error as { code?: unknown; cause?: { code?: unknown } };
+    if (candidate?.code === "23505" || candidate?.cause?.code === "23505") {
+      res.status(409).json({ error: "That Retell phone number is already assigned to another business." });
+      return;
+    }
+    req.log.error(
+      { businessId, errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Business Retell number could not be updated",
+    );
+    res.status(502).json({ error: "The Retell phone number could not be updated." });
   }
 });
 

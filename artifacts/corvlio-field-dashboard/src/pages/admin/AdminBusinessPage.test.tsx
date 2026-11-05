@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   mutate: vi.fn(),
   fallbackMutate: vi.fn(),
   checklistMutate: vi.fn(),
+  retellPhoneMutation: vi.fn(),
   invalidate: vi.fn(),
   setQueryData: vi.fn(),
 }));
@@ -33,6 +34,7 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetAdminOverviewQueryKey: () => ['admin-overview'],
   useGetAdminBusiness: () => h.query,
   useUpdateAdminManagedReports: () => ({ mutate: h.mutate, isPending: false, isError: false }),
+  useUpdateAdminBusinessRetellPhoneNumber: () => ({ mutate: h.retellPhoneMutation, isPending: false, isError: false }),
   useUpdateAdminBusinessFallbackPhone: () => ({ mutate: h.fallbackMutate, isPending: false }),
   useUpdateAdminFirstClientChecklistItem: () => ({ mutate: h.checklistMutate, isPending: false, isError: false }),
 }));
@@ -108,6 +110,43 @@ describe('AdminBusinessPage managed reports setting', () => {
     setBusiness(false, true);
     render(<AdminBusinessPage />);
     expect(screen.getByTestId('badge-internal-detail').textContent).toContain('Internal / non-billed');
+  });
+
+  it('requires an explicit confirmation before changing the Retell mapping', async () => {
+    render(<AdminBusinessPage />);
+    fireEvent.change(screen.getByTestId('input-admin-retell-phone-number'), {
+      target: { value: '+14353245513' },
+    });
+    fireEvent.click(screen.getByTestId('button-review-retell-phone-number'));
+
+    const confirmation = await screen.findByTestId('panel-confirm-retell-phone-number');
+    expect(confirmation.textContent).toContain('+14353245513');
+    expect(confirmation.textContent).toContain('Retell’s own phone routing will not be changed.');
+    expect(h.retellPhoneMutation).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('button-confirm-retell-phone-number-change'));
+    expect(h.retellPhoneMutation).toHaveBeenCalledWith(
+      { businessId: 44, data: { retellPhoneNumber: '+14353245513' } },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    const onSuccess = h.retellPhoneMutation.mock.calls[0][1].onSuccess as (result: {
+      businessId: number; retellPhoneNumber: string; changed: boolean;
+    }) => void;
+    act(() => onSuccess({ businessId: 44, retellPhoneNumber: '+14353245513', changed: true }));
+    expect(screen.getByTestId('text-retell-phone-number-notice').textContent).toContain('saved and audited');
+    const cacheUpdater = h.setQueryData.mock.calls[0][1] as (current: any) => any;
+    expect(cacheUpdater(h.query.data).business.retellPhoneNumber).toBe('+14353245513');
+  });
+
+  it('requires E.164 format before showing the confirmation step', async () => {
+    render(<AdminBusinessPage />);
+    fireEvent.change(screen.getByTestId('input-admin-retell-phone-number'), {
+      target: { value: '+1 (435) 324-5513' },
+    });
+    fireEvent.click(screen.getByTestId('button-review-retell-phone-number'));
+    expect(await screen.findByText('Enter a valid E.164 number, for example +14353245513.')).toBeTruthy();
+    expect(screen.queryByTestId('panel-confirm-retell-phone-number')).toBeNull();
+    expect(h.retellPhoneMutation).not.toHaveBeenCalled();
   });
 
   it('shows the resolved number and saves a business-specific US fallback', () => {

@@ -11,7 +11,7 @@ export function dynamicVariables(
   business: Business | null,
   fallbackPhoneNumber: string = DEFAULT_FALLBACK_PHONE_NUMBER,
 ) {
-  // Preserve saved text verbatim and keep the no-business generic case unchanged.
+  // Preserve saved text verbatim; unmatched calls use a Corvlio message-taking identity.
   const detail = (value: string | null | undefined, fallback: string) =>
     business ? (value?.trim() ? value : fallback) : "";
   const savedName = business?.agentName?.trim();
@@ -27,7 +27,12 @@ export function dynamicVariables(
     ...(business && hours.trim() && timeZone.trim() ? businessClock(hours, timeZone) : { current_local_time: "", business_is_open: "unknown", next_opening: "" }),
     transfer_available: "false", agent_name: agentName || "Aria",
     fallback_phone_number: business?.fallbackPhoneNumber ?? fallbackPhoneNumber,
-    business_name: business?.businessName ?? "our team", business_type: business?.businessType ?? "",
+    business_name: business?.businessName ?? "Corvlio",
+    business_type: business?.businessType ?? "",
+    business_match_status: business ? "matched" : "unmatched",
+    unmatched_number_instructions: business
+      ? "A business matched this called number. Follow only that business's supplied profile."
+      : "This called number did not match a business. Identify yourself as Corvlio's AI receptionist. Say you can take a message for the Corvlio team. Ask for the caller's name, best callback number, and message, one at a time; confirm the number. Do not invent the unknown business's identity or facts, and do not promise a callback time.",
     service_area: detail(business?.serviceArea, "Not provided. Do not guess whether an address is covered; take the caller's location and ask the owner to confirm."),
     services_offered: detail(business?.servicesOffered, PASS_TO_OWNER),
     major_issue_examples: detail(business?.majorIssueExamples, "Not provided. Do not guess which issues the business handles; record the caller's issue and pass it to the owner."),
