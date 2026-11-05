@@ -52,6 +52,12 @@ import type {
   AppReviewDemoStatus,
   BillingAccount,
   BillingAvailability,
+  BillingEnforcementModeInput,
+  BillingEnforcementModeResult,
+  BillingEnforcementOverrideInput,
+  BillingEnforcementOverrideResult,
+  BillingEnforcementReinstatement,
+  BillingEnforcementSettings,
   BillingPlanInput,
   BillingReadiness,
   BillingRedirect,
@@ -87,6 +93,7 @@ import type {
   LeadStatusUpdate,
   LeadWorkspace,
   ManagedReportsInput,
+  ManualInvoiceOverdueConfirmation,
   ManualPaymentConfirmation,
   ManualReleaseInput,
   NativeBillingSummary,
@@ -5872,6 +5879,338 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getSetStartupEligibilityMutationOptions(options));
+    }
+
+export const getGetBillingEnforcementUrl = () => {
+
+
+
+
+  return `/api/admin/billing-enforcement`
+}
+
+export const getBillingEnforcement = async ( options?: Parameters<typeof customFetch>[1]): Promise<BillingEnforcementSettings> => {
+
+  return customFetch<BillingEnforcementSettings>(getGetBillingEnforcementUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBillingEnforcementQueryKey = () => {
+    return [
+    `/api/admin/billing-enforcement`
+    ] as const;
+    }
+
+
+export const getGetBillingEnforcementQueryOptions = <TData = Awaited<ReturnType<typeof getBillingEnforcement>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingEnforcement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBillingEnforcementQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBillingEnforcement>>> = ({ signal }) => getBillingEnforcement({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBillingEnforcement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBillingEnforcementQueryResult = NonNullable<Awaited<ReturnType<typeof getBillingEnforcement>>>
+export type GetBillingEnforcementQueryError = ErrorType<unknown>
+
+
+
+export function useGetBillingEnforcement<TData = Awaited<ReturnType<typeof getBillingEnforcement>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingEnforcement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBillingEnforcementQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetBillingEnforcementModeUrl = () => {
+
+
+
+
+  return `/api/admin/billing-enforcement/mode`
+}
+
+export const setBillingEnforcementMode = async (billingEnforcementModeInput: BillingEnforcementModeInput, options?: Parameters<typeof customFetch>[1]): Promise<BillingEnforcementModeResult> => {
+
+  return customFetch<BillingEnforcementModeResult>(getSetBillingEnforcementModeUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(billingEnforcementModeInput)
+  }
+);}
+
+
+
+
+
+export const getSetBillingEnforcementModeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementMode>>, TError,{data: BodyType<BillingEnforcementModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementMode>>, TError,{data: BodyType<BillingEnforcementModeInput>}, TContext> => {
+
+const mutationKey = ['setBillingEnforcementMode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setBillingEnforcementMode>>, {data: BodyType<BillingEnforcementModeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setBillingEnforcementMode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetBillingEnforcementModeMutationResult = NonNullable<Awaited<ReturnType<typeof setBillingEnforcementMode>>>
+    export type SetBillingEnforcementModeMutationBody = BodyType<BillingEnforcementModeInput>
+    export type SetBillingEnforcementModeMutationError = ErrorType<unknown>
+
+    export const useSetBillingEnforcementMode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementMode>>, TError,{data: BodyType<BillingEnforcementModeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setBillingEnforcementMode>>,
+        TError,
+        {data: BodyType<BillingEnforcementModeInput>},
+        TContext
+      > => {
+      return useMutation(getSetBillingEnforcementModeMutationOptions(options));
+    }
+
+export const getSetBillingEnforcementOverrideUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/billing-enforcement/businesses/${businessId}/override`
+}
+
+export const setBillingEnforcementOverride = async (businessId: number,
+    billingEnforcementOverrideInput: BillingEnforcementOverrideInput, options?: Parameters<typeof customFetch>[1]): Promise<BillingEnforcementOverrideResult> => {
+
+  return customFetch<BillingEnforcementOverrideResult>(getSetBillingEnforcementOverrideUrl(businessId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(billingEnforcementOverrideInput)
+  }
+);}
+
+
+
+
+
+export const getSetBillingEnforcementOverrideMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementOverride>>, TError,{businessId: number;data: BodyType<BillingEnforcementOverrideInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementOverride>>, TError,{businessId: number;data: BodyType<BillingEnforcementOverrideInput>}, TContext> => {
+
+const mutationKey = ['setBillingEnforcementOverride'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setBillingEnforcementOverride>>, {businessId: number;data: BodyType<BillingEnforcementOverrideInput>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  setBillingEnforcementOverride(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetBillingEnforcementOverrideMutationResult = NonNullable<Awaited<ReturnType<typeof setBillingEnforcementOverride>>>
+    export type SetBillingEnforcementOverrideMutationBody = BodyType<BillingEnforcementOverrideInput>
+    export type SetBillingEnforcementOverrideMutationError = ErrorType<unknown>
+
+    export const useSetBillingEnforcementOverride = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setBillingEnforcementOverride>>, TError,{businessId: number;data: BodyType<BillingEnforcementOverrideInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setBillingEnforcementOverride>>,
+        TError,
+        {businessId: number;data: BodyType<BillingEnforcementOverrideInput>},
+        TContext
+      > => {
+      return useMutation(getSetBillingEnforcementOverrideMutationOptions(options));
+    }
+
+export const getReinstateBillingAccountUrl = (businessId: number,) => {
+
+
+
+
+  return `/api/admin/billing-enforcement/businesses/${businessId}/reinstate`
+}
+
+export const reinstateBillingAccount = async (businessId: number, options?: Parameters<typeof customFetch>[1]): Promise<BillingEnforcementReinstatement> => {
+
+  return customFetch<BillingEnforcementReinstatement>(getReinstateBillingAccountUrl(businessId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReinstateBillingAccountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reinstateBillingAccount>>, TError,{businessId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reinstateBillingAccount>>, TError,{businessId: number}, TContext> => {
+
+const mutationKey = ['reinstateBillingAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reinstateBillingAccount>>, {businessId: number}> = (props) => {
+          const {businessId} = props ?? {};
+
+          return  reinstateBillingAccount(businessId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReinstateBillingAccountMutationResult = NonNullable<Awaited<ReturnType<typeof reinstateBillingAccount>>>
+
+    export type ReinstateBillingAccountMutationError = ErrorType<unknown>
+
+    export const useReinstateBillingAccount = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reinstateBillingAccount>>, TError,{businessId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reinstateBillingAccount>>,
+        TError,
+        {businessId: number},
+        TContext
+      > => {
+      return useMutation(getReinstateBillingAccountMutationOptions(options));
+    }
+
+export const getConfirmManualInvoiceOverdueUrl = (invoiceId: number,) => {
+
+
+
+
+  return `/api/admin/billing-enforcement/manual-invoices/${invoiceId}/confirm-overdue`
+}
+
+export const confirmManualInvoiceOverdue = async (invoiceId: number, options?: Parameters<typeof customFetch>[1]): Promise<ManualInvoiceOverdueConfirmation> => {
+
+  return customFetch<ManualInvoiceOverdueConfirmation>(getConfirmManualInvoiceOverdueUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmManualInvoiceOverdueMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>, TError,{invoiceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>, TError,{invoiceId: number}, TContext> => {
+
+const mutationKey = ['confirmManualInvoiceOverdue'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>, {invoiceId: number}> = (props) => {
+          const {invoiceId} = props ?? {};
+
+          return  confirmManualInvoiceOverdue(invoiceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmManualInvoiceOverdueMutationResult = NonNullable<Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>>
+
+    export type ConfirmManualInvoiceOverdueMutationError = ErrorType<unknown>
+
+    export const useConfirmManualInvoiceOverdue = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>, TError,{invoiceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmManualInvoiceOverdue>>,
+        TError,
+        {invoiceId: number},
+        TContext
+      > => {
+      return useMutation(getConfirmManualInvoiceOverdueMutationOptions(options));
     }
 
 export const getGetOwnerInvoicesUrl = () => {

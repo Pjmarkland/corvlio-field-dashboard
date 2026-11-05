@@ -24,7 +24,13 @@ export const billingNoticesTable = pgTable("billing_notices", {
   audience: text("audience").notNull(),
   title: text("title").notNull(),
   body: text("body").notNull(),
-  delivery: jsonb("delivery").$type<{ email: boolean; push: boolean; emailRecipients?: string[]; deviceIds?: number[] }>().notNull(),
+  delivery: jsonb("delivery").$type<{
+    email: boolean;
+    push: boolean;
+    emailRecipients?: string[];
+    deviceIds?: number[];
+    emailSuppressed?: boolean;
+  }>().notNull(),
   nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

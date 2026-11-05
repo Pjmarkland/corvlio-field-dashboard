@@ -3,7 +3,6 @@ import { AlertTriangle, ArrowLeft, BarChart3, Building2, ChevronRight, Clock3, F
 import { Link, useLocation } from 'wouter';
 
 import { getGetAdminSystemAlertsQueryKey, useGetAdminSystemAlerts, type AdminBusinessSummary } from '@workspace/api-client-react';
-import { useBillingAvailability } from '@/hooks/useBilling';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 const BILLING_NAV = { href: '/admin/billing', label: 'Billing', icon: BarChart3 };
@@ -70,7 +69,6 @@ export function isNotFoundError(error: unknown) {
 
 export function AdminShell({ children, title, eyebrow, action }: { children: ReactNode; title: string; eyebrow: string; action?: ReactNode }) {
   const [location] = useLocation();
-  const { enabled: billingOn } = useBillingAvailability();
   const adminAccess = useAdminAccess();
   const alertsQuery = useGetAdminSystemAlerts({
     query: {
@@ -80,7 +78,9 @@ export function AdminShell({ children, title, eyebrow, action }: { children: Rea
     },
   });
   const openAlertCount = alertsQuery.data?.openCount ?? 0;
-  const navItems = billingOn ? [...ADMIN_NAV, BILLING_NAV] : ADMIN_NAV;
+  // Billing enforcement controls remain useful for manual-invoice accounts
+  // even when Stripe billing itself is disabled.
+  const navItems = [...ADMIN_NAV, BILLING_NAV];
   const alertBadge = (small = false) => openAlertCount > 0
     ? <span aria-label={`${openAlertCount} open system alerts`} className={`rounded-full bg-[#b94739] px-1.5 py-0.5 font-mono text-[9px] font-bold leading-none text-white ${small ? 'ml-1' : 'ml-auto'}`}>{openAlertCount > 99 ? '99+' : openAlertCount}</span>
     : null;

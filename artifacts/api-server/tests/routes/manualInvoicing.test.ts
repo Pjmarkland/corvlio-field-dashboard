@@ -2,13 +2,14 @@ import { createServer, type Server } from "node:http";
 import express from "express";
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 const m=vi.hoisted(()=>({
-  user:vi.fn(),admin:vi.fn(),find:vi.fn(),overview:vi.fn(),approve:vi.fn(),paid:vi.fn(),settings:vi.fn(),query:vi.fn(),cycle:vi.fn(),
+  user:vi.fn(),admin:vi.fn(),find:vi.fn(),overview:vi.fn(),approve:vi.fn(),paid:vi.fn(),settings:vi.fn(),query:vi.fn(),cycle:vi.fn(),reinstate:vi.fn(),
 }));
 vi.mock("@clerk/express",()=>({getAuth:m.user}));
 vi.mock("@workspace/db",()=>({pool:{query:m.query}}));
 vi.mock("../../src/middlewares/requireAdmin",()=>({requireAdmin:m.admin}));
 vi.mock("../../src/lib/businessDirectory",()=>({findBusinessByClerkUserId:m.find}));
 vi.mock("../../src/invoicing/worker",()=>({runInvoiceCycle:m.cycle}));
+vi.mock("../../src/billing/enforcement",()=>({reinstateForPaidInvoice:m.reinstate}));
 vi.mock("../../src/invoicing/service",async(importOriginal)=>({
   ...await importOriginal<typeof import("../../src/invoicing/service")>(),
   ownerInvoiceOverview:m.overview,approveStartup:m.approve,markInvoicePaid:m.paid,paymentInstructions:m.settings,
@@ -34,6 +35,7 @@ beforeEach(()=>{
   m.query.mockResolvedValue({rows:[]});
   m.settings.mockResolvedValue({instructions:"",paymentLink:""});
   m.cycle.mockResolvedValue(undefined);
+  m.reinstate.mockResolvedValue(false);
 });
 const post=(path:string,data={})=>fetch(url+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(data)});
 describe("manual invoice boundaries",()=>{
@@ -68,6 +70,7 @@ describe("manual invoice boundaries",()=>{
     m.admin.mockImplementation((_req,_res,next)=>next());m.user.mockReturnValue({userId:"verified_admin"});
     expect((await post("/admin/invoicing/invoices/9/paid",{reference:" Zelle 123 "})).status).toBe(200);
     expect(m.paid).toHaveBeenCalledWith(9,"verified_admin","Zelle 123");
+    expect(m.reinstate).toHaveBeenCalledWith(7,"manual","9","verified_admin");
     expect(m.cycle).toHaveBeenCalledOnce();
   });
   it("approves Startup through the approval service",async()=>{

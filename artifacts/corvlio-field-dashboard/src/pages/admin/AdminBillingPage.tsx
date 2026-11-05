@@ -1,10 +1,15 @@
 import { Redirect } from 'wouter';
 import { Capacitor } from '@capacitor/core';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetAdminBillingQueryKey, useCheckAdminBillingReadiness, useGetAdminBilling, useSetStartupEligibility } from '@workspace/api-client-react';
+import {
+  getGetAdminBillingQueryKey, getGetBillingEnforcementQueryKey,
+  useCheckAdminBillingReadiness, useConfirmManualInvoiceOverdue,
+  useGetAdminBilling, useGetBillingEnforcement, useReinstateBillingAccount,
+  useSetBillingEnforcementMode, useSetBillingEnforcementOverride, useSetStartupEligibility,
+} from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
 import { billingDate, errorText, money, usageText } from '@/lib/billingFormat';
-import { AdminEmpty, AdminError, AdminLoading, AdminShell } from './AdminShared';
+import { AdminEmpty, AdminError, AdminLoading, AdminShell, formatAdminDate } from './AdminShared';
 
 export default function AdminBillingPage() {
   if (Capacitor.isNativePlatform()) return <Redirect to="/dashboard" />;
@@ -19,6 +24,14 @@ function WebAdminBillingPage() {
 
 function Content({ billingEnabled }: { billingEnabled: boolean }) {
   const client = useQueryClient();
+  const enforcement = useGetBillingEnforcement({ query: {
+    queryKey: getGetBillingEnforcementQueryKey(), retry: false, refetchInterval: 30_000,
+  } });
+  const refreshEnforcement = () => { void client.invalidateQueries({ queryKey: getGetBillingEnforcementQueryKey() }); };
+  const setMode = useSetBillingEnforcementMode({ mutation: { onSuccess: refreshEnforcement } });
+  const setOverride = useSetBillingEnforcementOverride({ mutation: { onSuccess: refreshEnforcement } });
+  const reinstate = useReinstateBillingAccount({ mutation: { onSuccess: refreshEnforcement } });
+  const confirmOverdue = useConfirmManualInvoiceOverdue({ mutation: { onSuccess: refreshEnforcement } });
   const readiness = useCheckAdminBillingReadiness();
   const { data, isLoading, isError, refetch } = useGetAdminBilling({ query: {
     queryKey: getGetAdminBillingQueryKey(), enabled: billingEnabled, retry: false,
@@ -72,6 +85,110 @@ function Content({ billingEnabled }: { billingEnabled: boolean }) {
           </div>;
 
   return <AdminShell title={title} eyebrow={eyebrow} action={<span data-testid="badge-admin-billing-mode" className="rounded-full bg-[#e3eee5] px-3 py-1 text-xs font-bold text-[#2c6b56]">{billingEnabled ? 'Billing on' : 'Billing off'}</span>}>
+    <section className="mb-6 space-y-5" data-testid="panel-billing-enforcement">
+      <div className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold">Unpaid-client enforcement</h2>
+            <p className="mt-1 max-w-3xl text-sm text-[#66736c]">Off prevents warning delivery and suspension. Dry-run records eligible accounts without changing service. On sends day-3/day-5 reminders and may suspend after five business days, with live Stripe checks immediately before suspension.</p>
+          </div>
+          {enforcement.data ? <span className="rounded-full bg-[#e3eee5] px-3 py-1 text-xs font-bold text-[#2c6b56]" data-testid="badge-enforcement-mode">
+            {enforcement.data.mode === 'enforce' ? 'On' : enforcement.data.mode === 'dry_run' ? 'Dry-run' : 'Off'}
+          </span> : null}
+        </div>
+        {enforcement.isLoading ? <p className="mt-4 text-sm text-[#66736c]">Loading enforcement controls…</p> : null}
+        {enforcement.isError || !enforcement.data ? <div className="mt-4"><AdminError onRetry={() => void enforcement.refetch()} /></div> : <>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="min-w-[190px] text-sm font-semibold text-[#17231f]">Global mode
+              <select aria-label="Global enforcement mode" data-testid="select-enforcement-mode" value={enforcement.data.mode}
+                disabled={setMode.isPending}
+                onChange={(event) => setMode.mutate({ data: { mode: event.target.value as 'off' | 'dry_run' | 'enforce' } })}
+                className="mt-1 min-h-11 w-full rounded-xl border border-[#cfd8cf] bg-[#fbfbf7] px-3 text-sm text-[#17231f]">
+                <option value="off">Off</option><option value="dry_run">Dry-run</option><option value="enforce">On</option>
+              </select>
+            </label>
+            <p className="text-xs text-[#66736c]">Updated {formatAdminDate(enforcement.data.updatedAt)}{enforcement.data.updatedBy ? ` by ${enforcement.data.updatedBy}` : ''}</p>
+          </div>
+          {setMode.isError ? <p role="alert" className="mt-2 text-sm text-[#aa573f]">{errorText(setMode.error)}</p> : null}
+        </>}
+      </div>
+
+      {enforcement.data ? <>
+        <section className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5">
+          <h3 className="font-bold">Account protections and reinstatement</h3>
+          <p className="mt-1 text-sm text-[#66736c]">The never-auto-suspend setting is account-specific. Reinstatement restores only accounts suspended by this enforcement system.</p>
+          {enforcement.data.businesses.length === 0 ? <p className="mt-3 text-sm text-[#66736c]">No client accounts.</p> : <ul className="mt-3 divide-y divide-[#e1e6df]">
+            {enforcement.data.businesses.map((business) => <li key={business.businessId} className="flex flex-wrap items-center justify-between gap-3 py-3" data-testid={`enforcement-business-${business.businessId}`}>
+              <div>
+                <p className="font-semibold text-[#17231f]">{business.businessName}</p>
+                <p className="text-xs text-[#66736c]">{business.billingMode} billing · {business.accountStatus}{business.suspension ? ` since ${formatAdminDate(business.suspension.suspendedAt)} · ${business.suspension.source} invoice ${business.suspension.invoiceId}` : ''}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={business.neverAutoSuspend}
+                    disabled={setOverride.isPending}
+                    data-testid={`checkbox-never-auto-suspend-${business.businessId}`}
+                    onChange={(event) => setOverride.mutate({ businessId: business.businessId, data: { neverAutoSuspend: event.target.checked } })}
+                    className="h-4 w-4" />
+                  Never auto-suspend
+                </label>
+                {business.suspension ? <button type="button" disabled={reinstate.isPending}
+                  data-testid={`button-reinstate-${business.businessId}`}
+                  onClick={() => reinstate.mutate({ businessId: business.businessId })}
+                  className="min-h-10 rounded-xl bg-[#244d3f] px-3 text-sm font-bold text-white disabled:opacity-60">
+                  {reinstate.isPending ? 'Restoring…' : 'Reinstate now'}
+                </button> : null}
+              </div>
+            </li>)}
+          </ul>}
+          {setOverride.isError ? <p role="alert" className="mt-2 text-sm text-[#aa573f]">{errorText(setOverride.error)}</p> : null}
+          {reinstate.isError ? <p role="alert" className="mt-2 text-sm text-[#aa573f]">{errorText(reinstate.error)}</p> : null}
+        </section>
+
+        <section className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5">
+          <h3 className="font-bold">Manual overdue confirmations</h3>
+          <p className="mt-1 text-sm text-[#66736c]">Confirm an unpaid, overdue manual invoice to start its five-business-day review period. Nothing is suspended by confirming.</p>
+          <ul className="mt-3 divide-y divide-[#e1e6df]">
+            {enforcement.data.manualInvoices.filter((invoice) => !invoice.paidAt).map((invoice) => <li key={invoice.invoiceId} className="flex flex-wrap items-center justify-between gap-3 py-3" data-testid={`manual-enforcement-invoice-${invoice.invoiceId}`}>
+              <div><p className="font-semibold">{invoice.businessName} · Invoice {invoice.invoiceId}</p>
+                <p className="text-xs text-[#66736c]">Due {formatAdminDate(invoice.dueAt)}{invoice.overdueConfirmedAt ? ` · Confirmed ${formatAdminDate(invoice.overdueConfirmedAt)} by ${invoice.overdueConfirmedBy ?? 'admin'}` : ' · Not confirmed'}</p>
+              </div>
+              {!invoice.overdueConfirmedAt && new Date(invoice.dueAt).getTime() < Date.now() ? <button type="button"
+                disabled={confirmOverdue.isPending}
+                data-testid={`button-confirm-overdue-${invoice.invoiceId}`}
+                onClick={() => confirmOverdue.mutate({ invoiceId: invoice.invoiceId })}
+                className="min-h-10 rounded-xl border border-[#cfd8cf] px-3 text-sm font-semibold disabled:opacity-60">
+                {confirmOverdue.isPending ? 'Confirming…' : 'Confirm overdue'}
+              </button> : null}
+            </li>)}
+            {enforcement.data.manualInvoices.every((invoice) => invoice.paidAt || invoice.overdueConfirmedAt || new Date(invoice.dueAt).getTime() >= Date.now())
+              ? <li className="py-3 text-sm text-[#66736c]">No overdue manual invoices need confirmation.</li> : null}
+          </ul>
+          {confirmOverdue.isError ? <p role="alert" className="mt-2 text-sm text-[#aa573f]">{errorText(confirmOverdue.error)}</p> : null}
+        </section>
+
+        <section className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5" data-testid="panel-dry-run-candidates">
+            <h3 className="font-bold">Dry-run candidates</h3>
+            {enforcement.data.dryRunCandidates.length ? <ul className="mt-3 space-y-3">{enforcement.data.dryRunCandidates.map((candidate) =>
+              <li key={candidate.id} className="border-t border-[#e1e6df] pt-3 text-sm">
+                <p className="font-semibold">{candidate.businessName ?? `Business ${candidate.businessId ?? 'unknown'}`} · {candidate.source} invoice {candidate.invoiceId ?? 'unknown'}</p>
+                <p className="mt-1 text-xs text-[#66736c]">{candidate.reason}</p>
+                <p className="mt-1 text-xs text-[#66736c]">{formatAdminDate(candidate.createdAt)}</p>
+              </li>)}</ul> : <p className="mt-3 text-sm text-[#66736c]">No dry-run candidates have been recorded.</p>}
+          </div>
+          <div className="rounded-2xl border border-[#dfe4dc] bg-white/70 p-4 sm:p-5" data-testid="panel-enforcement-audit">
+            <h3 className="font-bold">Enforcement audit log</h3>
+            {enforcement.data.auditLog.length ? <ul className="mt-3 max-h-[480px] space-y-3 overflow-auto">{enforcement.data.auditLog.map((event) =>
+              <li key={event.id} className="border-t border-[#e1e6df] pt-3 text-sm">
+                <p className="font-semibold">{event.businessName ?? 'Global setting'} · {event.action.replaceAll('_', ' ')}</p>
+                <p className="mt-1 text-xs text-[#66736c]">{event.reason}</p>
+                <p className="mt-1 text-xs text-[#66736c]">{formatAdminDate(event.createdAt)}{event.actor ? ` · ${event.actor}` : ''}</p>
+              </li>)}</ul> : <p className="mt-3 text-sm text-[#66736c]">No enforcement events recorded.</p>}
+          </div>
+        </section>
+      </> : null}
+    </section>
     <section className="mb-5 rounded-2xl border border-[#dfe4dc] bg-white/60 p-4 sm:p-5" data-testid="panel-billing-readiness">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 className="font-bold">Stripe readiness</h2><p className="mt-1 text-sm text-[#66736c]">Checks configuration and webhook reachability. Secret values are never displayed.</p></div>

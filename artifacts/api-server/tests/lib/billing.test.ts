@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { billingFixture } from "../fixtures/billing";
 import { addBusinessDays, addMonths, billingGate, cancellationDate, config, initialBillingState, usagePeriod } from "../../src/billing/policy";
 
+const enforcementMocks = vi.hoisted(() => ({ reinstateForPaidInvoice: vi.fn(async () => false) }));
+vi.mock("../../src/billing/enforcement", async importOriginal => ({
+  ...await importOriginal<typeof import("../../src/billing/enforcement")>(),
+  reinstateForPaidInvoice: enforcementMocks.reinstateForPaidInvoice,
+}));
+
 beforeEach(() => vi.stubEnv("PUBLIC_API_BASE_URL", "https://billing.example.test/api"));
 afterEach(() => vi.unstubAllEnvs());
 describe("test-only billing policy", () => {
@@ -107,6 +113,7 @@ describe("Stripe events and notices (SDK mocked; no network)", () => {
     f.setNow("2026-10-17T10:00:00Z"); await f.service.refresh(1);
     await f.service.webhook(f.event("invoice.paid", "evt_paid"));
     expect(f.state()).toMatchObject({ status: "active", pastDueSince: null, graceEndsAt: null, needsAdminReview: false, setupPaid: true });
+    expect(enforcementMocks.reinstateForPaidInvoice).toHaveBeenCalledWith(1, "stripe", "in_test", "stripe_webhook");
   });
   it("does not let a stale failed event resurrect a paid invoice", async () => {
     const f = billingFixture(); f.subscribed();
@@ -130,6 +137,7 @@ describe("Stripe events and notices (SDK mocked; no network)", () => {
     await f.service.webhook(event);
     expect(f.state().setupPaid).toBe(true);
     expect(f.activations).toEqual([1]);
+    expect(enforcementMocks.reinstateForPaidInvoice).toHaveBeenCalledWith(1, "stripe", "in_test", "stripe_webhook");
   });
   it("stores subscription updates and deletion without automatic offboarding", async () => {
     const f = billingFixture(); f.subscribed();

@@ -7,7 +7,8 @@ import { config, billingUrl } from "./policy";
 import { sendBillingNotificationEmail } from "../lib/gmail";
 import { sendApnsNotification } from "../lib/apnsAdapter";
 import { logger } from "../lib/logger";
-import { runBillingEnforcementCycle } from "./enforcement";
+import { getBillingEnforcementMode, runBillingEnforcementCycle } from "./enforcement";
+import { isEnforcementWarningNotice, shouldSendEnforcementWarningEmail } from "./enforcementNoticeGate";
 
 let timer: ReturnType<typeof setInterval> | undefined;
 let running: Promise<void> | undefined;
@@ -36,21 +37,43 @@ async function deliverPendingNotices() {
       if (!business) continue;
       const link = notice.audience === "owner" ? billingUrl(undefined, true) : billingUrl(config.operations.adminPath);
       const body = `${business.businessName}\n\n${notice.body}\n\n${link}`;
+      const warningNotice = isEnforcementWarningNotice(notice.id);
+      const mode = warningNotice ? await getBillingEnforcementMode() : "enforce";
+      if (progress.emailSuppressed === true && mode === "enforce") {
+        progress.email = false;
+        progress.emailSuppressed = false;
+      }
       if (!progress.email) {
-        const recipients = notice.audience === "owner" ? [business.ownerEmail].filter((v): v is string => !!v)
-          : [...new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.trim()).filter(Boolean))];
-        progress.emailRecipients ??= [];
-        for (const recipient of recipients) {
-          if (progress.emailRecipients.includes(recipient)) continue;
-          try {
-            if (await sendBillingNotificationEmail(recipient, notice.title, body)) {
-              progress.emailRecipients.push(recipient);
+        if (!shouldSendEnforcementWarningEmail(notice.id, mode)) {
+          // Preserve suppression state so enforcement cannot mistake a skipped
+          // warning for a delivered one. If mode later returns to On, retry it.
+          progress.emailSuppressed = true;
+          progress.email = false;
+          await save();
+        } else {
+          const recipients = notice.audience === "owner" ? [business.ownerEmail].filter((v): v is string => !!v)
+            : [...new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.trim()).filter(Boolean))];
+          progress.emailRecipients ??= [];
+          for (const recipient of recipients) {
+            if (progress.emailRecipients.includes(recipient)) continue;
+            if (warningNotice && await getBillingEnforcementMode() !== "enforce") {
+              progress.email = false;
+              progress.emailSuppressed = true;
               await save();
+              break;
             }
-          } catch { logger.warn({ noticeId: notice.id }, "Billing email pending; other channels continue"); }
+            try {
+              if (await sendBillingNotificationEmail(recipient, notice.title, body)) {
+                progress.emailRecipients.push(recipient);
+                await save();
+              }
+            } catch { logger.warn({ noticeId: notice.id }, "Billing email pending; other channels continue"); }
+          }
+          progress.email = !progress.emailSuppressed
+            && recipients.length > 0
+            && recipients.every(r => progress.emailRecipients!.includes(r));
+          await save();
         }
-        progress.email = recipients.length > 0 && recipients.every(r => progress.emailRecipients!.includes(r));
-        await save();
       }
       if (!progress.push) {
         const devices = notice.audience === "owner" ? await db.select().from(notificationDevicesTable).where(and(

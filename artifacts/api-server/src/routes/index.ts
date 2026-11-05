@@ -16,6 +16,7 @@ import accountRouter from "./account";
 import ownerSmsRouter from "./ownerSms";
 import pendingReleasesRouter from "./pendingReleases";
 import invoicingRouter from "./invoicing";
+import adminBillingEnforcementRouter from "./adminBillingEnforcement";
 import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { billingEnforcementAccess } from "../middlewares/billingEnforcementAccess";
@@ -33,6 +34,7 @@ router.use(invoicingRouter);
 
 router.use(billingRouter);
 router.use(adminEmailHealthRouter);
+router.use(adminBillingEnforcementRouter);
 router.use(adminRouter);
 router.use(businessesRouter);
 router.use(leadsRouter);

@@ -366,7 +366,10 @@ async function warningsDelivered(candidate: EnforcementCandidate): Promise<boole
     warningNoticeId(candidate, 5, "admin"),
   ];
   const byId = new Map(rows.map(row => [row.id, row.delivery]));
-  return expected.every(id => byId.get(id)?.email === true);
+  return expected.every(id => {
+    const delivery = byId.get(id);
+    return delivery?.email === true && delivery.emailSuppressed !== true;
+  });
 }
 
 async function suspend(candidate: EnforcementCandidate): Promise<boolean> {
@@ -544,6 +547,19 @@ export async function runBillingEnforcementCycle(now = new Date()): Promise<void
 export async function getBillingEnforcementSettings() {
   const [settings] = await db.select().from(billingEnforcementSettingsTable)
     .where(eq(billingEnforcementSettingsTable.id, SETTINGS_ID)).limit(1);
+  const businesses = await db.select({
+    businessId: businessesTable.id,
+    businessName: businessesTable.businessName,
+    billingMode: businessesTable.billingMode,
+    accountStatus: businessesTable.accountStatus,
+    neverAutoSuspend: businessesTable.neverAutoSuspend,
+    suspendedAt: businessesTable.billingEnforcementSuspendedAt,
+    source: businessesTable.billingEnforcementInvoiceSource,
+    invoiceId: businessesTable.billingEnforcementInvoiceId,
+  }).from(businessesTable).where(and(
+    eq(businessesTable.isInternal, false),
+    eq(businessesTable.isSample, false),
+  )).orderBy(businessesTable.businessName).limit(500);
   const wouldSuspend = await db.select({
     id: billingEnforcementEventsTable.id,
     businessId: billingEnforcementEventsTable.businessId,
@@ -560,6 +576,18 @@ export async function getBillingEnforcementSettings() {
     mode: settings ? modeOrOff(settings.mode) : "off" as const,
     updatedAt: settings?.updatedAt.toISOString() ?? null,
     updatedBy: settings?.updatedBy ?? null,
+    businesses: businesses.map(business => ({
+      ...business,
+      suspension: business.suspendedAt && business.source && business.invoiceId ? {
+        suspendedAt: business.suspendedAt.toISOString(),
+        source: business.source,
+        invoiceId: business.invoiceId,
+      } : null,
+      suspendedAt: undefined,
+      source: undefined,
+      invoiceId: undefined,
+    })),
+    manualInvoices: await listManualInvoiceEnforcementStatus(),
     dryRunCandidates: wouldSuspend.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
     auditLog: (await db.select({
       id: billingEnforcementEventsTable.id,

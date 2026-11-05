@@ -5,6 +5,161 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type BillingEnforcementMode = typeof BillingEnforcementMode[keyof typeof BillingEnforcementMode];
+
+
+export const BillingEnforcementMode = {
+  off: 'off',
+  dry_run: 'dry_run',
+  enforce: 'enforce',
+} as const;
+
+export interface BillingEnforcementModeInput {
+  mode: BillingEnforcementMode;
+}
+
+export interface BillingEnforcementModeResult {
+  mode: BillingEnforcementMode;
+  changed: boolean;
+}
+
+export interface BillingEnforcementOverrideInput {
+  neverAutoSuspend: boolean;
+}
+
+export interface BillingEnforcementOverrideResult {
+  businessId: number;
+  neverAutoSuspend: boolean;
+  changed: boolean;
+}
+
+export type BillingEnforcementSuspensionSource = typeof BillingEnforcementSuspensionSource[keyof typeof BillingEnforcementSuspensionSource];
+
+
+export const BillingEnforcementSuspensionSource = {
+  stripe: 'stripe',
+  manual: 'manual',
+} as const;
+
+export interface BillingEnforcementSuspension {
+  suspendedAt: string;
+  source: BillingEnforcementSuspensionSource;
+  invoiceId: string;
+}
+
+export interface BillingEnforcementBusiness {
+  businessId: number;
+  businessName: string;
+  billingMode: string;
+  accountStatus: string;
+  neverAutoSuspend: boolean;
+  suspension: BillingEnforcementSuspension | null;
+}
+
+export type BillingEnforcementDryRunCandidateSource = typeof BillingEnforcementDryRunCandidateSource[keyof typeof BillingEnforcementDryRunCandidateSource];
+
+
+export const BillingEnforcementDryRunCandidateSource = {
+  stripe: 'stripe',
+  manual: 'manual',
+  system: 'system',
+} as const;
+
+export interface BillingEnforcementDryRunCandidate {
+  id: number;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  source: BillingEnforcementDryRunCandidateSource;
+  /** @nullable */
+  invoiceId: string | null;
+  reason: string;
+  createdAt: string;
+}
+
+export type BillingEnforcementAuditEntrySource = typeof BillingEnforcementAuditEntrySource[keyof typeof BillingEnforcementAuditEntrySource];
+
+
+export const BillingEnforcementAuditEntrySource = {
+  stripe: 'stripe',
+  manual: 'manual',
+  system: 'system',
+} as const;
+
+export type BillingEnforcementAuditEntryAction = typeof BillingEnforcementAuditEntryAction[keyof typeof BillingEnforcementAuditEntryAction];
+
+
+export const BillingEnforcementAuditEntryAction = {
+  would_suspend: 'would_suspend',
+  warning_day_3: 'warning_day_3',
+  warning_day_5: 'warning_day_5',
+  suspended: 'suspended',
+  reinstated: 'reinstated',
+  manual_overdue_confirmed: 'manual_overdue_confirmed',
+  mode_changed: 'mode_changed',
+  override_changed: 'override_changed',
+} as const;
+
+export type BillingEnforcementAuditEntryDetails = { [key: string]: unknown };
+
+export interface BillingEnforcementAuditEntry {
+  id: number;
+  /** @nullable */
+  businessId: number | null;
+  /** @nullable */
+  businessName: string | null;
+  source: BillingEnforcementAuditEntrySource;
+  /** @nullable */
+  invoiceId: string | null;
+  action: BillingEnforcementAuditEntryAction;
+  /** @nullable */
+  actor: string | null;
+  reason: string;
+  details: BillingEnforcementAuditEntryDetails;
+  createdAt: string;
+}
+
+export interface ManualInvoiceEnforcementStatus {
+  invoiceId: number;
+  businessId: number;
+  businessName: string;
+  dueAt: string;
+  /** @nullable */
+  paidAt: string | null;
+  /** @nullable */
+  overdueConfirmedAt: string | null;
+  /** @nullable */
+  overdueConfirmedBy: string | null;
+}
+
+export interface BillingEnforcementSettings {
+  mode: BillingEnforcementMode;
+  /** @nullable */
+  updatedAt: string | null;
+  /** @nullable */
+  updatedBy: string | null;
+  businesses: BillingEnforcementBusiness[];
+  manualInvoices: ManualInvoiceEnforcementStatus[];
+  dryRunCandidates: BillingEnforcementDryRunCandidate[];
+  auditLog: BillingEnforcementAuditEntry[];
+}
+
+export interface ManualInvoiceOverdueConfirmation {
+  invoiceId: number;
+  confirmed: boolean;
+  /** @nullable */
+  confirmedAt: string | null;
+  changed: boolean;
+  /** @nullable */
+  reason: string | null;
+}
+
+export interface BillingEnforcementReinstatement {
+  businessId: number;
+  reinstated: boolean;
+}
+
 export interface ManualPaymentConfirmation {
   /** @maxLength 500 */
   reference: string;

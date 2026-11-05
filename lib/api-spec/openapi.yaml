@@ -1598,6 +1598,57 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/StartupEligibilityInput"}}}}
       responses:
         "200": {description: Admin eligibility, content: {application/json: {schema: {$ref: "#/components/schemas/BillingAccount"}}}}
+  /admin/billing-enforcement:
+    get:
+      operationId: getBillingEnforcement
+      security:
+        - clerkSession: []
+      responses:
+        "200": {description: Enforcement settings and admin review data, content: {application/json: {schema: {$ref: "#/components/schemas/BillingEnforcementSettings"}}}}
+  /admin/billing-enforcement/mode:
+    patch:
+      operationId: setBillingEnforcementMode
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BillingEnforcementModeInput"}
+      responses:
+        "200": {description: Updated enforcement mode, content: {application/json: {schema: {$ref: "#/components/schemas/BillingEnforcementModeResult"}}}}
+  /admin/billing-enforcement/businesses/{businessId}/override:
+    patch:
+      operationId: setBillingEnforcementOverride
+      security:
+        - clerkSession: []
+      parameters:
+        - {in: path, name: businessId, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/BillingEnforcementOverrideInput"}
+      responses:
+        "200": {description: Updated per-account override, content: {application/json: {schema: {$ref: "#/components/schemas/BillingEnforcementOverrideResult"}}}}
+  /admin/billing-enforcement/businesses/{businessId}/reinstate:
+    post:
+      operationId: reinstateBillingAccount
+      security:
+        - clerkSession: []
+      parameters:
+        - {in: path, name: businessId, required: true, schema: {type: integer}}
+      responses:
+        "200": {description: Account reinstated, content: {application/json: {schema: {$ref: "#/components/schemas/BillingEnforcementReinstatement"}}}}
+  /admin/billing-enforcement/manual-invoices/{invoiceId}/confirm-overdue:
+    post:
+      operationId: confirmManualInvoiceOverdue
+      security:
+        - clerkSession: []
+      parameters:
+        - {in: path, name: invoiceId, required: true, schema: {type: integer}}
+      responses:
+        "200": {description: Manual invoice overdue confirmation, content: {application/json: {schema: {$ref: "#/components/schemas/ManualInvoiceOverdueConfirmation"}}}}
   /invoicing/me:
     get:
       operationId: getOwnerInvoices
@@ -1725,6 +1776,121 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    BillingEnforcementMode:
+      type: string
+      enum: [off, dry_run, enforce]
+    BillingEnforcementModeInput:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode: {$ref: "#/components/schemas/BillingEnforcementMode"}
+    BillingEnforcementModeResult:
+      type: object
+      required: [mode, changed]
+      properties:
+        mode: {$ref: "#/components/schemas/BillingEnforcementMode"}
+        changed: {type: boolean}
+    BillingEnforcementOverrideInput:
+      type: object
+      additionalProperties: false
+      required: [neverAutoSuspend]
+      properties:
+        neverAutoSuspend: {type: boolean}
+    BillingEnforcementOverrideResult:
+      type: object
+      required: [businessId, neverAutoSuspend, changed]
+      properties:
+        businessId: {type: integer}
+        neverAutoSuspend: {type: boolean}
+        changed: {type: boolean}
+    BillingEnforcementSuspension:
+      type: object
+      required: [suspendedAt, source, invoiceId]
+      properties:
+        suspendedAt: {type: string, format: date-time}
+        source: {type: string, enum: [stripe, manual]}
+        invoiceId: {type: string}
+    BillingEnforcementBusiness:
+      type: object
+      required: [businessId, businessName, billingMode, accountStatus, neverAutoSuspend, suspension]
+      properties:
+        businessId: {type: integer}
+        businessName: {type: string}
+        billingMode: {type: string}
+        accountStatus: {type: string}
+        neverAutoSuspend: {type: boolean}
+        suspension: {oneOf: [{$ref: "#/components/schemas/BillingEnforcementSuspension"}, {type: "null"}]}
+    BillingEnforcementDryRunCandidate:
+      type: object
+      required: [id, businessId, businessName, source, invoiceId, reason, createdAt]
+      properties:
+        id: {type: integer}
+        businessId: {type: ["integer", "null"]}
+        businessName: {type: ["string", "null"]}
+        source: {type: string, enum: [stripe, manual, system]}
+        invoiceId: {type: ["string", "null"]}
+        reason: {type: string}
+        createdAt: {type: string, format: date-time}
+    BillingEnforcementAuditEntry:
+      type: object
+      required: [id, businessId, businessName, source, invoiceId, action, actor, reason, details, createdAt]
+      properties:
+        id: {type: integer}
+        businessId: {type: ["integer", "null"]}
+        businessName: {type: ["string", "null"]}
+        source: {type: string, enum: [stripe, manual, system]}
+        invoiceId: {type: ["string", "null"]}
+        action: {type: string, enum: [would_suspend, warning_day_3, warning_day_5, suspended, reinstated, manual_overdue_confirmed, mode_changed, override_changed]}
+        actor: {type: ["string", "null"]}
+        reason: {type: string}
+        details: {type: object, additionalProperties: true}
+        createdAt: {type: string, format: date-time}
+    ManualInvoiceEnforcementStatus:
+      type: object
+      required: [invoiceId, businessId, businessName, dueAt, paidAt, overdueConfirmedAt, overdueConfirmedBy]
+      properties:
+        invoiceId: {type: integer}
+        businessId: {type: integer}
+        businessName: {type: string}
+        dueAt: {type: string, format: date-time}
+        paidAt: {type: ["string", "null"], format: date-time}
+        overdueConfirmedAt: {type: ["string", "null"], format: date-time}
+        overdueConfirmedBy: {type: ["string", "null"]}
+    BillingEnforcementSettings:
+      type: object
+      required: [mode, updatedAt, updatedBy, businesses, manualInvoices, dryRunCandidates, auditLog]
+      properties:
+        mode: {$ref: "#/components/schemas/BillingEnforcementMode"}
+        updatedAt: {type: ["string", "null"], format: date-time}
+        updatedBy: {type: ["string", "null"]}
+        businesses:
+          type: array
+          items: {$ref: "#/components/schemas/BillingEnforcementBusiness"}
+        manualInvoices:
+          type: array
+          items: {$ref: "#/components/schemas/ManualInvoiceEnforcementStatus"}
+        dryRunCandidates:
+          type: array
+          items: {$ref: "#/components/schemas/BillingEnforcementDryRunCandidate"}
+        auditLog:
+          type: array
+          items: {$ref: "#/components/schemas/BillingEnforcementAuditEntry"}
+    ManualInvoiceOverdueConfirmation:
+      type: object
+      required: [invoiceId, confirmed, confirmedAt, changed, reason]
+      properties:
+        invoiceId: {type: integer}
+        confirmed: {type: boolean}
+        confirmedAt: {type: ["string", "null"], format: date-time}
+        changed: {type: boolean}
+        reason: {type: ["string", "null"]}
+    BillingEnforcementReinstatement:
+      type: object
+      required: [businessId, reinstated]
+      properties:
+        businessId: {type: integer}
+        reinstated: {type: boolean}
     ManualPaymentConfirmation:
       type: object
       required: [reference]

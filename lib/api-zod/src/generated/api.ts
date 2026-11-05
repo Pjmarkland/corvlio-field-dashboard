@@ -2340,6 +2340,103 @@ export const SetStartupEligibilityResponse = zod.object({
 })
 
 
+export const GetBillingEnforcementResponse = zod.object({
+  "mode": zod.enum(['off', 'dry_run', 'enforce']),
+  "updatedAt": zod.coerce.date().nullable(),
+  "updatedBy": zod.string().nullable(),
+  "businesses": zod.array(zod.object({
+  "businessId": zod.int(),
+  "businessName": zod.string(),
+  "billingMode": zod.string(),
+  "accountStatus": zod.string(),
+  "neverAutoSuspend": zod.boolean(),
+  "suspension": zod.union([zod.object({
+  "suspendedAt": zod.coerce.date(),
+  "source": zod.enum(['stripe', 'manual']),
+  "invoiceId": zod.string()
+}),zod.null()])
+})),
+  "manualInvoices": zod.array(zod.object({
+  "invoiceId": zod.int(),
+  "businessId": zod.int(),
+  "businessName": zod.string(),
+  "dueAt": zod.coerce.date(),
+  "paidAt": zod.coerce.date().nullable(),
+  "overdueConfirmedAt": zod.coerce.date().nullable(),
+  "overdueConfirmedBy": zod.string().nullable()
+})),
+  "dryRunCandidates": zod.array(zod.object({
+  "id": zod.int(),
+  "businessId": zod.int().nullable(),
+  "businessName": zod.string().nullable(),
+  "source": zod.enum(['stripe', 'manual', 'system']),
+  "invoiceId": zod.string().nullable(),
+  "reason": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "auditLog": zod.array(zod.object({
+  "id": zod.int(),
+  "businessId": zod.int().nullable(),
+  "businessName": zod.string().nullable(),
+  "source": zod.enum(['stripe', 'manual', 'system']),
+  "invoiceId": zod.string().nullable(),
+  "action": zod.enum(['would_suspend', 'warning_day_3', 'warning_day_5', 'suspended', 'reinstated', 'manual_overdue_confirmed', 'mode_changed', 'override_changed']),
+  "actor": zod.string().nullable(),
+  "reason": zod.string(),
+  "details": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+export const SetBillingEnforcementModeBody = zod.object({
+  "mode": zod.enum(['off', 'dry_run', 'enforce'])
+})
+
+export const SetBillingEnforcementModeResponse = zod.object({
+  "mode": zod.enum(['off', 'dry_run', 'enforce']),
+  "changed": zod.boolean()
+})
+
+
+export const SetBillingEnforcementOverrideParams = zod.object({
+  "businessId": zod.coerce.number().int()
+})
+
+export const SetBillingEnforcementOverrideBody = zod.object({
+  "neverAutoSuspend": zod.boolean()
+})
+
+export const SetBillingEnforcementOverrideResponse = zod.object({
+  "businessId": zod.int(),
+  "neverAutoSuspend": zod.boolean(),
+  "changed": zod.boolean()
+})
+
+
+export const ReinstateBillingAccountParams = zod.object({
+  "businessId": zod.coerce.number().int()
+})
+
+export const ReinstateBillingAccountResponse = zod.object({
+  "businessId": zod.int(),
+  "reinstated": zod.boolean()
+})
+
+
+export const ConfirmManualInvoiceOverdueParams = zod.object({
+  "invoiceId": zod.coerce.number().int()
+})
+
+export const ConfirmManualInvoiceOverdueResponse = zod.object({
+  "invoiceId": zod.int(),
+  "confirmed": zod.boolean(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "changed": zod.boolean(),
+  "reason": zod.string().nullable()
+})
+
+
 export const getOwnerInvoicesResponseSettingsInstructionsMax = 6000;
 
 export const getOwnerInvoicesResponseSettingsPaymentLinkMax = 2048;
