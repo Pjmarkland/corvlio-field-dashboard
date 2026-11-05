@@ -18,12 +18,14 @@ import pendingReleasesRouter from "./pendingReleases";
 import invoicingRouter from "./invoicing";
 import { accountDeletionGuard } from "../middlewares/accountDeletionGuard";
 import { requireAdmin } from "../middlewares/requireAdmin";
+import { billingEnforcementAccess } from "../middlewares/billingEnforcementAccess";
 
 const router: IRouter = Router();
 router.use(healthRouter);
 // This guard runs before all route groups so no /api/admin path can bypass it.
 router.use("/admin", requireAdmin);
 router.use(accountDeletionGuard);
+router.use(billingEnforcementAccess);
 router.use(accountRouter);
 router.use(ownerSmsRouter);
 router.use(pendingReleasesRouter);

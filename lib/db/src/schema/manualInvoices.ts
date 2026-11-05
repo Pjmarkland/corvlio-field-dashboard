@@ -19,6 +19,8 @@ export const manualInvoicesTable = pgTable("manual_invoices", {
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
+  overdueConfirmedAt: timestamp("overdue_confirmed_at", { withTimezone: true }),
+  overdueConfirmedBy: text("overdue_confirmed_by"),
   paidBy: text("paid_by"),
   paymentReference: text("payment_reference"),
 }, t => [uniqueIndex("manual_invoices_business_period_unique").on(t.businessId, t.periodKey)]);

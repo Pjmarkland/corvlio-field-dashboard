@@ -7,6 +7,7 @@ import { config, billingUrl } from "./policy";
 import { sendBillingNotificationEmail } from "../lib/gmail";
 import { sendApnsNotification } from "../lib/apnsAdapter";
 import { logger } from "../lib/logger";
+import { runBillingEnforcementCycle } from "./enforcement";
 
 let timer: ReturnType<typeof setInterval> | undefined;
 let running: Promise<void> | undefined;
@@ -84,21 +85,23 @@ async function deliverPendingNotices() {
   }
 }
 export function runBillingCycle(): Promise<void> {
-  if (!billingEnabled()) return Promise.resolve();
   if (running) return running;
   running = (async () => {
-    for (const business of await billingStore.businesses()) {
-      try { await billingService.refresh(business.id); }
-      catch { logger.warn({ businessId: business.id }, "Test billing refresh failed; calls unaffected"); }
+    if (billingEnabled()) {
+      for (const business of await billingStore.businesses()) {
+        try { await billingService.refresh(business.id); }
+        catch { logger.warn({ businessId: business.id }, "Test billing refresh failed; calls unaffected"); }
+      }
     }
     await deliverPendingNotices();
+    await runBillingEnforcementCycle();
   })().catch(() => {
-    logger.warn("Test billing worker unavailable; calls unaffected");
+    logger.warn("Billing worker unavailable; enforcement remains fail-open");
   }).finally(() => { running = undefined; });
   return running;
 }
 export function startBillingWorker() {
-  if (!billingEnabled() || timer) return;
+  if (timer) return;
   void runBillingCycle();
   timer = setInterval(() => void runBillingCycle(), config.operations.workerIntervalMs);
   timer.unref();

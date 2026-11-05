@@ -204,6 +204,23 @@ router.get("/businesses/me", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/businesses/me/enforcement-status", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  setPrivateOwnerResponseHeaders(res);
+  if (!userId) { res.status(401).json({ error: "Authentication required" }); return; }
+  try {
+    const business = await findBusinessByClerkUserId(userId);
+    if (!business) { res.status(404).json({ error: "No business is configured for this account" }); return; }
+    res.json({
+      suspended: Boolean(business.billingEnforcementSuspendedAt),
+      source: business.billingEnforcementInvoiceSource ?? null,
+    });
+  } catch {
+    // The client treats an unavailable enforcement check as service-on.
+    res.status(503).json({ error: "Billing access status is temporarily unavailable." });
+  }
+});
+
 router.get("/businesses/me/call-usage", async (req, res): Promise<void> => {
   const { userId } = getAuth(req);
   setPrivateOwnerResponseHeaders(res);

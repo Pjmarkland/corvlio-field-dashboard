@@ -289,7 +289,7 @@ router.post("/webhooks/retell/pre-call", async (req, res): Promise<void> => {
       call_inbound: {
         dynamic_variables: dynamicVariables(
           availableBusiness,
-          availableBusiness?.fallbackPhoneNumber ?? defaultFallbackPhoneNumber,
+          business?.fallbackPhoneNumber ?? defaultFallbackPhoneNumber,
         ),
       },
     });

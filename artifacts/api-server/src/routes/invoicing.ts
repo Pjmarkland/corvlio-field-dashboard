@@ -11,6 +11,7 @@ import { validPaymentLink } from "../invoicing/policy";
 import { provisionPaidBusinesses, runInvoiceCycle } from "../invoicing/worker";
 import { billingService } from "../billing/runtime";
 import { BillingError } from "../billing/policy";
+import { reinstateForPaidInvoice } from "../billing/enforcement";
 const router = Router();
 const idSchema=z.coerce.number().int().positive();
 router.get("/invoicing/me",async(req,res,next) => {
@@ -89,7 +90,10 @@ router.post("/admin/invoicing/invoices/:invoiceId/paid",async(req,res,next) => {
   const body=z.object({reference:z.string().trim().min(1).max(500)}).strict().safeParse(req.body);
   if(!id.success||!body.success){res.status(400).json({error:"A payment reference is required."});return;}
   try {
-    res.json(await markInvoicePaid(id.data,getAuth(req).userId!,body.data.reference));
+    const actor = getAuth(req).userId!;
+    const result = await markInvoicePaid(id.data,actor,body.data.reference);
+    await reinstateForPaidInvoice(result.businessId,"manual",String(id.data),actor);
+    res.json(result);
     void runInvoiceCycle();
   }catch(e){next(e);}
 });

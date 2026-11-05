@@ -5,6 +5,7 @@ import { ensurePlanPrices } from "./stripeClient";
 import type { BillingStore, BillingTransaction } from "./store";
 import { recordOperationalFailure } from "../lib/operationalFailures";
 import { runNotificationOutboxNow } from "../lib/notificationService";
+import { reinstateForPaidInvoice } from "./enforcement";
 
 export type SubscriptionData = {
   id: string; customer: string | { id: string }; status: string; start_date?: number;
@@ -55,7 +56,6 @@ export class BillingService {
   ) {}
   async webhook(event: Stripe.Event) {
     if (event.livemode !== (this.mode() === "live")) throw new BillingError("Stripe event mode does not match the active billing mode", 401);
-    if (await this.store.hasEvent(event.id)) return { replay: true };
     const kinds = ["checkout.session.completed", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted"];
     if (!kinds.includes(event.type)) return { ignored: true };
     const data = event.data.object as unknown as EventData;
@@ -64,6 +64,14 @@ export class BillingService {
     const businessId = await this.store.findByStripe(idOf(data.customer), subscriptionId);
     // Never bind tenants using owner-supplied email, query params or arbitrary metadata.
     if (!businessId) return { ignored: true };
+    if (await this.store.hasEvent(event.id)) {
+      // A prior delivery may have committed billing state but failed before the
+      // reinstatement write. Replaying the signed paid event safely retries it.
+      if (event.type === "invoice.paid" && typeof data.id === "string") {
+        await reinstateForPaidInvoice(businessId, "stripe", data.id, "stripe_webhook");
+      }
+      return { replay: true };
+    }
     const sub = event.type.startsWith("customer.subscription.") ? data as unknown as SubscriptionData
       : subscriptionId ? await this.stripe().subscriptions.retrieve(subscriptionId) as unknown as SubscriptionData : null;
     const checkoutPlan = event.type === "checkout.session.completed"
@@ -165,6 +173,9 @@ export class BillingService {
       if (!s.lastEvent || event.created >= s.lastEvent.created) s.lastEvent = { id: event.id, type: event.type, created: event.created };
       return { response: { processed: true }, firstPayment: false };
     });
+    if (event.type === "invoice.paid" && typeof data.id === "string") {
+      await reinstateForPaidInvoice(businessId, "stripe", data.id, "stripe_webhook");
+    }
     if (outcome.firstPayment) await this.activateFirstPaidBusiness(businessId);
     return outcome.response;
   }
