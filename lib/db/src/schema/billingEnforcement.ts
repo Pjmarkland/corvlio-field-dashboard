@@ -3,7 +3,7 @@ import { businessesTable } from "./businesses";
 
 export const billingEnforcementSettingsTable = pgTable("billing_enforcement_settings", {
   id: integer("id").primaryKey(),
-  mode: text("mode", { enum: ["off", "dry_run", "enforce"] }).notNull().default("dry_run"),
+  mode: text("mode", { enum: ["off", "dry_run", "enforce"] }).notNull().default("off"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by"),
 });
