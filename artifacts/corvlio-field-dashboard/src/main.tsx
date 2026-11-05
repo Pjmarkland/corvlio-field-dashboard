@@ -68,7 +68,7 @@ function StartupLoading() {
   );
 }
 
-function StartupFailure({ error, resetError }: ErrorFallbackProps) {
+function StartupFailure({ error }: ErrorFallbackProps) {
   return (
     <main
       role="alert"
@@ -84,7 +84,7 @@ function StartupFailure({ error, resetError }: ErrorFallbackProps) {
         ) : null}
         <button
           type="button"
-          onClick={resetError}
+          onClick={() => window.location.reload()}
           className="mt-5 min-h-11 rounded-xl bg-white px-5 text-sm font-semibold text-[#071527]"
         >
           Retry

@@ -30,6 +30,7 @@ export function isAllowedCorsOrigin(
 
 export const corsOptions: CorsOptions = {
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "X-Native-Clerk-Client"],
   origin(origin, callback) {
     callback(null, Boolean(origin && isAllowedCorsOrigin(origin)));
   },

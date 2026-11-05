@@ -6,8 +6,8 @@ const config: CapacitorConfig = {
   // Android: com.corvlio.fielddashboard
   appId: 'com.corvlio.fielddashboard',
   appName: 'Corvlio',
-  // Native builds read the deployed production URL at build time.
-  // Override with CAPACITOR_SERVER_URL in CI to point at the correct deployment.
+  // Production native builds use the bundled assets in webDir. Keep server.url
+  // unset; a remote URL here would make TestFlight depend on a live web page.
   webDir: 'dist/public',
   server: {
     // During development in a simulator/emulator, point at the Replit dev domain.

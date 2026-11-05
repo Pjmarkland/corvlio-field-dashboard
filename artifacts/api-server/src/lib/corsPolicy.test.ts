@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowedCorsOrigin } from './corsPolicy';
+import { corsOptions, isAllowedCorsOrigin } from './corsPolicy';
 
 describe('native app CORS origins', () => {
   it('allows Capacitor iOS requests with bearer authorization headers', () => {
@@ -8,6 +8,8 @@ describe('native app CORS origins', () => {
         PUBLIC_API_BASE_URL: 'https://corvlio-field-dashboard--pjmarkland08.replit.app',
       }),
     ).toBe(true);
+    expect(corsOptions.credentials).toBe(true);
+    expect(corsOptions.allowedHeaders).toContain('Authorization');
   });
 
   it('continues to allow browser-based localhost development origins', () => {
