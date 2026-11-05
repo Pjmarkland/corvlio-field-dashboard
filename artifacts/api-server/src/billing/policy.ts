@@ -54,6 +54,16 @@ export class BillingError extends Error {
   constructor(message: string, public status = 409) { super(message); }
 }
 export type StripeBillingMode = "off" | "test" | "live";
+export type StripeSecretKeyMode = "live" | "live_restricted" | "test" | "test_restricted" | "unknown" | "missing";
+
+export function stripeSecretKeyMode(key: string | undefined): StripeSecretKeyMode {
+  if (!key) return "missing";
+  if (key.startsWith("sk_live_")) return "live";
+  if (key.startsWith("rk_live_")) return "live_restricted";
+  if (key.startsWith("sk_test_")) return "test";
+  if (key.startsWith("rk_test_")) return "test_restricted";
+  return "unknown";
+}
 
 export function publicApiBase(env: NodeJS.ProcessEnv = process.env): URL | null {
   try {
@@ -79,18 +89,21 @@ export function billingGate(env: NodeJS.ProcessEnv = process.env) {
 
   const liveOptIn = env.STRIPE_LIVE_MODE_ENABLED === "true";
   const secretKey = env.STRIPE_SECRET_KEY ?? "";
+  const keyMode = stripeSecretKeyMode(secretKey);
+  const isLiveKey = keyMode === "live" || keyMode === "live_restricted";
+  const isTestKey = keyMode === "test" || keyMode === "test_restricted";
   if (liveOptIn) {
     if (env.NODE_ENV !== "production") return off("live_mode_requires_production");
-    if (!secretKey.startsWith("sk_live_") || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
+    if (!isLiveKey || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
       return off("missing_live_credentials");
     const base = publicApiBase(env);
     if (!base || !isConfiguredReplitHost(base, env)) return off("invalid_production_base");
     return { enabled: true, mode: "live" as const, reason: "live_ready" };
   }
 
-  if (secretKey.startsWith("sk_live_")) return off("live_mode_flag_off");
+  if (isLiveKey) return off("live_mode_flag_off");
   if (env.NODE_ENV === "production") return off("production_disabled");
-  if (!secretKey.startsWith("sk_test_") || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
+  if (!isTestKey || !env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_"))
     return off("missing_test_credentials");
   if (!publicApiBase(env)) return off("missing_or_invalid_public_base");
   return { enabled: true, mode: "test" as const, reason: "test_only" };

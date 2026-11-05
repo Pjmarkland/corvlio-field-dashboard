@@ -19,10 +19,11 @@ admin-assigned Startup plan. Its six-month Starter review date is recorded and
 shown to admins; it never changes the subscription automatically.
 
 - `BILLING_ENABLED` defaults off. Test billing is limited to non-production
-  runtimes and requires test credentials plus an HTTPS public API base.
+  runtimes and requires an `sk_test_` or `rk_test_` key plus an HTTPS public API
+  base.
 - Live billing additionally requires `STRIPE_LIVE_MODE_ENABLED=true`, production
-  runtime, an `sk_live_` key, a `whsec_` webhook secret, and a public HTTPS base
-  whose hostname is in `REPLIT_DOMAINS`.
+  runtime, an `sk_live_` or `rk_live_` key, a `whsec_` webhook secret, and a
+  public HTTPS base whose hostname is in `REPLIT_DOMAINS`.
 - The four standard plan prices are locked in `config.json`. Checkout lazily creates one
   Stripe Product per plan, then separate monthly and one-time setup Prices.
 - `Live Test $3` is a separate, live-mode-only, one-time payment with no monthly
@@ -97,7 +98,8 @@ No credentials, flags, Stripe resources or webhooks were changed or created by t
 work. Before live billing is enabled, the owner must configure these workspace
 settings through the Secrets/environment UI:
 
-- Secret `STRIPE_SECRET_KEY`: live Stripe secret beginning `sk_live_`.
+- Secret `STRIPE_SECRET_KEY`: live Stripe secret beginning `sk_live_` or
+  restricted live key beginning `rk_live_`.
 - Secret `STRIPE_WEBHOOK_SECRET`: signing secret for the production webhook.
 - Non-secret `PUBLIC_API_BASE_URL`: production HTTPS API base; a trailing `/api`
   is supported.

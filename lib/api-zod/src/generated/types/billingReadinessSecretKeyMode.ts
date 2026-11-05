@@ -11,7 +11,9 @@ export type BillingReadinessSecretKeyMode = typeof BillingReadinessSecretKeyMode
 
 export const BillingReadinessSecretKeyMode = {
   live: 'live',
+  live_restricted: 'live_restricted',
   test: 'test',
+  test_restricted: 'test_restricted',
   unknown: 'unknown',
   missing: 'missing',
 } as const;

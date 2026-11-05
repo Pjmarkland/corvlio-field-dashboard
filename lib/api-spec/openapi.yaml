@@ -2073,7 +2073,7 @@ components:
         liveModeOptIn: {type: boolean}
         runningInProduction: {type: boolean}
         secretKeyPresent: {type: boolean}
-        secretKeyMode: {type: string, enum: [live, test, unknown, missing]}
+        secretKeyMode: {type: string, enum: [live, live_restricted, test, test_restricted, unknown, missing]}
         webhookSecretPresent: {type: boolean}
         webhookSecretValid: {type: boolean}
         publicApiBaseValid: {type: boolean}

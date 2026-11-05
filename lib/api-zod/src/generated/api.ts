@@ -2232,7 +2232,7 @@ export const CheckAdminBillingReadinessResponse = zod.object({
   "liveModeOptIn": zod.boolean(),
   "runningInProduction": zod.boolean(),
   "secretKeyPresent": zod.boolean(),
-  "secretKeyMode": zod.enum(['live', 'test', 'unknown', 'missing']),
+  "secretKeyMode": zod.enum(['live', 'live_restricted', 'test', 'test_restricted', 'unknown', 'missing']),
   "webhookSecretPresent": zod.boolean(),
   "webhookSecretValid": zod.boolean(),
   "publicApiBaseValid": zod.boolean(),

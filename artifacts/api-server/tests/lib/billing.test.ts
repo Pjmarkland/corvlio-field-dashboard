@@ -25,24 +25,25 @@ describe("test-only billing policy", () => {
   it.each([{}, { BILLING_ENABLED: "true" }, { BILLING_ENABLED: "false", STRIPE_SECRET_KEY: "sk_test_dummy" }])("is off without required test configuration", env => {
     expect(billingGate(env).enabled).toBe(false);
   });
-  it("refuses live keys unless the separate live-mode flag is enabled", () => {
-    expect(billingGate({ BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_live_dummy" }).reason).toBe("live_mode_flag_off");
+  it.each(["sk_live_dummy", "rk_live_dummy"])("refuses live keys unless the separate live-mode flag is enabled: %s", secretKey => {
+    expect(billingGate({ BILLING_ENABLED: "true", STRIPE_SECRET_KEY: secretKey }).reason).toBe("live_mode_flag_off");
   });
   it("never enables in production", () => {
     expect(billingGate({ NODE_ENV: "production", BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_dummy",
       STRIPE_WEBHOOK_SECRET: "whsec_dummy", PUBLIC_API_BASE_URL: "https://example.test" }).enabled).toBe(false);
   });
-  it("accepts only an explicitly enabled test environment", () => {
-    expect(billingGate({ NODE_ENV: "test", BILLING_ENABLED: "true", STRIPE_SECRET_KEY: "sk_test_dummy",
+  it.each(["sk_test_dummy", "rk_test_dummy"])("accepts standard and restricted keys in an explicitly enabled test environment: %s", secretKey => {
+    expect(billingGate({ NODE_ENV: "test", BILLING_ENABLED: "true", STRIPE_SECRET_KEY: secretKey,
       STRIPE_WEBHOOK_SECRET: "whsec_dummy", PUBLIC_API_BASE_URL: "https://example.test" }).enabled).toBe(true);
   });
-  it("requires explicit production opt-in, live credentials and a configured production domain", () => {
+  it.each(["sk_live_dummy", "rk_live_dummy"])("requires explicit production opt-in, live credentials and a configured production domain: %s", secretKey => {
     const base = { NODE_ENV: "production", BILLING_ENABLED: "true", STRIPE_LIVE_MODE_ENABLED: "true",
-      STRIPE_SECRET_KEY: "sk_live_dummy", STRIPE_WEBHOOK_SECRET: "whsec_live_dummy",
+      STRIPE_SECRET_KEY: secretKey, STRIPE_WEBHOOK_SECRET: "whsec_live_dummy",
       PUBLIC_API_BASE_URL: "https://billing.example.test/api", REPLIT_DOMAINS: "billing.example.test" };
     expect(billingGate(base)).toMatchObject({ enabled: true, mode: "live" });
     expect(billingGate({ ...base, NODE_ENV: "test" }).reason).toBe("live_mode_requires_production");
     expect(billingGate({ ...base, REPLIT_DOMAINS: "other.example.test" }).reason).toBe("invalid_production_base");
+    expect(billingGate({ ...base, STRIPE_WEBHOOK_SECRET: "invalid" }).reason).toBe("missing_live_credentials");
     expect(billingGate({ ...base, BILLING_ENABLED: "false" }).reason).toBe("flag_off");
   });
   it("counts five business days, not five calendar days", () => {

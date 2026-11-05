@@ -202,7 +202,7 @@ function Content({ billingEnabled }: { billingEnabled: boolean }) {
         <p><span className="font-semibold">Status:</span> {readinessReason[readiness.data.reason] ?? 'Configuration needs review.'}</p>
         <p><span className="font-semibold">Live-mode flag:</span> {readiness.data.liveModeOptIn ? 'On' : 'Off'}</p>
         <p><span className="font-semibold">Runtime:</span> {readiness.data.runningInProduction ? 'Production' : 'Not production'}</p>
-        <p><span className="font-semibold">Stripe key:</span> {readiness.data.secretKeyPresent ? `Present (${readiness.data.secretKeyMode})` : 'Missing'}</p>
+        <p><span className="font-semibold">Stripe key:</span> {readiness.data.secretKeyPresent ? `Present (${readiness.data.secretKeyMode.replaceAll('_', ' ')})` : 'Missing'}</p>
         <p><span className="font-semibold">Webhook secret:</span> {readiness.data.webhookSecretValid ? 'Present and valid format' : 'Missing or invalid format'}</p>
         <p><span className="font-semibold">Public HTTPS API base:</span> {readiness.data.publicApiBaseValid ? 'Valid' : 'Missing or invalid'}</p>
         <p><span className="font-semibold">Webhook reachability:</span> {readiness.data.webhookReachable === true ? 'Reachable' : readiness.data.webhookReachable === false ? 'Unreachable' : 'Not checked'}</p>

@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   override: vi.fn(),
   reinstate: vi.fn(),
   confirm: vi.fn(),
+  readinessData: null as any,
 }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false } }));
 vi.mock('wouter', () => ({ Redirect: ({ to }: { to: string }) => <div>{to}</div> }));
@@ -15,7 +16,7 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock('@workspace/api-client-react', () => ({
   getGetAdminBillingQueryKey: () => ['admin-billing'],
   getGetBillingEnforcementQueryKey: () => ['billing-enforcement'],
-  useCheckAdminBillingReadiness: () => ({ mutate: vi.fn(), isPending: false, isError: false, data: null }),
+  useCheckAdminBillingReadiness: () => ({ mutate: vi.fn(), isPending: false, isError: false, data: m.readinessData }),
   useGetAdminBilling: () => ({ data: m.data, isLoading: false, isError: false, refetch: vi.fn() }),
   useSetStartupEligibility: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useGetBillingEnforcement: () => ({ data: {
@@ -50,6 +51,7 @@ import AdminBillingPage from './AdminBillingPage';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.readinessData = null;
   m.data = [{
     businessId: 3,
     businessName: 'Admin Test Business',
@@ -85,6 +87,33 @@ describe('admin billing page', () => {
     expect(screen.getByTestId('button-reinstate-12')).toBeTruthy();
     expect(screen.getByTestId('panel-enforcement-audit')).toBeTruthy();
     expect(screen.getByTestId('panel-dry-run-candidates')).toBeTruthy();
+  });
+
+  it('labels a restricted live Stripe key as live restricted without displaying its value', () => {
+    m.readinessData = {
+      mode: 'off',
+      reason: 'missing_live_credentials',
+      liveModeOptIn: true,
+      runningInProduction: true,
+      secretKeyPresent: true,
+      secretKeyMode: 'live_restricted',
+      webhookSecretPresent: true,
+      webhookSecretValid: true,
+      publicApiBaseValid: true,
+      webhookUrl: null,
+      webhookReachable: null,
+      sms: {},
+      webPush: {
+        configured: false,
+        publicKeyPresent: false,
+        privateKeyPresent: false,
+        subjectPresent: false,
+        subjectValid: false,
+      },
+    };
+    render(<AdminBillingPage />);
+    expect(screen.getByText('Present (live restricted)')).toBeTruthy();
+    expect(screen.queryByText(/rk_live_/)).toBeNull();
   });
 
   it('submits the selected enforcement mode and account-specific actions', () => {

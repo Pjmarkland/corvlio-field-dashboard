@@ -1,11 +1,4 @@
-import { billingGate, isConfiguredReplitHost, publicApiBase } from "./policy";
-
-function stripeKeyMode(key: string | undefined): "live" | "test" | "unknown" | "missing" {
-  if (!key) return "missing";
-  if (key.startsWith("sk_live_")) return "live";
-  if (key.startsWith("sk_test_")) return "test";
-  return "unknown";
-}
+import { billingGate, isConfiguredReplitHost, publicApiBase, stripeSecretKeyMode } from "./policy";
 
 function webhookUrl(base: URL): URL {
   const prefix = base.pathname.replace(/\/+$/, "");
@@ -43,7 +36,7 @@ export async function checkBillingReadiness(env: NodeJS.ProcessEnv = process.env
     liveModeOptIn: env.STRIPE_LIVE_MODE_ENABLED === "true",
     runningInProduction: env.NODE_ENV === "production",
     secretKeyPresent: Boolean(env.STRIPE_SECRET_KEY),
-    secretKeyMode: stripeKeyMode(env.STRIPE_SECRET_KEY),
+    secretKeyMode: stripeSecretKeyMode(env.STRIPE_SECRET_KEY),
     webhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET),
     webhookSecretValid: Boolean(env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_")),
     publicApiBaseValid: Boolean(base),
