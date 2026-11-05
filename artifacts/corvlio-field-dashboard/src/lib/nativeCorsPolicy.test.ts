@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { corsOptions, isAllowedCorsOrigin } from './corsPolicy';
+import {
+  corsOptions,
+  isAllowedCorsOrigin,
+} from '../../../api-server/src/lib/corsPolicy';
 
 describe('native app CORS origins', () => {
   it('allows Capacitor iOS requests with bearer authorization headers', () => {
