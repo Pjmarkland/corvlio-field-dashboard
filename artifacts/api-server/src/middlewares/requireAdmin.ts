@@ -117,6 +117,21 @@ const defaultDependencies: AdminGuardDependencies = {
   audit: defaultAudit,
 };
 
+export async function isVerifiedAdminUser(userId: string): Promise<boolean> {
+  const allowedEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
+  if (!userId || allowedEmails.size === 0) return false;
+  try {
+    const user = await defaultDependencies.getUser(userId);
+    return Boolean(getPrimaryVerifiedAdminEmail(
+      user.primaryEmailAddressId,
+      user.emailAddresses,
+      allowedEmails,
+    ));
+  } catch {
+    return false;
+  }
+}
+
 function ipDigest(req: Request): string {
   return createHash("sha256").update(requestIp(req)).digest("hex");
 }

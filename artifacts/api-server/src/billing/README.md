@@ -22,9 +22,20 @@ shown to admins; it never changes the subscription automatically.
   runtimes and requires test credentials plus an HTTPS public API base.
 - Live billing additionally requires `STRIPE_LIVE_MODE_ENABLED=true`, production
   runtime, an `sk_live_` key, a `whsec_` webhook secret, and a public HTTPS base
-  whose hostname is in `REPLIT_DOMAINS`. The live-mode flag is not set here.
-- The four plan prices are locked in `config.json`. Checkout lazily creates one
+  whose hostname is in `REPLIT_DOMAINS`.
+- The four standard plan prices are locked in `config.json`. Checkout lazily creates one
   Stripe Product per plan, then separate monthly and one-time setup Prices.
+- `Live Test $3` is a separate, live-mode-only, one-time payment with no monthly
+  price or setup fee. Its single `config.json` entry is hidden unless the current
+  owner has a verified primary email listed in `ADMIN_EMAILS`; checkout is also
+  guarded server-side by the existing admin middleware. Stripe creates its
+  one-time Price at runtime. The Checkout session and PaymentIntent are marked
+  as test payments, and the admin billing view labels the activated account.
+- A paid Live Test session uses the same first-paid activation marker and worker
+  as a subscription's first paid invoice. If the selected business is awaiting
+  payment and has no Retell number, the existing activation flow may purchase
+  and provision one. Use a controlled business whose activation you intend to
+  complete. A business can complete this test payment only once.
 - New businesses use emailed invoices while Stripe is off. When Stripe is enabled,
   new businesses are assigned to Stripe billing; existing manual accounts remain
   on emailed invoices. Checkout refuses all manual-mode businesses until an

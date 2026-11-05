@@ -2008,7 +2008,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        plan: {type: string, enum: [startup, starter, professional, managed]}
+        plan: {type: string, minLength: 1, maxLength: 100}
       required: [plan]
     StartupEligibilityInput:
       type: object
@@ -2024,7 +2024,7 @@ components:
     BillingAccount:
       type: object
       properties:
-        plan: {type: [string, "null"], enum: [startup, starter, professional, managed, null]}
+        plan: {type: [string, "null"]}
         status: {type: string}
         customerId: {type: [string, "null"]}
         subscriptionId: {type: [string, "null"]}
@@ -2073,7 +2073,10 @@ components:
               monthlyCents: {type: number}
               setupCents: {type: number}
               callLimit: {type: [number, "null"]}
-            required: [id, label, monthlyCents, setupCents, callLimit]
+              billingType: {type: string, enum: [recurring, one_time]}
+              oneTimeCents: {type: [number, "null"]}
+              testOnly: {type: boolean}
+            required: [id, label, monthlyCents, setupCents, callLimit, billingType, oneTimeCents, testOnly]
         policy:
           type: object
           properties:

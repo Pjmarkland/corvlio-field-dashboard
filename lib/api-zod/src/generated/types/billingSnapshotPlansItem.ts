@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingSnapshotPlansItemBillingType } from './billingSnapshotPlansItemBillingType';
 
 export type BillingSnapshotPlansItem = {
   id: string;
@@ -13,4 +14,8 @@ export type BillingSnapshotPlansItem = {
   setupCents: number;
   /** @nullable */
   callLimit: number | null;
+  billingType: BillingSnapshotPlansItemBillingType;
+  /** @nullable */
+  oneTimeCents: number | null;
+  testOnly: boolean;
 };

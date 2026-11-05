@@ -520,18 +520,12 @@ export interface NativeBillingSummary {
   hasStripeCustomer: boolean;
 }
 
-export type BillingPlanInputPlan = typeof BillingPlanInputPlan[keyof typeof BillingPlanInputPlan];
-
-
-export const BillingPlanInputPlan = {
-  startup: 'startup',
-  starter: 'starter',
-  professional: 'professional',
-  managed: 'managed',
-} as const;
-
 export interface BillingPlanInput {
-  plan: BillingPlanInputPlan;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  plan: string;
 }
 
 export interface StartupEligibilityInput {
@@ -545,19 +539,6 @@ export interface BillingRedirect {
 /**
  * @nullable
  */
-export type BillingAccountPlan = typeof BillingAccountPlan[keyof typeof BillingAccountPlan] | null;
-
-
-export const BillingAccountPlan = {
-  startup: 'startup',
-  starter: 'starter',
-  professional: 'professional',
-  managed: 'managed',
-} as const;
-
-/**
- * @nullable
- */
 export type BillingAccountLastEvent = {
   id: string;
   type: string;
@@ -566,7 +547,7 @@ export type BillingAccountLastEvent = {
 
 export interface BillingAccount {
   /** @nullable */
-  plan: BillingAccountPlan;
+  plan: string | null;
   status: string;
   /** @nullable */
   customerId: string | null;
@@ -606,6 +587,14 @@ export type BillingSnapshotUsage = {
   end: string;
 };
 
+export type BillingSnapshotPlansItemBillingType = typeof BillingSnapshotPlansItemBillingType[keyof typeof BillingSnapshotPlansItemBillingType];
+
+
+export const BillingSnapshotPlansItemBillingType = {
+  recurring: 'recurring',
+  one_time: 'one_time',
+} as const;
+
 export type BillingSnapshotPlansItem = {
   id: string;
   label: string;
@@ -613,6 +602,10 @@ export type BillingSnapshotPlansItem = {
   setupCents: number;
   /** @nullable */
   callLimit: number | null;
+  billingType: BillingSnapshotPlansItemBillingType;
+  /** @nullable */
+  oneTimeCents: number | null;
+  testOnly: boolean;
 };
 
 export type BillingSnapshotPolicy = {

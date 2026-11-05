@@ -1,11 +1,12 @@
 {
-  "documentation": "Locked four-plan Corvlio pricing shared by test and live Stripe modes. Amounts are USD cents. No call blocking, suspension, automatic tier movement or per-call charges.",
+  "documentation": "Locked standard Corvlio prices plus a restricted live-only one-time test payment. Amounts are USD cents. No call blocking, suspension, automatic tier movement or per-call charges.",
   "currency": "usd",
   "plans": [
     {"id":"startup","label":"Startup","monthlyCents":50000,"setupCents":25000,"callLimit":100},
     {"id":"starter","label":"Starter","monthlyCents":75000,"setupCents":30000,"callLimit":150},
     {"id":"professional","label":"Professional","monthlyCents":100000,"setupCents":30000,"callLimit":null},
-    {"id":"managed","label":"Managed","monthlyCents":125000,"setupCents":30000,"callLimit":null}
+    {"id":"managed","label":"Managed","monthlyCents":125000,"setupCents":30000,"callLimit":null},
+    {"id":"live-test-3","label":"Live Test $3","billingType":"one_time","oneTimeCents":300,"monthlyCents":0,"setupCents":0,"callLimit":null,"adminOnly":true,"testOnly":true}
   ],
   "policy": {
     "failedPaymentGraceBusinessDays": 5,

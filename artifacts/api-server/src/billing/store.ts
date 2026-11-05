@@ -89,7 +89,7 @@ export const billingStore: BillingStore = {
             billing_mode: string; first_invoice_paid_at: Date | null; is_internal: boolean; is_sample: boolean;
           } | undefined;
           if (!current || current.is_internal || current.is_sample || current.billing_mode !== "stripe")
-            throw new BillingError("The paid Stripe subscription is not assigned to this business.", 409);
+            throw new BillingError("The paid Stripe payment is not assigned to this business.", 409);
           if (current.first_invoice_paid_at) return false;
           await tx.update(businessesTable).set({
             firstInvoicePaidAt: paidAt,

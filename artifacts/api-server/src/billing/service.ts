@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import type { BillingSnapshot } from "@workspace/api-zod";
-import { config, BillingError, addMonths, addBusinessDays, billingUrl, cancellationDate, planFor, usagePeriod, type BillingState, type PlanId } from "./policy";
+import { config, BillingError, addMonths, addBusinessDays, billingUrl, cancellationDate, isAdminOnlyPlan, isOneTimePlan, isTestPlan, planFor, snapshotPlan, usagePeriod, type BillingState, type PlanId } from "./policy";
 import { ensurePlanPrices } from "./stripeClient";
 import type { BillingStore, BillingTransaction } from "./store";
 import { recordOperationalFailure } from "../lib/operationalFailures";
@@ -15,6 +15,8 @@ export type SubscriptionData = {
 };
 type EventData = {
   id: string; customer?: string | { id: string }; subscription?: string | { id: string } | null;
+  mode?: string; payment_status?: string; amount_total?: number | null; currency?: string | null;
+  client_reference_id?: string | null; metadata?: Record<string, string> | null;
   parent?: { subscription_details?: { subscription?: string | { id: string } } };
   lines?: { data: Array<{ period?: { end?: number } }> };
 };
@@ -64,12 +66,62 @@ export class BillingService {
     if (!businessId) return { ignored: true };
     const sub = event.type.startsWith("customer.subscription.") ? data as unknown as SubscriptionData
       : subscriptionId ? await this.stripe().subscriptions.retrieve(subscriptionId) as unknown as SubscriptionData : null;
+    const checkoutPlan = event.type === "checkout.session.completed"
+      ? config.plans.find(plan => plan.id === data.metadata?.corvlio_plan)
+      : undefined;
+    const testPaymentPlan = checkoutPlan && isOneTimePlan(checkoutPlan) && isTestPlan(checkoutPlan)
+      ? checkoutPlan
+      : null;
     const outcome = await this.store.transact(businessId, async tx => {
-      if (!await tx.claimEvent(event.id, event.type, "Signature-verified Stripe event", new Date(event.created * 1000)))
+      const eventDetail = testPaymentPlan
+        ? `TEST PAYMENT: ${testPaymentPlan.label} — $${(testPaymentPlan.oneTimeCents / 100).toFixed(2)} USD one-time; no setup fee or recurring charge.`
+        : "Signature-verified Stripe event";
+      if (!await tx.claimEvent(event.id, event.type, eventDetail, new Date(event.created * 1000)))
         return { response: { replay: true }, firstPayment: false };
       const s = tx.state;
       if (s.subscriptionId && sub && sub.id !== s.subscriptionId && s.status !== "canceled" && s.status !== "not_subscribed")
         return { response: { ignored: true }, firstPayment: false };
+      if (event.type === "checkout.session.completed" && !sub) {
+        if (!testPaymentPlan || data.mode !== "payment" || data.payment_status !== "paid"
+          || data.amount_total !== testPaymentPlan.oneTimeCents || data.currency !== config.currency)
+          throw new BillingError("Completed one-time Checkout does not match the test plan configuration.", 409);
+        const customerId = idOf(data.customer);
+        if (!customerId || customerId !== s.customerId || s.pendingCheckout?.id !== data.id
+          || s.pendingCheckout.plan !== testPaymentPlan.id
+          || data.metadata?.business_id !== String(businessId)
+          || data.client_reference_id !== String(businessId))
+          throw new BillingError("Completed test Checkout does not match the pending business payment.", 409);
+        if (s.subscriptionId || s.status === "active")
+          throw new BillingError("Live Test can only activate a business without an existing Stripe subscription.", 409);
+        if (event.created < s.lastPaidEventCreated)
+          throw new BillingError("Completed test payment is older than the last recorded payment event.", 409);
+
+        s.plan = testPaymentPlan.id;
+        s.customerId = customerId;
+        s.status = "active";
+        s.periodStart = null;
+        s.periodEnd = null;
+        s.paidPeriodEnd = null;
+        s.pastDueSince = null;
+        s.graceEndsAt = null;
+        s.needsAdminReview = false;
+        s.cancelAt = null;
+        s.cancelRequestedAt = null;
+        s.cancelRequestedBy = null;
+        s.setupPaid = false;
+        s.usageFlags = [];
+        s.lastPaidEventCreated = event.created;
+        s.pendingCheckout = null;
+        if (!s.lastEvent || event.created >= s.lastEvent.created)
+          s.lastEvent = { id: event.id, type: event.type, created: event.created };
+        // Deliberately reuse the first-paid activation marker and worker used by invoice.paid.
+        // An eligible awaiting-payment business may proceed to normal phone provisioning.
+        const firstPayment = await tx.markStripeFirstInvoicePaid(
+          testPaymentPlan.id,
+          new Date(event.created * 1000),
+        );
+        return { response: { processed: true }, firstPayment };
+      }
       if (sub) applySubscription(s, sub, event.created);
       if (event.type === "checkout.session.completed") {
         if (!sub) throw new BillingError("Subscription missing from completed Checkout", 400);
@@ -169,28 +221,38 @@ export class BillingService {
     if (alertQueued) void runNotificationOutboxNow().catch(() => undefined);
     return refreshed;
   }
-  async snapshot(businessId: number): Promise<BillingSnapshot> {
+  async snapshot(businessId: number, includeAdminOnlyPlans = false): Promise<BillingSnapshot> {
     const business = await this.store.business(businessId);
     if (!business) throw new BillingError("Business not found", 404);
+    const includeRestrictedPlans = includeAdminOnlyPlans && this.mode() === "live";
     return { businessId, businessName: business.businessName, ...await this.refresh(businessId),
-      plans: config.plans, policy: config.policy, timeline: await this.store.timeline(businessId) };
+      plans: config.plans.filter(plan => includeRestrictedPlans || !isAdminOnlyPlan(plan.id)).map(snapshotPlan),
+      policy: config.policy, timeline: await this.store.timeline(businessId) };
   }
   async checkout(businessId: number, planId: PlanId) {
     const business = await this.store.business(businessId);
     if (!business) throw new BillingError("Business not found", 404);
     return this.store.transact(businessId, async tx => {
-      const s = tx.state;
+      const s = tx.state, plan = planFor(planId), oneTime = isOneTimePlan(plan);
       if (planId === "startup" && (!s.startupEligible || s.plan !== "startup")) throw new BillingError("Startup requires admin assignment", 403);
+      if (oneTime && (s.subscriptionId || s.status === "active" || (s.plan === planId && s.lastPaidEventCreated > 0)))
+        throw new BillingError("Live Test requires an unactivated business without an existing Stripe subscription.");
       if (s.subscriptionId && s.status !== "canceled") throw new BillingError("Use Upgrade for your existing subscription");
       const mode = this.mode();
+      if (isTestPlan(plan) && mode !== "live")
+        throw new BillingError("Live Test is available only in live Stripe mode.", 403);
       await tx.prepareStripeBilling(planId);
       const stripe = this.stripe(), prices = await ensurePlanPrices(stripe, planId, mode);
-      const needsSetup = !s.setupPaid || !config.policy.setupFeeOncePerBusiness;
+      const needsSetup = !oneTime && (!s.setupPaid || !config.policy.setupFeeOncePerBusiness);
+      if (oneTime ? !prices.oneTime : !prices.monthly)
+        throw new BillingError("The configured Stripe price is unavailable.", 503);
       // Do not reuse a pre-card-only session with dynamically enabled methods.
-      const fingerprint = `${prices.monthly}:${needsSetup ? prices.setup : "no_setup"}:card_only`;
+      const fingerprint = oneTime
+        ? `payment:${prices.oneTime}:card_only`
+        : `${prices.monthly}:${needsSetup ? prices.setup : "no_setup"}:card_only`;
       if (s.pendingCheckout) {
         const pending = await stripe.checkout.sessions.retrieve(s.pendingCheckout.id);
-        if (pending.status === "complete") throw new BillingError("Payment was submitted; wait for Stripe confirmation before starting another subscription");
+        if (pending.status === "complete") throw new BillingError("Payment was submitted; wait for Stripe confirmation before starting another checkout");
         if (pending.status === "open" && pending.url) {
           if (s.pendingCheckout.plan === planId && s.pendingCheckout.fingerprint === fingerprint) return { url: pending.url };
           // A second tab must not leave two payable subscriptions behind.
@@ -206,17 +268,27 @@ export class BillingService {
         if (customer.livemode !== (mode === "live")) throw new BillingError("Stripe customer mode mismatch", 401);
         s.customerId = customer.id;
       }
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription", allowed_payment_method_types: ["card"],
+      const metadata = { business_id: String(businessId), corvlio_plan: planId };
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        mode: oneTime ? "payment" : "subscription",
+        allowed_payment_method_types: ["card"],
         customer: s.customerId, client_reference_id: String(businessId),
-        line_items: [{ price: prices.monthly, quantity: 1 },
-          ...(needsSetup ? [{ price: prices.setup, quantity: 1 }] : [])],
-        subscription_data: { metadata: { business_id: String(businessId), corvlio_plan: planId } },
-        metadata: { business_id: String(businessId), corvlio_plan: planId },
+        line_items: oneTime
+          ? [{ price: prices.oneTime!, quantity: 1 }]
+          : [{ price: prices.monthly!, quantity: 1 },
+            ...(needsSetup ? [{ price: prices.setup!, quantity: 1 }] : [])],
+        ...(oneTime
+          ? { payment_intent_data: { metadata: { ...metadata, corvlio_test_payment: "true" } } }
+          : { subscription_data: { metadata } }),
+        metadata: { ...metadata, ...(oneTime ? { corvlio_test_payment: "true" } : {}) },
         success_url: billingUrl() + "?checkout=success", cancel_url: billingUrl() + "?checkout=cancel",
+      };
       // Reuse the same pending session on accidental repeated clicks; new monthly
       // bucket permits a fresh expired session without inventing a second customer.
-      }, { idempotencyKey: `corvlio_${mode}_checkout_card_only_v2_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}` });
+      const idempotencyKey = oneTime
+        ? `corvlio_${mode}_checkout_one_time_test_v1_${businessId}_${planId}_${prices.oneTime}`
+        : `corvlio_${mode}_checkout_card_only_v2_${businessId}_${planId}_${s.subscriptionId ?? "new"}_${s.setupPaid}_${prices.monthly}_${this.now().toISOString().slice(0, 13)}`;
+      const session = await stripe.checkout.sessions.create(sessionParams, { idempotencyKey });
       if (session.livemode !== (mode === "live") || !session.url) throw new BillingError("Stripe Checkout URL mode mismatch", 502);
       s.pendingCheckout = { id: session.id, plan: planId, fingerprint };
       return { url: session.url };
@@ -277,6 +349,9 @@ export class BillingService {
     });
   }
   async upgrade(businessId: number, planId: PlanId, actor: string) {
+    const targetPlan = planFor(planId);
+    if (isOneTimePlan(targetPlan) || isAdminOnlyPlan(planId))
+      throw new BillingError("This plan is only available through its restricted one-time Checkout.", 400);
     return this.store.transact(businessId, async tx => {
       const s = tx.state, plan = planFor(planId);
       if (planId === "startup" || !s.plan || !s.subscriptionId || s.status === "canceled"
@@ -296,6 +371,9 @@ export class BillingService {
     });
   }
   async adminChangePlan(businessId: number, planId: PlanId, actor: string, reason: string | null) {
+    const targetPlan = planFor(planId);
+    if (isOneTimePlan(targetPlan) || isAdminOnlyPlan(planId))
+      throw new BillingError("This plan cannot be assigned as a subscription.", 400);
     return this.store.transact(businessId, async tx => {
       const s = tx.state;
       if (planId === "startup" && !s.startupEligible)

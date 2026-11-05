@@ -9,7 +9,12 @@ describe("test-only billing policy", () => {
     expect(config.plans.map(p => [p.id, p.monthlyCents, p.setupCents, p.callLimit])).toEqual([
       ["startup", 50000, 25000, 100], ["starter", 75000, 30000, 150],
       ["professional", 100000, 30000, null], ["managed", 125000, 30000, null],
+      ["live-test-3", 0, 0, null],
     ]);
+    expect(config.plans.at(-1)).toMatchObject({
+      label: "Live Test $3", billingType: "one_time", oneTimeCents: 300,
+      monthlyCents: 0, setupCents: 0, adminOnly: true, testOnly: true,
+    });
   });
   it.each([{}, { BILLING_ENABLED: "true" }, { BILLING_ENABLED: "false", STRIPE_SECRET_KEY: "sk_test_dummy" }])("is off without required test configuration", env => {
     expect(billingGate(env).enabled).toBe(false);
@@ -149,6 +154,25 @@ describe("Stripe events and notices (SDK mocked; no network)", () => {
 });
 
 describe("usage, Checkout, policy actions and isolation", () => {
+  it("shows the one-time test plan only in an admin-authorized snapshot", async () => {
+    const f = billingFixture();
+    const owner = await f.service.snapshot(1);
+    expect(owner.plans.some(plan => plan.testOnly)).toBe(false);
+    const testModeAdmin = await f.service.snapshot(1, true);
+    expect(testModeAdmin.plans.some(plan => plan.testOnly)).toBe(false);
+    f.setMode("live");
+    const admin = await f.service.snapshot(1, true);
+    expect(admin.plans).toContainEqual(expect.objectContaining({
+      id: "live-test-3", billingType: "one_time", oneTimeCents: 300, testOnly: true,
+    }));
+  });
+  it("keeps the Live Test plan unavailable in Stripe test mode", async () => {
+    const f = billingFixture();
+    await expect(f.service.checkout(1, "live-test-3")).rejects.toThrow("only in live Stripe mode");
+    expect(f.sdk.products.create).not.toHaveBeenCalled();
+    expect(f.sdk.customers.create).not.toHaveBeenCalled();
+    expect(f.states.has(1)).toBe(false);
+  });
   it("notifies 80% and 100% once each per period, with no tier change or extra charge", async () => {
     const f = billingFixture(); f.subscribed(); f.calls.set(1, 120);
     await f.service.refresh(1); await f.service.refresh(1);
@@ -177,6 +201,86 @@ describe("usage, Checkout, policy actions and isolation", () => {
     expect(f.sdk.checkout.sessions.create.mock.calls[0]![0]).toMatchObject({
       mode: "subscription", allowed_payment_method_types: ["card"],
     });
+  });
+  it("creates a runtime $3 one-time price and payment Checkout without recurring or setup prices", async () => {
+    const f = billingFixture();
+    f.setMode("live");
+    const result = await f.service.checkout(1, "live-test-3");
+    expect(result.url).toContain("live-session");
+    expect(f.sdk.products.create).toHaveBeenCalledWith(expect.objectContaining({
+      name: "Corvlio Live Test $3 (TEST PAYMENT)",
+      metadata: { corvlio_catalog: "corvlio_v1", corvlio_plan: "live-test-3" },
+    }), expect.objectContaining({ idempotencyKey: expect.stringContaining("corvlio_live_product") }));
+    expect(f.sdk.prices.create).toHaveBeenCalledTimes(1);
+    const price = f.sdk.prices.create.mock.calls[0]![0] as Record<string, unknown>;
+    expect(price).toMatchObject({
+      unit_amount: 300, currency: "usd", metadata: { corvlio_plan: "live-test-3", corvlio_kind: "one_time" },
+    });
+    expect(price).not.toHaveProperty("recurring");
+    const params = f.sdk.checkout.sessions.create.mock.calls[0]![0] as unknown as Record<string, unknown>;
+    expect(params).toMatchObject({
+      mode: "payment",
+      allowed_payment_method_types: ["card"],
+      line_items: [{ price: expect.any(String), quantity: 1 }],
+      payment_intent_data: { metadata: { business_id: "1", corvlio_plan: "live-test-3", corvlio_test_payment: "true" } },
+      metadata: { business_id: "1", corvlio_plan: "live-test-3", corvlio_test_payment: "true" },
+    });
+    expect(params).not.toHaveProperty("subscription_data");
+    expect((params.line_items as unknown[])).toHaveLength(1);
+  });
+  it("activates a paid one-time test Checkout through the shared first-payment path exactly once", async () => {
+    const f = billingFixture();
+    f.setMode("live");
+    await f.service.checkout(1, "live-test-3");
+    const paid = f.event("checkout.session.completed", "evt_live_test_payment", undefined, {
+      id: "cs_live_1",
+      customer: "cus_live_1",
+      mode: "payment",
+      payment_status: "paid",
+      amount_total: 300,
+      currency: "usd",
+      client_reference_id: "1",
+      metadata: { business_id: "1", corvlio_plan: "live-test-3", corvlio_test_payment: "true" },
+    });
+    await f.service.webhook(paid);
+    expect(f.state()).toMatchObject({
+      plan: "live-test-3", status: "active", customerId: "cus_live_1",
+      subscriptionId: null, pendingCheckout: null, setupPaid: false,
+      lastEvent: { id: "evt_live_test_payment", type: "checkout.session.completed" },
+    });
+    expect(f.activations).toEqual([1]);
+    expect(f.sdk.subscriptions.retrieve).not.toHaveBeenCalled();
+    expect([...f.events.values()][0]?.detail).toContain("TEST PAYMENT");
+    expect([...f.events.values()][0]?.detail).toContain("$3.00 USD one-time");
+    expect(await f.service.webhook(paid)).toEqual({ replay: true });
+    expect(f.activations).toEqual([1]);
+  });
+  it("does not activate a one-time Checkout with the wrong amount or payment status", async () => {
+    const f = billingFixture();
+    f.setMode("live");
+    await f.service.checkout(1, "live-test-3");
+    const unpaid = f.event("checkout.session.completed", "evt_unpaid_test_payment", undefined, {
+      id: "cs_live_1", customer: "cus_live_1", mode: "payment", payment_status: "unpaid",
+      amount_total: 300, currency: "usd", client_reference_id: "1",
+      metadata: { business_id: "1", corvlio_plan: "live-test-3" },
+    });
+    await expect(f.service.webhook(unpaid)).rejects.toThrow("does not match");
+    expect(f.activations).toEqual([]);
+    expect(f.state().status).toBe("not_subscribed");
+    expect(f.events.size).toBe(0);
+  });
+  it("prevents another live test charge after the one-time account activation", async () => {
+    const f = billingFixture();
+    f.setMode("live");
+    await f.service.checkout(1, "live-test-3");
+    const paid = f.event("checkout.session.completed", "evt_live_test_once", undefined, {
+      id: "cs_live_1", customer: "cus_live_1", mode: "payment", payment_status: "paid",
+      amount_total: 300, currency: "usd", client_reference_id: "1",
+      metadata: { business_id: "1", corvlio_plan: "live-test-3", corvlio_test_payment: "true" },
+    });
+    await f.service.webhook(paid);
+    await expect(f.service.checkout(1, "live-test-3")).rejects.toThrow("unactivated business");
+    expect(f.sdk.checkout.sessions.create).toHaveBeenCalledTimes(1);
   });
   it("uses only live-mode Stripe catalog objects and Checkout in explicit live mode", async () => {
     const f = billingFixture(); f.setMode("live");

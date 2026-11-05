@@ -5,6 +5,7 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vites
 const m = vi.hoisted(() => ({
   nativeSummary: vi.fn(),
   enabled: true, mode: "test" as "test" | "live" | "off", signature: vi.fn(), process: vi.fn(), snapshot: vi.fn(), cancel: vi.fn(),
+  isVerifiedAdminUser: vi.fn(),
   resume: vi.fn(), checkout: vi.fn(), upgrade: vi.fn(), portal: vi.fn(), eligibility: vi.fn(), businesses: vi.fn(),
 }));
 vi.mock("../../src/billing/nativeSummary", () => ({ readNativeBillingSummary: m.nativeSummary }));
@@ -23,6 +24,7 @@ vi.mock("../../src/lib/businessDirectory", () => ({
 }));
 vi.mock("../../src/middlewares/requireAdmin", () => ({
   requireAdmin: (req: express.Request, res: express.Response, next: express.NextFunction) => req.get("x-test-admin") === "yes" ? next() : res.sendStatus(404),
+  isVerifiedAdminUser: m.isVerifiedAdminUser,
 }));
 import billingRouter from "../../src/routes/billing";
 import { billingWebhook } from "../../src/billing/webhook";
@@ -42,6 +44,7 @@ afterAll(() => new Promise<void>((resolve, reject) => server.close(error => erro
 beforeEach(() => {
   vi.clearAllMocks(); m.enabled = true; m.mode = "test";
   m.snapshot.mockImplementation(async id => ({ businessId: id }));
+  m.isVerifiedAdminUser.mockResolvedValue(false);
   m.cancel.mockResolvedValue({ cancelAt: "2026-11-09T10:00:00Z" });
   m.process.mockResolvedValue({ processed: true });
   m.businesses.mockResolvedValue([{ id: 1 }, { id: 2 }]);
@@ -104,7 +107,7 @@ describe("billing authorization and feature flag", () => {
   });
   it("owner A cannot read B through query-string selectors", async () => {
     const response = await fetch(`${base}/billing?businessId=2`, { headers: ownerHeaders });
-    expect(await response.json()).toEqual({ businessId: 1 }); expect(m.snapshot).toHaveBeenCalledWith(1);
+    expect(await response.json()).toEqual({ businessId: 1 }); expect(m.snapshot).toHaveBeenCalledWith(1, false);
   });
   it.each(["cancel", "resume", "portal"])("rejects forged tenant IDs for %s", async action => {
     expect((await fetch(`${base}/billing/${action}`, { method: "POST", headers: ownerHeaders, body: JSON.stringify({ businessId: 2 }) })).status).toBe(400);
@@ -129,6 +132,35 @@ describe("billing authorization and feature flag", () => {
   it("rejects extra keys instead of accepting owner-supplied eligibility", async () => {
     expect((await fetch(`${base}/billing/checkout`, { method: "POST", headers: ownerHeaders, body: '{"plan":"startup","eligible":true}' })).status).toBe(400);
     expect(m.checkout).not.toHaveBeenCalled();
+  });
+  it("hides the admin-only test plan from non-admin owner snapshots", async () => {
+    const testPlan = { id: "live-test-3", label: "Live Test $3", testOnly: true };
+    m.snapshot.mockImplementation(async (id, includeAdminPlans) => ({
+      businessId: id,
+      plans: includeAdminPlans ? [testPlan] : [],
+    }));
+    const ordinary = await fetch(`${base}/billing`, { headers: ownerHeaders });
+    expect((await ordinary.json()).plans).toEqual([]);
+    expect(m.snapshot).toHaveBeenLastCalledWith(1, false);
+
+    m.isVerifiedAdminUser.mockResolvedValue(true);
+    const admin = await fetch(`${base}/billing`, { headers: ownerHeaders });
+    expect((await admin.json()).plans).toEqual([testPlan]);
+    expect(m.snapshot).toHaveBeenLastCalledWith(1, true);
+  });
+  it("rejects non-admin test-plan Checkout server-side and permits an admin owner", async () => {
+    const body = JSON.stringify({ plan: "live-test-3" });
+    expect((await fetch(`${base}/billing/checkout`, {
+      method: "POST", headers: ownerHeaders, body,
+    })).status).toBe(404);
+    expect(m.checkout).not.toHaveBeenCalled();
+
+    m.checkout.mockResolvedValue({ url: "https://checkout.stripe.com/live-test" });
+    const admin = await fetch(`${base}/billing/checkout`, {
+      method: "POST", headers: { ...ownerHeaders, "x-test-admin": "yes" }, body,
+    });
+    expect(admin.status).toBe(200);
+    expect(m.checkout).toHaveBeenCalledWith(1, "live-test-3");
   });
   it("keeps readiness admin-only and available while billing is off", async () => {
     m.enabled = false;

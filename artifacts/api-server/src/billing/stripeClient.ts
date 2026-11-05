@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { billingGate, config, type StripeBillingMode } from "./policy";
+import { billingGate, config, isOneTimePlan, isTestPlan, type StripeBillingMode } from "./policy";
 import { logger } from "../lib/logger";
 
 let warnedLive = false;
@@ -32,7 +32,7 @@ export async function ensurePlanPrices(stripe: Stripe, planId: string, mode: Exc
   });
   if (products.data.length > 1) throw new Error("Multiple Stripe products found for this plan");
   const product = products.data[0] ?? await stripe.products.create({
-    name: `Corvlio ${plan.label}`,
+    name: `Corvlio ${plan.label}${isTestPlan(plan) ? " (TEST PAYMENT)" : ""}`,
     metadata: { corvlio_catalog: "corvlio_v1", corvlio_plan: plan.id },
   }, { idempotencyKey: `corvlio_${mode}_product_v1_${plan.id}` });
   if (product.livemode !== (mode === "live") || !product.active
@@ -40,9 +40,15 @@ export async function ensurePlanPrices(stripe: Stripe, planId: string, mode: Exc
     throw new Error("Stripe Product does not match the active billing catalog");
   // Versioned lookup keys incorporate the config amount so price edits never
   // reuse a stale immutable Stripe Price. Concurrent creation shares an idem key.
-  const result: { monthly: string; setup: string } = { monthly: "", setup: "" };
-  for (const kind of ["monthly", "setup"] as const) {
-    const amount = kind === "monthly" ? plan.monthlyCents : plan.setupCents;
+  const specs = isOneTimePlan(plan)
+    ? [{ kind: "one_time" as const, amount: plan.oneTimeCents }]
+    : [
+        { kind: "monthly" as const, amount: plan.monthlyCents },
+        { kind: "setup" as const, amount: plan.setupCents },
+      ];
+  const result: { monthly?: string; setup?: string; oneTime?: string } = {};
+  for (const { kind, amount } of specs) {
+    if (!Number.isInteger(amount) || amount <= 0) throw new Error("Plan price must be a positive integer amount");
     const key = `corvlio_${mode}_${plan.id}_${kind}_${config.currency}_${amount}`;
     const existing = await stripe.prices.list({ lookup_keys: [key], active: true, limit: 1 });
     const price = existing.data[0] ?? await stripe.prices.create({
@@ -56,7 +62,8 @@ export async function ensurePlanPrices(stripe: Stripe, planId: string, mode: Exc
       || price.lookup_key !== key || price.metadata.corvlio_plan !== plan.id || price.metadata.corvlio_kind !== kind
       || (kind === "monthly" ? price.recurring?.interval !== "month" : !!price.recurring))
       throw new Error("Stripe Price does not match the locked plan configuration");
-    result[kind] = price.id;
+    if (kind === "one_time") result.oneTime = price.id;
+    else result[kind] = price.id;
   }
   return result;
 }

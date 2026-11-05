@@ -6,11 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BillingAccountLastEvent } from './billingAccountLastEvent';
-import type { BillingAccountPlan } from './billingAccountPlan';
 
 export interface BillingAccount {
   /** @nullable */
-  plan: BillingAccountPlan;
+  plan: string | null;
   status: string;
   /** @nullable */
   customerId: string | null;

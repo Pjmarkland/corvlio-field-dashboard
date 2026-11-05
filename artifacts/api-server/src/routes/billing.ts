@@ -1,8 +1,8 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction, type RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
-import { requireAdmin } from "../middlewares/requireAdmin";
+import { isVerifiedAdminUser, requireAdmin } from "../middlewares/requireAdmin";
 import { billingEnabled } from "../billing/stripeClient";
 import { billingService } from "../billing/runtime";
 import { billingStore } from "../billing/store";
@@ -11,6 +11,7 @@ import { readNativeBillingSummary } from "../billing/nativeSummary";
 import { checkBillingReadiness } from "../billing/readiness";
 import { getOwnerSmsReadiness } from "../lib/ownerSms";
 import { getWebPushReadiness } from "../lib/webPushService";
+import { isAdminOnlyPlan } from "../billing/policy";
 
 const router: IRouter = Router();
 // Read-only exception BEFORE the unchanged payment gate. This cannot enable billing.
@@ -55,7 +56,7 @@ const enabled = (_req: Request, res: Response, next: NextFunction) => {
 router.use("/billing", enabled);
 router.use("/admin/billing", enabled, requireAdmin);
 const emptyInput = z.object({}).strict();
-const planInput = z.object({ plan: z.enum(["startup", "starter", "professional", "managed"]) }).strict();
+const planInput = z.object({ plan: z.string().min(1).max(100) }).strict();
 
 type Action = (businessId: number, actor: string, req: Request) => Promise<unknown>;
 function ownerAction(action: Action, input: "plan" | "empty" | "none" = "empty") {
@@ -76,8 +77,18 @@ function ownerAction(action: Action, input: "plan" | "empty" | "none" = "empty")
     }
   };
 }
-router.get("/billing", ownerAction(id => billingService.snapshot(id), "none"));
-router.post("/billing/checkout", ownerAction((id, _actor, req) => billingService.checkout(id, planInput.parse(req.body).plan), "plan"));
+router.get("/billing", ownerAction(async (id, userId) =>
+  billingService.snapshot(id, await isVerifiedAdminUser(userId)), "none"));
+const requireAdminForRestrictedPlan: RequestHandler = async (req, res, next): Promise<void> => {
+  const input = planInput.safeParse(req.body ?? {});
+  if (input.success && isAdminOnlyPlan(input.data.plan)) {
+    await requireAdmin(req, res, next);
+    return;
+  }
+  next();
+};
+router.post("/billing/checkout", requireAdminForRestrictedPlan,
+  ownerAction((id, _actor, req) => billingService.checkout(id, planInput.parse(req.body).plan), "plan"));
 router.post("/billing/portal", ownerAction(id => billingService.portal(id)));
 router.post("/billing/upgrade", ownerAction((id, actor, req) => billingService.upgrade(id, planInput.parse(req.body).plan, actor), "plan"));
 router.post("/billing/cancel", ownerAction((id, actor) => billingService.cancel(id, actor)));
@@ -86,7 +97,7 @@ router.get("/admin/billing", async (_req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");
   try {
     const businesses = await billingStore.businesses();
-    res.json(await Promise.all(businesses.map(b => billingService.snapshot(b.id))));
+    res.json(await Promise.all(businesses.map(b => billingService.snapshot(b.id, true))));
   } catch { res.status(503).json({ error: "Billing is temporarily unavailable" }); }
 });
 router.patch("/admin/billing/:businessId/startup", async (req, res): Promise<void> => {

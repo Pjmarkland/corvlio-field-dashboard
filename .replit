@@ -30,3 +30,4 @@ VITE_NATIVE_API_BASE_URL = "https://corvlio-field-dashboard--pjmarkland08.replit
 PUBLIC_API_BASE_URL = "https://corvlio-field-dashboard--pjmarkland08.replit.app"
 RETELL_API_BASE_URL = "https://api.retellai.com"
 STRIPE_LIVE_MODE_ENABLED = "true"
+BILLING_ENABLED = "true"

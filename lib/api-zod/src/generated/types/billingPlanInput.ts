@@ -5,8 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { BillingPlanInputPlan } from './billingPlanInputPlan';
 
 export interface BillingPlanInput {
-  plan: BillingPlanInputPlan;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  plan: string;
 }

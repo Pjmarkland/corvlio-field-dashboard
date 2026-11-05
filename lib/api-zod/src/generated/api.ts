@@ -2005,7 +2005,7 @@ export const GetOwnerBillingResponse = zod.object({
   "businessId": zod.number(),
   "businessName": zod.string(),
   "account": zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),
@@ -2039,7 +2039,10 @@ export const GetOwnerBillingResponse = zod.object({
   "label": zod.string(),
   "monthlyCents": zod.number(),
   "setupCents": zod.number(),
-  "callLimit": zod.number().nullable()
+  "callLimit": zod.number().nullable(),
+  "billingType": zod.enum(['recurring', 'one_time']),
+  "oneTimeCents": zod.number().nullable(),
+  "testOnly": zod.boolean()
 })),
   "policy": zod.object({
   "cancellationNoticeDays": zod.number(),
@@ -2057,8 +2060,12 @@ export const GetOwnerBillingResponse = zod.object({
 })
 
 
+export const createBillingCheckoutBodyPlanMax = 100;
+
+
+
 export const CreateBillingCheckoutBody = zod.object({
-  "plan": zod.enum(['startup', 'starter', 'professional', 'managed'])
+  "plan": zod.string().min(1).max(createBillingCheckoutBodyPlanMax)
 })
 
 export const CreateBillingCheckoutResponse = zod.object({
@@ -2071,12 +2078,16 @@ export const CreateBillingPortalResponse = zod.object({
 })
 
 
+export const upgradeBillingPlanBodyPlanMax = 100;
+
+
+
 export const UpgradeBillingPlanBody = zod.object({
-  "plan": zod.enum(['startup', 'starter', 'professional', 'managed'])
+  "plan": zod.string().min(1).max(upgradeBillingPlanBodyPlanMax)
 })
 
 export const UpgradeBillingPlanResponse = zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),
@@ -2102,7 +2113,7 @@ export const UpgradeBillingPlanResponse = zod.object({
 
 
 export const CancelBillingResponse = zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),
@@ -2128,7 +2139,7 @@ export const CancelBillingResponse = zod.object({
 
 
 export const ResumeBillingResponse = zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),
@@ -2157,7 +2168,7 @@ export const GetAdminBillingResponseItem = zod.object({
   "businessId": zod.number(),
   "businessName": zod.string(),
   "account": zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),
@@ -2191,7 +2202,10 @@ export const GetAdminBillingResponseItem = zod.object({
   "label": zod.string(),
   "monthlyCents": zod.number(),
   "setupCents": zod.number(),
-  "callLimit": zod.number().nullable()
+  "callLimit": zod.number().nullable(),
+  "billingType": zod.enum(['recurring', 'one_time']),
+  "oneTimeCents": zod.number().nullable(),
+  "testOnly": zod.boolean()
 })),
   "policy": zod.object({
   "cancellationNoticeDays": zod.number(),
@@ -2301,7 +2315,7 @@ export const SetStartupEligibilityBody = zod.object({
 })
 
 export const SetStartupEligibilityResponse = zod.object({
-  "plan": zod.union([zod.literal('startup'),zod.literal('starter'),zod.literal('professional'),zod.literal('managed'),zod.literal(null)]).nullable(),
+  "plan": zod.string().nullable(),
   "status": zod.string(),
   "customerId": zod.string().nullable(),
   "subscriptionId": zod.string().nullable(),

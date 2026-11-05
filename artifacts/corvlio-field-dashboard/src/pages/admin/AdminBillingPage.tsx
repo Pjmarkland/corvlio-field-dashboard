@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetAdminBillingQueryKey, useCheckAdminBillingReadiness, useGetAdminBilling, useSetStartupEligibility } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
-import { billingDate, errorText, usageText } from '@/lib/billingFormat';
+import { billingDate, errorText, money, usageText } from '@/lib/billingFormat';
 import { AdminEmpty, AdminError, AdminLoading, AdminShell } from './AdminShared';
 
 export default function AdminBillingPage() {
@@ -51,9 +51,13 @@ function Content({ billingEnabled }: { billingEnabled: boolean }) {
               <thead><tr className="border-b border-[#dfe4dc] text-xs text-[#66736c]"><th className="p-3">Business</th><th className="p-3">Plan</th><th className="p-3">Status</th><th className="p-3">Usage</th><th className="p-3">Flags</th><th className="p-3">Startup eligibility</th></tr></thead>
               <tbody>{data.map((s) => {
                 const a = s.account;
+                const plan = s.plans.find((item) => item.id === a.plan);
                 return <tr key={s.businessId} className="border-b border-[#e1e6df] align-top last:border-0" data-testid={`row-billing-${s.businessId}`}>
                   <td className="p-3 font-bold">{s.businessName}</td>
-                  <td className="p-3">{a.plan ?? 'None'}</td>
+                  <td className="p-3">
+                    {plan?.label ?? a.plan ?? 'None'}
+                    {plan?.testOnly ? <span data-testid={`badge-test-payment-${s.businessId}`} className="mt-1 block w-fit rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">TEST PAYMENT · {money(plan.oneTimeCents ?? 0)} ONE-TIME</span> : null}
+                  </td>
                   <td className="p-3">{a.status}{a.cancelAt ? `, ends ${billingDate(a.cancelAt)}` : ''}{a.status === 'past_due' ? `, grace ends ${billingDate(a.graceEndsAt)}` : ''}</td>
                   <td className="p-3">{usageText(s.usage)}</td>
                   <td className="p-3">

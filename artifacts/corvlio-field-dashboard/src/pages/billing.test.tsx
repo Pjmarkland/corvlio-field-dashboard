@@ -119,4 +119,32 @@ describe('billing page', () => {
     expect(m.cancel).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('text-cancel-confirmation').textContent).toContain('August 14, 2025');
   });
+  it('shows the server-provided one-time test plan with its activation warning', () => {
+    m.avail = { enabled: true, settled: true, disabled: false, mode: 'live' };
+    const snapshot = m.data as { account: Record<string, unknown>; plans: unknown[] };
+    snapshot.account = { ...snapshot.account, plan: null, status: 'not_subscribed', subscriptionId: null };
+    snapshot.plans.push({
+      id: 'live-test-3', label: 'Live Test $3', monthlyCents: 0, setupCents: 0,
+      callLimit: null, billingType: 'one_time', oneTimeCents: 300, testOnly: true,
+    });
+    render(<BillingPage />);
+    expect(screen.getByTestId('plan-live-test-3').textContent).toContain('TEST ONLY');
+    expect(screen.getByTestId('plan-live-test-3').textContent).toContain('$3 one-time charge');
+    expect(screen.getByTestId('text-live-test-activation-warning').textContent).toContain('may purchase and provision a Retell number');
+    fireEvent.click(screen.getByTestId('button-checkout-live-test-3'));
+    expect(m.checkout).toHaveBeenCalledWith({ data: { plan: 'live-test-3' } }, expect.any(Object));
+  });
+  it('labels a completed one-time payment and prevents buying the same test plan twice', () => {
+    m.avail = { enabled: true, settled: true, disabled: false, mode: 'live' };
+    const snapshot = m.data as { account: Record<string, unknown>; plans: unknown[] };
+    snapshot.account = { ...snapshot.account, plan: 'live-test-3', status: 'active', subscriptionId: null };
+    snapshot.plans.push({
+      id: 'live-test-3', label: 'Live Test $3', monthlyCents: 0, setupCents: 0,
+      callLimit: null, billingType: 'one_time', oneTimeCents: 300, testOnly: true,
+    });
+    render(<BillingPage />);
+    expect(screen.getByTestId('badge-test-payment').textContent).toBe('TEST PAYMENT');
+    expect(screen.getByTestId('text-price').textContent).toContain('$3 one-time test payment');
+    expect(screen.queryByTestId('button-checkout-live-test-3')).toBeNull();
+  });
 });

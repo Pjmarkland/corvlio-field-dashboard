@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetOwnerBillingQueryKey, useCancelBilling, useCreateBillingCheckout, useCreateBillingPortal,
   useGetOwnerBilling, useResumeBilling, useUpgradeBillingPlan,
-  type BillingPlanInputPlan, type BillingSnapshot,
+  type BillingSnapshot,
   useGetBusinessProfile, getGetBusinessProfileQueryKey,
 } from '@workspace/api-client-react';
 import { useBillingAvailability } from '@/hooks/useBilling';
@@ -84,8 +84,10 @@ function BillingContent({ mode }: { mode: 'off' | 'test' | 'live' }) {
   const noNextCharge = effectiveCancellation && account.periodEnd && Date.parse(effectiveCancellation) <= Date.parse(account.periodEnd);
   const renewalBeforeCancellation = effectiveCancellation && account.periodEnd && Date.parse(effectiveCancellation) > Date.parse(account.periodEnd);
   const startupAssigned = isAssignedStartup(account);
-  const chooseable = plans.filter((p) => p.id !== 'startup' || startupAssigned);
-  const upgrades = plans.filter((p) => p.id !== 'startup' && current && p.monthlyCents > current.monthlyCents);
+  const chooseable = plans.filter((p) => (p.id !== 'startup' || startupAssigned)
+    && !(p.testOnly && account.plan === p.id && account.status === 'active'));
+  const upgrades = plans.filter((p) => p.billingType === 'recurring' && !p.testOnly
+    && p.id !== 'startup' && current && p.monthlyCents > current.monthlyCents);
   const busy = checkout.isPending || upgrade.isPending || cancel.isPending || resume.isPending || portal.isPending;
   const fail = (e: unknown) => setError(errorText(e));
 
@@ -99,9 +101,12 @@ function BillingContent({ mode }: { mode: 'off' | 'test' | 'live' }) {
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6" data-testid="section-billing-current">
       <h2 className="font-bold">Current plan</h2>
       <p data-testid="text-plan" className="mt-2 text-2xl font-800">{current?.label ?? 'No plan yet'}</p>
+      {current?.testOnly ? <span data-testid="badge-test-payment" className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">TEST PAYMENT</span> : null}
       <p data-testid="text-status" className="mt-1 text-sm text-muted-foreground">Status: {account.status}</p>
       {account.plan === 'startup' && startupAssigned ? <p data-testid="text-startup-approved" className="mt-1 text-sm">Startup plan, admin approved.</p> : null}
-      {current ? <p data-testid="text-price" className="mt-1 text-sm">{money(current.monthlyCents)} per month</p> : null}
+      {current ? <p data-testid="text-price" className="mt-1 text-sm">{current.billingType === 'one_time'
+        ? `${money(current.oneTimeCents ?? 0)} one-time test payment; no recurring charge or setup fee.`
+        : `${money(current.monthlyCents)} per month`}</p> : null}
       <p data-testid="text-usage" className="mt-3 text-sm font-semibold">{usageText(usage)}</p>
       <p data-testid="text-period" className="text-sm text-muted-foreground">Current period: {periodLabel(usage)}</p>
       {subscribed ? <p data-testid="text-next-charge" className="mt-1 text-sm">Next charge: {noNextCharge ? 'None, plan is ending' : billingDate(account.periodEnd)}{renewalBeforeCancellation ? ' (renewal before cancellation)' : ''}</p> : null}
@@ -113,10 +118,19 @@ function BillingContent({ mode }: { mode: 'off' | 'test' | 'live' }) {
       {!subscribed ? <>
         <h2 className="font-bold">Choose a plan</h2>
         <div className="mt-3 space-y-2">
-          {chooseable.map((p) => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3" data-testid={`plan-${p.id}`}>
-            <div><p className="text-sm font-bold">{p.label}{p.id === 'startup' ? ' (admin approved)' : ''}</p><p className="text-xs text-muted-foreground">{money(p.monthlyCents)} per month, {money(p.setupCents)} setup, {p.callLimit === null ? 'unlimited calls' : `${p.callLimit} calls per month`}</p></div>
-            <button type="button" disabled={busy} data-testid={`button-checkout-${p.id}`} onClick={() => { setError(null); checkout.mutate({ data: { plan: p.id as BillingPlanInputPlan } }, { onSuccess: (r) => window.location.assign(r.url), onError: fail }); }} className="min-h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50">Checkout</button>
-          </div>)}
+          {chooseable.map((p) => {
+            const priceText = p.billingType === 'one_time'
+              ? `${money(p.oneTimeCents ?? 0)} one-time charge; no monthly price or setup fee.`
+              : `${money(p.monthlyCents)} per month, ${money(p.setupCents)} setup, ${p.callLimit === null ? 'unlimited calls' : `${p.callLimit} calls per month`}`;
+            return <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3" data-testid={`plan-${p.id}`}>
+              <div>
+                <p className="text-sm font-bold">{p.label}{p.id === 'startup' ? ' (admin approved)' : ''}{p.testOnly ? ' — TEST ONLY' : ''}</p>
+                <p className="text-xs text-muted-foreground">{priceText}</p>
+                {p.testOnly ? <p data-testid="text-live-test-activation-warning" className="mt-1 max-w-xl text-xs text-muted-foreground">After payment, normal first-payment activation runs. If this business is awaiting payment and has no phone number, it may purchase and provision a Retell number.</p> : null}
+              </div>
+              <button type="button" disabled={busy} data-testid={`button-checkout-${p.id}`} onClick={() => { setError(null); checkout.mutate({ data: { plan: p.id } }, { onSuccess: (r) => window.location.assign(r.url), onError: fail }); }} className="min-h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50">Checkout</button>
+            </div>;
+          })}
         </div>
       </> : <>
         <h2 className="font-bold">Manage</h2>
@@ -124,7 +138,7 @@ function BillingContent({ mode }: { mode: 'off' | 'test' | 'live' }) {
         {upgrades.length > 0 && !cancelling ? <div className="mt-4 space-y-2">
           {upgrades.map((p) => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3">
             <p className="text-sm"><strong>{p.label}</strong>, {money(p.monthlyCents)} per month, {p.callLimit === null ? 'unlimited calls' : `${p.callLimit} calls per month`}</p>
-            <button type="button" disabled={busy} data-testid={`button-upgrade-${p.id}`} onClick={() => { setError(null); upgrade.mutate({ data: { plan: p.id as BillingPlanInputPlan } }, { onSuccess: () => void refresh(), onError: fail }); }} className="min-h-11 rounded-xl border border-border px-4 text-sm font-bold disabled:opacity-50">Upgrade to {p.label}</button>
+            <button type="button" disabled={busy} data-testid={`button-upgrade-${p.id}`} onClick={() => { setError(null); upgrade.mutate({ data: { plan: p.id } }, { onSuccess: () => void refresh(), onError: fail }); }} className="min-h-11 rounded-xl border border-border px-4 text-sm font-bold disabled:opacity-50">Upgrade to {p.label}</button>
           </div>)}
         </div> : null}
       </>}

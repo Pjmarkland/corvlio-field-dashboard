@@ -3,6 +3,7 @@ import type { BillingAccount } from "@workspace/api-zod";
 
 export { config };
 export type PlanId = NonNullable<BillingAccount["plan"]>;
+export type PlanConfig = (typeof config.plans)[number];
 export type BillingState = BillingAccount & {
   failureInvoiceId: string | null;
   lastPaidEventCreated: number;
@@ -24,6 +25,30 @@ export function planFor(id: string) {
   const plan = config.plans.find(p => p.id === id);
   if (!plan) throw new BillingError("Unknown plan", 400);
   return plan;
+}
+export function isOneTimePlan(plan: PlanConfig): plan is PlanConfig & { billingType: "one_time"; oneTimeCents: number } {
+  return "billingType" in plan && plan.billingType === "one_time"
+    && "oneTimeCents" in plan && typeof plan.oneTimeCents === "number";
+}
+export function isAdminOnlyPlan(planId: string): boolean {
+  const plan = config.plans.find(p => p.id === planId);
+  return !!plan && "adminOnly" in plan && plan.adminOnly === true;
+}
+export function isTestPlan(plan: PlanConfig): boolean {
+  return "testOnly" in plan && plan.testOnly === true;
+}
+export function snapshotPlan(plan: PlanConfig) {
+  const oneTime = isOneTimePlan(plan);
+  return {
+    id: plan.id,
+    label: plan.label,
+    monthlyCents: plan.monthlyCents,
+    setupCents: plan.setupCents,
+    callLimit: plan.callLimit,
+    billingType: oneTime ? "one_time" as const : "recurring" as const,
+    oneTimeCents: oneTime ? plan.oneTimeCents : null,
+    testOnly: isTestPlan(plan),
+  };
 }
 export class BillingError extends Error {
   constructor(message: string, public status = 409) { super(message); }
