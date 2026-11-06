@@ -42,6 +42,42 @@ describe("native Clerk cookie bridge", () => {
     expect(window.localStorage.getItem(storageKey)).toBe("client_rotated-456");
   });
 
+  it("bridges the sign-in, password, and email-code requests and persists rotated client headers", async () => {
+    window.localStorage.setItem(storageKey, "client_before_signin");
+    const requestUrls = [
+      `${DEFAULT_NATIVE_API_BASE_URL}/api/__clerk/v1/client/sign_ins`,
+      `${DEFAULT_NATIVE_API_BASE_URL}/api/__clerk/v1/client/sign_ins/signin_test/attempt_first_factor`,
+      `${DEFAULT_NATIVE_API_BASE_URL}/api/__clerk/v1/client/sign_ins/signin_test/prepare_first_factor`,
+      `${DEFAULT_NATIVE_API_BASE_URL}/api/__clerk/v1/client/sign_ins/signin_test/attempt_first_factor`,
+    ];
+    const returnedClientValues = [
+      "client_after_start",
+      "client_after_password",
+      "client_after_email_code_prepare",
+      "client_after_email_code_attempt",
+    ];
+    fetchMock.mockImplementation(async () => {
+      const value = returnedClientValues.shift();
+      return new Response("ok", {
+        headers: value ? { [nativeHeader]: value } : undefined,
+      });
+    });
+
+    for (const requestUrl of requestUrls) {
+      const clientValueSent = window.localStorage.getItem(storageKey);
+      const response = await window.fetch(requestUrl, { method: "POST" });
+      const [, init] = fetchMock.mock.calls.at(-1) as [RequestInfo | URL, RequestInit?];
+      expect(new Headers(init?.headers).get(nativeHeader)).toBe(clientValueSent);
+      expect(response.headers.get(nativeHeader)).toBeTruthy();
+      expect(window.localStorage.getItem(storageKey)).toBe(
+        response.headers.get(nativeHeader),
+      );
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(requestUrls.length);
+    expect(window.localStorage.getItem(storageKey)).toBe("client_after_email_code_attempt");
+  });
+
   it("removes invalid stored and returned cookie values", async () => {
     window.localStorage.setItem(storageKey, "bad\r\nvalue");
     fetchMock.mockResolvedValueOnce(

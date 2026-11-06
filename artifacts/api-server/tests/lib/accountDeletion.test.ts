@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@clerk/express", () => ({ clerkClient: { users: { deleteUser: vi.fn() } } }));
 vi.mock("@workspace/db", () => ({ pool: {} }));
 vi.mock("../../src/lib/notificationService", () => ({ runNotificationOutboxNow: vi.fn().mockResolvedValue(undefined) }));
-import { deleteAccount, type DeletionDependencies } from "../../src/lib/accountDeletion";
+import {
+  accountDeletionEligibility,
+  deleteAccount,
+  type DeletionDependencies,
+} from "../../src/lib/accountDeletion";
 import { processPendingStripeCancellations } from "../../src/lib/accountDeletionWorker";
 
 function fixture() {
@@ -55,6 +59,27 @@ describe("account deletion safety", () => {
     await expect(deleteAccount("user_owner",f.deps)).rejects.toMatchObject({status:403});
     expect(f.calls.some(c=>c.sql.startsWith("DELETE"))).toBe(false);
     expect(f.deleteUser).not.toHaveBeenCalled();
+  });
+  it("allows deletion of a non-internal sample business and removes its leads", async () => {
+    const f = fixture();
+    Object.assign(f.state.business, { is_sample: true, is_internal: false });
+    const eligibilityDeps: DeletionDependencies = {
+      ...f.deps,
+      pool: {
+        ...f.deps.pool,
+        query: vi.fn().mockResolvedValue({ rows: [{ is_internal: false }] }),
+      },
+      isProtectedUser: async () => false,
+    };
+
+    expect(await accountDeletionEligibility("user_owner", eligibilityDeps)).toEqual({
+      allowed: true,
+      reason: null,
+    });
+    await expect(deleteAccount("user_owner", f.deps)).resolves.toBe("completed");
+    expect(f.calls.some(c => c.sql.startsWith("DELETE FROM leads"))).toBe(true);
+    expect(f.calls.some(c => c.sql.startsWith("DELETE FROM businesses"))).toBe(true);
+    expect(f.deleteUser).toHaveBeenCalledOnce();
   });
   it("anonymizes retained invoices and balance alerts while retaining accounting references",async()=>{
     const f=fixture();

@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({
   offset: 0,
   pageWhereSql: "",
   aggregateWhereSql: "",
+  isSample: false,
   fail: false,
   error: vi.fn(),
 }));
@@ -30,8 +31,8 @@ vi.mock("../../src/lib/businessDirectory", () => ({
         businessName: "Northside Plumbing",
         retellPhoneNumber: "+15550000000",
         timeZone: "America/Chicago",
-        isSample: false,
-        provisioningState: "ready",
+        isSample: fixture.isSample,
+        provisioningState: fixture.isSample ? "sample" : "ready",
       }
     : undefined,
 }));
@@ -106,6 +107,7 @@ beforeEach(() => {
   fixture.offset = 0;
   fixture.pageWhereSql = "";
   fixture.aggregateWhereSql = "";
+  fixture.isSample = false;
   fixture.fail = false;
   fixture.rows = Array.from({ length: 5 }, (_, index) => ({
     id: index + 1,
@@ -157,6 +159,22 @@ describe("paginated owner lead list", () => {
     expect(response.body.leads[0]).not.toHaveProperty("summary");
     expect(fixture.limit).toBe(3);
     expect(fixture.offset).toBe(0);
+  });
+
+  it("treats a linked sample business as configured so its leads can load without onboarding", async () => {
+    fixture.isSample = true;
+    const response = await request("/leads", "owner");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      configured: true,
+      isSample: true,
+      provisioningState: "sample",
+      businessName: "Northside Plumbing",
+      leads: expect.arrayContaining([
+        expect.objectContaining({ id: "1", name: "Caller 1" }),
+      ]),
+    });
   });
 
   it("loads the next page and marks the final page", async () => {
