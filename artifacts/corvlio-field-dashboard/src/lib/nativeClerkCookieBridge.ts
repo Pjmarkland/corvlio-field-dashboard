@@ -1,10 +1,14 @@
 import { Capacitor } from '@capacitor/core';
+import { getNativeApiBaseUrl, getNativeClerkProxyUrl } from './nativeConfig';
 
 const NATIVE_CLERK_CLIENT_STORAGE_KEY = 'corvlio.clerkClient';
 const NATIVE_CLERK_CLIENT_HEADER = 'X-Native-Clerk-Client';
-const CLERK_PROXY_PATH_SEGMENT = '/api/__clerk';
 const MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH = 4096;
 const NATIVE_CLERK_CLIENT_COOKIE_PATTERN = /^[A-Za-z0-9._~%-]+$/;
+const nativeClerkProxyUrl = getNativeClerkProxyUrl(
+  import.meta.env.VITE_CLERK_PROXY_URL,
+  getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL),
+);
 
 function isValidNativeClientValue(value: string): boolean {
   return value.length > 0
@@ -15,9 +19,10 @@ function isValidNativeClientValue(value: string): boolean {
 function isClerkProxyRequest(inputUrl: string): boolean {
   try {
     const url = new URL(inputUrl, window.location.href);
-    return url.origin === window.location.origin
-      && (url.pathname === CLERK_PROXY_PATH_SEGMENT
-        || url.pathname.startsWith(`${CLERK_PROXY_PATH_SEGMENT}/`));
+    const proxy = new URL(nativeClerkProxyUrl, window.location.href);
+    const proxyPath = proxy.pathname.replace(/\/+$/, '') || '/';
+    return url.origin === proxy.origin
+      && (url.pathname === proxyPath || url.pathname.startsWith(`${proxyPath}/`));
   } catch {
     return false;
   }
