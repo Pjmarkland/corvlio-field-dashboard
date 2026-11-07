@@ -16,8 +16,9 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static let redirectURL = "com.corvlio.fielddashboard://callback"
     private static let callbackScheme = "com.corvlio.fielddashboard"
-    private var configuredPublishableKey: String?
+    @MainActor private var configuredPublishableKey: String?
 
+    @MainActor
     @objc func initialize(_ call: CAPPluginCall) {
         guard let publishableKey = call.getString("publishableKey")?.trimmingCharacters(in: .whitespacesAndNewlines),
               publishableKey.hasPrefix("pk_live_") || publishableKey.hasPrefix("pk_test_") else {
@@ -45,11 +46,13 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         resolveAuthState(call)
     }
 
+    @MainActor
     @objc func getAuthState(_ call: CAPPluginCall) {
         guard ensureConfigured(call) else { return }
         resolveAuthState(call)
     }
 
+    @MainActor
     @objc func startHostedAuth(_ call: CAPPluginCall) {
         guard ensureConfigured(call) else { return }
         let mode = call.getString("mode") ?? "signIn"
@@ -68,6 +71,7 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @MainActor
     @objc func getToken(_ call: CAPPluginCall) {
         guard ensureConfigured(call) else { return }
         Task { @MainActor in
@@ -80,6 +84,7 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @MainActor
     @objc func signOut(_ call: CAPPluginCall) {
         guard ensureConfigured(call) else { return }
         Task { @MainActor in
@@ -92,6 +97,7 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @MainActor
     private func ensureConfigured(_ call: CAPPluginCall) -> Bool {
         guard configuredPublishableKey != nil else {
             call.reject("Clerk native authentication has not been initialized.")
@@ -100,6 +106,7 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         return true
     }
 
+    @MainActor
     private func resolveAuthState(_ call: CAPPluginCall) {
         Task { @MainActor in
             call.resolve(await authStatePayload())
