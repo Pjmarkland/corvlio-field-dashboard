@@ -24,8 +24,8 @@
 import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'http';
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { getClerkFrontendApiUrl } from './clerkFrontendApi';
 
-const CLERK_FAPI = 'https://frontend-api.clerk.dev';
 export const CLERK_PROXY_PATH = '/api/__clerk';
 const NATIVE_APP_ORIGINS = new Set([
   'capacitor://localhost',
@@ -203,7 +203,7 @@ export function clerkProxyMiddleware(): RequestHandler {
   }
 
   const proxyMiddleware = createProxyMiddleware({
-    target: CLERK_FAPI,
+    target: getClerkFrontendApiUrl(process.env.CLERK_FRONTEND_API_URL),
     changeOrigin: true,
     // Take over the response so it can be re-sent with a Content-Length (see
     // proxyRes); the deployment edge rejects chunked proxied responses.

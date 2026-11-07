@@ -18,7 +18,6 @@ import {
   type LeadWorkspace,
 } from '@workspace/api-client-react';
 import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
@@ -45,6 +44,7 @@ import { usePushDeepLink } from '@/hooks/usePushDeepLink';
 import { useSignOut } from '@/hooks/useSignOut';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { getNativeApiBaseUrl, getNativeClerkProxyUrl } from '@/lib/nativeConfig';
+import { getClerkPublishableKey } from '@/lib/clerkPublishableKey';
 import {
   clearOnboardingConfirmation,
   readOnboardingConfirmation,
@@ -134,9 +134,10 @@ const AdminSmsPage = lazy(() => import('@/pages/admin/AdminSmsPage'));
 const AdminBusinessPage = lazy(() => import('@/pages/admin/AdminBusinessPage'));
 const AdminFallbackPhoneSettingsPage = lazy(() => import('@/pages/admin/AdminFallbackPhoneSettingsPage'));
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-const clerkPubKey = publishableKeyFromHost(
+const clerkPubKey = getClerkPublishableKey(
   window.location.hostname,
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+  Capacitor.isNativePlatform(),
 );
 const nativeApiBaseUrl = getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL);
 const clerkProxyUrl = Capacitor.isNativePlatform()

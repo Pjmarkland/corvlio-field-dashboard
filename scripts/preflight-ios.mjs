@@ -13,6 +13,24 @@ function fail(message) {
   failures.push(message);
 }
 
+function clerkKeyPrefix(value, kind) {
+  if (typeof value !== 'string') return null;
+  if (kind === 'publishable') {
+    if (value.startsWith('pk_live_')) return 'pk_live';
+    if (value.startsWith('pk_test_')) return 'pk_test';
+    return null;
+  }
+  if (value.startsWith('sk_live_')) return 'sk_live';
+  if (value.startsWith('sk_test_')) return 'sk_test';
+  return null;
+}
+
+function isProductionClerkConfigured() {
+  return clerkKeyPrefix(process.env.CLERK_PUBLISHABLE_KEY, 'publishable') === 'pk_live'
+    || clerkKeyPrefix(process.env.CLERK_SECRET_KEY, 'secret') === 'sk_live'
+    || /^https:\/\/clerk\./i.test(process.env.CLERK_FRONTEND_API_URL?.trim() ?? '');
+}
+
 async function collectFiles(entry) {
   let info;
   try {
@@ -38,17 +56,21 @@ function getAttribute(tag, name) {
   return match?.[2] ?? null;
 }
 
-async function referencedBundlesContainKey(entryPath, expectedKey, visited = new Set()) {
-  if (visited.has(entryPath)) return false;
+async function inspectReferencedBundleGraph(entryPath, expectedKey, visited = new Set()) {
+  if (visited.has(entryPath)) return { containsExpectedKey: false, keyPrefixes: new Set() };
   visited.add(entryPath);
 
   let bundle;
   try {
     bundle = await readFile(entryPath, 'utf8');
   } catch {
-    return false;
+    return { containsExpectedKey: false, keyPrefixes: new Set() };
   }
-  if (bundle.includes(expectedKey)) return true;
+  const keyPrefixes = new Set(
+    [...bundle.matchAll(/\b(pk_(?:test|live)_[A-Za-z0-9_-]+)/g)]
+      .map(([key]) => key.startsWith('pk_live_') ? 'pk_live' : 'pk_test'),
+  );
+  let containsExpectedKey = bundle.includes(expectedKey);
 
   const imports = [...bundle.matchAll(/(?:import\s*\(\s*|from\s*)["']([^"']+\.js(?:\?[^"']*)?)["']/g)]
     .map((match) => match[1]);
@@ -63,15 +85,23 @@ async function referencedBundlesContainKey(entryPath, expectedKey, visited = new
       continue;
     }
     if (!importedPath.startsWith(`${outputRoot}${path.sep}`)) continue;
-    if (await referencedBundlesContainKey(importedPath, expectedKey, visited)) return true;
+    const child = await inspectReferencedBundleGraph(importedPath, expectedKey, visited);
+    containsExpectedKey ||= child.containsExpectedKey;
+    for (const prefix of child.keyPrefixes) keyPrefixes.add(prefix);
   }
-  return false;
+  return { containsExpectedKey, keyPrefixes };
 }
 
 if (!clerkKey) {
   fail('VITE_CLERK_PUBLISHABLE_KEY is missing or empty. Add it to Replit Secrets, then rebuild the iOS web assets.');
 } else {
   console.log('PASS Clerk publishable key is configured (value not displayed).');
+  const prefix = clerkKeyPrefix(clerkKey, 'publishable');
+  if (!prefix) {
+    fail('VITE_CLERK_PUBLISHABLE_KEY must start with pk_live_ or pk_test_. The key value was not displayed.');
+  } else {
+    console.log(`Clerk iOS key prefix: ${prefix}.`);
+  }
 }
 
 let indexInfo;
@@ -140,10 +170,15 @@ if (html) {
   }
 
   if (clerkKey) {
-    const keyInBundleGraph = await Promise.all(
-      resolvedEntries.map((entry) => referencedBundlesContainKey(entry, clerkKey)),
+    const bundleChecks = await Promise.all(
+      resolvedEntries.map((entry) => inspectReferencedBundleGraph(entry, clerkKey)),
     );
-    if (!keyInBundleGraph.some(Boolean)) {
+    const keyInBundleGraph = bundleChecks.some((result) => result.containsExpectedKey);
+    const bundleKeyPrefixes = new Set(bundleChecks.flatMap((result) => [...result.keyPrefixes]));
+    if (isProductionClerkConfigured() && bundleKeyPrefixes.has('pk_test')) {
+      fail('The iOS bundle contains a development Clerk key (pk_test), but production Clerk is configured. Set VITE_CLERK_PUBLISHABLE_KEY to the matching production key and rebuild before syncing.');
+    }
+    if (!keyInBundleGraph) {
       fail('The Clerk key is not present in the JavaScript bundle graph referenced by index.html. Rebuild with the correct VITE_CLERK_PUBLISHABLE_KEY.');
     } else {
       console.log('PASS The JavaScript bundle graph referenced by index.html contains the configured Clerk key (value not displayed).');

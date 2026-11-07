@@ -17,6 +17,10 @@ import {
   clerkProxyMiddleware,
   isValidNativeClerkClientCookie,
 } from "../../src/middlewares/clerkProxyMiddleware";
+import {
+  DEFAULT_CLERK_FRONTEND_API_URL,
+  getClerkFrontendApiUrl,
+} from "../../src/middlewares/clerkFrontendApi";
 
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "production");
@@ -26,6 +30,32 @@ beforeEach(() => {
 });
 
 describe("native Clerk proxy cookie validation", () => {
+  it("defaults to Clerk's standard Frontend API and accepts the configured production Frontend API", () => {
+    expect(getClerkFrontendApiUrl()).toBe(DEFAULT_CLERK_FRONTEND_API_URL);
+    expect(getClerkFrontendApiUrl(" https://clerk.corvlio.com/ ")).toBe(
+      "https://clerk.corvlio.com",
+    );
+  });
+
+  it("rejects non-HTTPS or non-Clerk proxy targets", () => {
+    expect(() => getClerkFrontendApiUrl("http://clerk.corvlio.com")).toThrow(
+      "CLERK_FRONTEND_API_URL must be an HTTPS Clerk Frontend API origin.",
+    );
+    expect(() => getClerkFrontendApiUrl("https://attacker.example")).toThrow(
+      "CLERK_FRONTEND_API_URL must be an HTTPS Clerk Frontend API origin.",
+    );
+  });
+
+  it("routes Clerk proxy requests to the configured Frontend API", () => {
+    vi.stubEnv("CLERK_FRONTEND_API_URL", "https://clerk.corvlio.com");
+
+    clerkProxyMiddleware();
+
+    expect((proxyState.options as { target: string }).target).toBe(
+      "https://clerk.corvlio.com",
+    );
+  });
+
   it("accepts only bounded cookie values with a safe character set", () => {
     expect(isValidNativeClerkClientCookie("client_abc-123.%~")).toBe(true);
     expect(isValidNativeClerkClientCookie("")).toBe(false);
