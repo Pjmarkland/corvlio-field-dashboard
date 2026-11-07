@@ -1,5 +1,3 @@
-import { registerPlugin } from '@capacitor/core';
-
 export type NativeClerkUser = {
   id: string;
   fullName: string | null;
@@ -14,12 +12,6 @@ export type NativeClerkAuthState = {
   user: NativeClerkUser | null;
 };
 
-type HostedAuthOptions = {
-  publishableKey: string;
-  redirectUrl: string;
-  callbackUrlScheme: string;
-};
-
 type NativeClerkAuthPlugin = {
   initialize(options: HostedAuthOptions): Promise<NativeClerkAuthState>;
   getAuthState(): Promise<NativeClerkAuthState>;
@@ -28,7 +20,28 @@ type NativeClerkAuthPlugin = {
   signOut(): Promise<NativeClerkAuthState>;
 };
 
-export const nativeClerkAuth = registerPlugin<NativeClerkAuthPlugin>('ClerkNativeAuth');
+type HostedAuthOptions = {
+  publishableKey: string;
+  redirectUrl: string;
+  callbackUrlScheme: string;
+};
+
+let pluginPromise: Promise<NativeClerkAuthPlugin> | null = null;
+
+async function getPlugin(): Promise<NativeClerkAuthPlugin> {
+  pluginPromise ??= import('@capacitor/core').then(({ registerPlugin }) =>
+    registerPlugin<NativeClerkAuthPlugin>('ClerkNativeAuth'),
+  );
+  return pluginPromise;
+}
+
+export const nativeClerkAuth: NativeClerkAuthPlugin = {
+  initialize: async (options) => (await getPlugin()).initialize(options),
+  getAuthState: async () => (await getPlugin()).getAuthState(),
+  startHostedAuth: async (options) => (await getPlugin()).startHostedAuth(options),
+  getToken: async () => (await getPlugin()).getToken(),
+  signOut: async () => (await getPlugin()).signOut(),
+};
 
 export async function getNativeClerkToken(): Promise<string | null> {
   try {

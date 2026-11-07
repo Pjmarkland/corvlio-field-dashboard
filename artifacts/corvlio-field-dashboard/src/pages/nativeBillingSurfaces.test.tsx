@@ -7,6 +7,12 @@ vi.mock('wouter', () => ({
   Redirect: ({ to }: { to: string }) => <div data-testid="redirect">{to}</div>,
 }));
 vi.mock('@/hooks/useBilling', () => ({ useBillingAvailability: m.availability }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: null, isLoaded: true, isSignedIn: true, error: null,
+    signOut: vi.fn(), startHostedAuth: vi.fn(),
+  }),
+}));
 import TermsPage from './terms';
 import ClientAgreementPage from './client-agreement';
 import AdminBillingPage from './admin/AdminBillingPage';

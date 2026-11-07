@@ -16,7 +16,12 @@ vi.mock('@workspace/api-client-react', () => ({
     return { data: m.data, isPending: false, isFetching: false, isError: false, refetch: m.refetch };
   },
 }));
-vi.mock('@clerk/react', () => ({ useUser: () => ({ isLoaded: true, isSignedIn: true, user: { id: 'client-1' } }) }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    isLoaded: true, isSignedIn: true, user: { id: 'client-1' },
+    error: null, signOut: vi.fn(), startHostedAuth: vi.fn(),
+  }),
+}));
 vi.mock('@/pages/onboarding', () => ({
   NativeOnboardingForm: () => <div data-testid="native-onboarding-form">Native setup form</div>,
 }));

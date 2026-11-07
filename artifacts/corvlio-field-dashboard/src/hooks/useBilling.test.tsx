@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ native: false, signedIn: true, availability: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => m.native } }));
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isSignedIn: m.signedIn }) }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: null, isLoaded: true, isSignedIn: m.signedIn, error: null,
+    signOut: vi.fn(), startHostedAuth: vi.fn(),
+  }),
+}));
 vi.mock('@workspace/api-client-react', () => ({
   useGetBillingAvailability: m.availability,
   getGetBillingAvailabilityQueryKey: () => ['billing-availability'],

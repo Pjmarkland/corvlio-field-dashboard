@@ -4,10 +4,10 @@ import { Route, Router, Switch } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessSetupGuard } from './BusinessSetupGuard';
 
-const { useUser, useGetLeads, setupMounted, welcomeMounted, refetch } = vi.hoisted(() => ({
-  useUser: vi.fn(), useGetLeads: vi.fn(), setupMounted: vi.fn(), welcomeMounted: vi.fn(), refetch: vi.fn(),
+const { useAppAuth, useGetLeads, setupMounted, welcomeMounted, refetch } = vi.hoisted(() => ({
+  useAppAuth: vi.fn(), useGetLeads: vi.fn(), setupMounted: vi.fn(), welcomeMounted: vi.fn(), refetch: vi.fn(),
 }));
-vi.mock('@clerk/react', () => ({ useUser }));
+vi.mock('@/auth/AppAuthProvider', () => ({ useAppAuth }));
 vi.mock('@workspace/api-client-react', () => ({
   useGetLeads, getGetLeadsQueryKey: () => ['/api/leads'],
 }));
@@ -24,7 +24,7 @@ function flow(path: string) {
   const location = memoryLocation({ path, record: true });
   render(<Router hook={location.hook}><Switch>
     <Route path="/sign-in"><button onClick={() => {
-      useUser.mockReturnValue({ isLoaded: true, isSignedIn: true, user: { id: 'existing-owner' } });
+      useAppAuth.mockReturnValue({ isLoaded: true, isSignedIn: true, user: { id: 'existing-owner' } });
       location.navigate('/onboarding');
     }}>Sign in</button></Route>
     <Route path="/onboarding"><BusinessSetupGuard><Setup /></BusinessSetupGuard></Route>
@@ -36,7 +36,7 @@ function flow(path: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useUser.mockReturnValue({ isLoaded: true, isSignedIn: true, user: { id: 'existing-owner' } });
+  useAppAuth.mockReturnValue({ isLoaded: true, isSignedIn: true, user: { id: 'existing-owner' } });
   useGetLeads.mockReturnValue({
     data: { configured: true, businessName: 'Existing business', leads: [], retellPhoneNumber: null },
     isPending: false, isFetching: false, isError: false, refetch,
@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe('existing-owner setup routing', () => {
   it('an existing owner signs in and lands on the dashboard, even with an old onboarding return URL', async () => {
-    useUser.mockReturnValue({ isLoaded: true, isSignedIn: false, user: null });
+    useAppAuth.mockReturnValue({ isLoaded: true, isSignedIn: false, user: null });
     flow('/sign-in');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Existing business dashboard')).toBeTruthy();
@@ -61,7 +61,7 @@ describe('existing-owner setup routing', () => {
   });
 
   it('waits for authentication and business lookup instead of flashing setup', () => {
-    useUser.mockReturnValue({ isLoaded: false, isSignedIn: undefined, user: null });
+    useAppAuth.mockReturnValue({ isLoaded: false, isSignedIn: false, user: null });
     useGetLeads.mockReturnValue({ isPending: true, isFetching: false });
     flow('/onboarding');
     expect(screen.getByRole('status').textContent).toContain('Checking your business');
@@ -89,7 +89,7 @@ describe('existing-owner setup routing', () => {
   });
 
   it('sends signed-out setup visitors to sign-in without looking up a business', async () => {
-    useUser.mockReturnValue({ isLoaded: true, isSignedIn: false, user: null });
+    useAppAuth.mockReturnValue({ isLoaded: true, isSignedIn: false, user: null });
     flow('/onboarding');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy());
     expect(setupMounted).not.toHaveBeenCalled();

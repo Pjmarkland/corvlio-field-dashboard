@@ -17,6 +17,18 @@ vi.mock('@clerk/react', () => ({
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
   Show: () => null, SignIn: () => null, SignUp: () => null,
 }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: state.signedIn ? { id: state.userId } : null,
+    isLoaded: true,
+    isSignedIn: state.signedIn,
+    error: null,
+    signOut: vi.fn(),
+    startHostedAuth: vi.fn(),
+  }),
+  WebAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  NativeAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock('@capacitor/core', async importOriginal => ({ ...await importOriginal<object>(), Capacitor: {
   isNativePlatform: () => state.native, getPlatform: () => state.native ? 'ios' : 'web',
 } }));

@@ -33,6 +33,18 @@ vi.mock('@clerk/react', () => ({
   SignIn: () => null,
   SignUp: () => null,
 }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: { id: 'user_unconfigured', fullName: null, firstName: null, lastName: null, primaryEmailAddress: null, emailAddresses: [] },
+    isLoaded: true,
+    isSignedIn: true,
+    error: null,
+    signOut: mockSignOut,
+    startHostedAuth: vi.fn(),
+  }),
+  WebAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  NativeAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 vi.mock('@/hooks/usePushNotifications', () => ({
   usePushNotifications: () => ({ revoke: mockRevoke }),

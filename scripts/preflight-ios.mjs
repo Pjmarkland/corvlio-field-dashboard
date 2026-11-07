@@ -15,11 +15,13 @@ function fail(message) {
 }
 
 async function validateNativeDeploymentTarget() {
-  const [podfile, xcodeProject, capacitorConfig, releaseChecklist] = await Promise.all([
+  const [podfile, xcodeProject, capacitorConfig, releaseChecklist, infoPlist, appDelegate] = await Promise.all([
     readFile(path.join(iosProjectRoot, 'Podfile'), 'utf8').catch(() => ''),
     readFile(path.join(iosProjectRoot, 'App.xcodeproj/project.pbxproj'), 'utf8').catch(() => ''),
     readFile(path.join(dashboardRoot, 'capacitor.config.ts'), 'utf8').catch(() => ''),
     readFile(path.join(repoRoot, 'RELEASE_CHECKLIST.md'), 'utf8').catch(() => ''),
+    readFile(path.join(iosProjectRoot, 'App/Info.plist'), 'utf8').catch(() => ''),
+    readFile(path.join(iosProjectRoot, 'App/AppDelegate.swift'), 'utf8').catch(() => ''),
   ]);
   const xcodeTargets = [...xcodeProject.matchAll(/IPHONEOS_DEPLOYMENT_TARGET\s*=\s*([0-9.]+)\s*;/g)]
     .map(([, version]) => version);
@@ -27,11 +29,15 @@ async function validateNativeDeploymentTarget() {
     && xcodeTargets.length > 0
     && xcodeTargets.every((version) => version === '17.0')
     && /IOS_MINIMUM_DEPLOYMENT_TARGET\s*=\s*['"]17\.0['"]/.test(capacitorConfig)
-    && /iOS 17\.0/.test(releaseChecklist);
+    && /iOS 17\.0/.test(releaseChecklist)
+    && /ClerkKit/.test(xcodeProject)
+    && /ClerkNativeAuthPlugin\.swift/.test(xcodeProject)
+    && /ClerkNativeAuthPlugin\(\)/.test(appDelegate)
+    && /<string>com\.corvlio\.fielddashboard<\/string>/.test(infoPlist);
   if (ok) {
-    console.log('PASS Podfile, Xcode, Capacitor release config, and checklist require iOS 17.0.');
+    console.log('PASS iOS 17 target, ClerkKit linkage, plugin registration, and callback scheme are configured.');
   } else {
-    fail('Native deployment target must be iOS 17.0 in the Podfile, every Xcode configuration, Capacitor config, and RELEASE_CHECKLIST.md.');
+    fail('Native iOS setup must require iOS 17.0 and link/register ClerkKit with the com.corvlio.fielddashboard callback scheme.');
   }
 }
 

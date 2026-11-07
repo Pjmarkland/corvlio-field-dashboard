@@ -7,6 +7,12 @@ vi.mock('@workspace/api-client-react', () => ({
   useGetAccountDeletionEligibility:()=>({data:{allowed:m.allowed,reason:m.allowed?null:'Protected admin and internal business accounts cannot be deleted from this screen.'}}),
 }));
 vi.mock('@clerk/react', () => ({ useClerk: () => ({ signOut: m.signOut }) }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: null, isLoaded: true, isSignedIn: true, error: null,
+    signOut: m.signOut, startHostedAuth: vi.fn(),
+  }),
+}));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ clear: m.clear }) }));
 import AccountDeletionPanel, { deletionSignOutMarker } from './AccountDeletionPanel';
 beforeEach(() => { vi.clearAllMocks(); m.allowed=true; sessionStorage.clear(); m.mutate.mockResolvedValue({ status: 'completed' }); m.signOut.mockResolvedValue(undefined); });

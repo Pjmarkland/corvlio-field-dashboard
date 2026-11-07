@@ -5,6 +5,12 @@ const m = vi.hoisted(() => ({ native: true, summary: {} as any, loading: false, 
   query: vi.fn(), refetch: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => m.native } }));
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isSignedIn: true }) }));
+vi.mock('@/auth/AppAuthProvider', () => ({
+  useAppAuth: () => ({
+    user: { id: 'billing-owner' }, isLoaded: true, isSignedIn: true, error: null,
+    signOut: vi.fn(), startHostedAuth: vi.fn(),
+  }),
+}));
 vi.mock('@workspace/api-client-react', () => ({
   getGetNativeBillingSummaryQueryKey: () => ['native-summary'],
   getGetBusinessProfileQueryKey: () => ['prof'],

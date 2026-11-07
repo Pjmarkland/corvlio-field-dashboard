@@ -95,9 +95,9 @@ describe('native Clerk hosted authentication', () => {
     mocks.initialize.mockResolvedValue(signedInState);
     renderNative(<AuthProbe />, '/dashboard');
 
-    expect(await screen.findByTestId('native-auth-state')).toHaveTextContent('signed-in:user_native_test');
+    expect((await screen.findByTestId('native-auth-state')).textContent).toContain('signed-in:user_native_test');
     fireEvent.click(screen.getByText('Sign out in test'));
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
-    await waitFor(() => expect(screen.getByTestId('native-auth-state')).toHaveTextContent('signed-out'));
+    await waitFor(() => expect(screen.getByTestId('native-auth-state').textContent).toContain('signed-out'));
   });
 });

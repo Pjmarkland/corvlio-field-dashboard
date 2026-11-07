@@ -20,7 +20,7 @@ test("refuses to run without exactly one valid Clerk user ID", () => {
 test("parses seed, remove, and explicit production modes", () => {
   assert.deepEqual(
     parseArgs(["--", "--clerk-user-id=user_review_demo_test"]),
-    { help: false, clerkUserId: "user_review_demo_test", remove: false, production: false },
+    { help: false, clerkUserId: "user_review_demo_test", remove: false, allowProduction: false },
   );
   assert.deepEqual(
     parseArgs(["--clerk-user-id", "user_review_demo_test", "--remove", "--allow-production"]),
