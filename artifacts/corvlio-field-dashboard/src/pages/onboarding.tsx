@@ -4,7 +4,7 @@ import { getGetLeadsQueryKey, getGetNativeBusinessSetupStatusQueryKey, submitNat
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, Clock3, ExternalLink, FileCheck2, Headphones, PhoneCall, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { PlanPicker } from '@/components/PlanPicker';
 import { validStartupAge, type PlanId } from '@/lib/invoicePlans';
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { Link, useLocation } from 'wouter';
 import logoUrl from '@/assets/logo-dark.png';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -390,7 +390,7 @@ export function OnboardingProgress({ currentStep, totalSteps }: { currentStep: n
 }
 
 function OnboardingForm({ nativeMode }: { nativeMode: boolean }) {
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [activeSetupStep, setActiveSetupStep] = useState(1);

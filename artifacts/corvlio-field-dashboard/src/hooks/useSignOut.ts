@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useClerk } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { useToast } from '@/hooks/use-toast';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -13,7 +13,7 @@ export function useSignOut(
   revoke: () => Promise<void>,
   navigate: PublicRootNavigator = navigateToPublicRoot,
 ) {
-  const { signOut } = useClerk();
+  const { signOut } = useAppAuth();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
 

@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { getGetLeadsQueryKey, useGetLeads } from '@workspace/api-client-react';
 import { Redirect } from 'wouter';
 
 /** Read-only gate: setup pages must never mount for an already configured owner. */
 export function BusinessSetupGuard({ children, allowConfigured = false }: { children: ReactNode; allowConfigured?: boolean }) {
-  const { isLoaded, isSignedIn, user } = useUser();
+  const { isLoaded, isSignedIn, user } = useAppAuth();
   const { data, isPending, isFetching, isError, refetch } = useGetLeads(undefined, {
     query: {
       // Do not reuse another account's cached setup decision during an auth change.

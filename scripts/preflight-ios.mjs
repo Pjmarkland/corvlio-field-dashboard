@@ -6,11 +6,33 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const dashboardRoot = path.join(repoRoot, 'artifacts/corvlio-field-dashboard');
 const outputRoot = path.join(dashboardRoot, 'dist/public');
 const outputIndex = path.join(outputRoot, 'index.html');
+const iosProjectRoot = path.join(dashboardRoot, 'ios/App');
 const clerkKey = process.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
 const failures = [];
 
 function fail(message) {
   failures.push(message);
+}
+
+async function validateNativeDeploymentTarget() {
+  const [podfile, xcodeProject, capacitorConfig, releaseChecklist] = await Promise.all([
+    readFile(path.join(iosProjectRoot, 'Podfile'), 'utf8').catch(() => ''),
+    readFile(path.join(iosProjectRoot, 'App.xcodeproj/project.pbxproj'), 'utf8').catch(() => ''),
+    readFile(path.join(dashboardRoot, 'capacitor.config.ts'), 'utf8').catch(() => ''),
+    readFile(path.join(repoRoot, 'RELEASE_CHECKLIST.md'), 'utf8').catch(() => ''),
+  ]);
+  const xcodeTargets = [...xcodeProject.matchAll(/IPHONEOS_DEPLOYMENT_TARGET\s*=\s*([0-9.]+)\s*;/g)]
+    .map(([, version]) => version);
+  const ok = /platform\s+:ios,\s*['"]17\.0['"]/.test(podfile)
+    && xcodeTargets.length > 0
+    && xcodeTargets.every((version) => version === '17.0')
+    && /IOS_MINIMUM_DEPLOYMENT_TARGET\s*=\s*['"]17\.0['"]/.test(capacitorConfig)
+    && /iOS 17\.0/.test(releaseChecklist);
+  if (ok) {
+    console.log('PASS Podfile, Xcode, Capacitor release config, and checklist require iOS 17.0.');
+  } else {
+    fail('Native deployment target must be iOS 17.0 in the Podfile, every Xcode configuration, Capacitor config, and RELEASE_CHECKLIST.md.');
+  }
 }
 
 function clerkKeyPrefix(value, kind) {
@@ -103,6 +125,8 @@ if (!clerkKey) {
     console.log(`Clerk iOS key prefix: ${prefix}.`);
   }
 }
+
+await validateNativeDeploymentTarget();
 
 let indexInfo;
 let html = '';

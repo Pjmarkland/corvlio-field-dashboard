@@ -17,7 +17,7 @@ import {
   useUpdateLeadStatus,
   type LeadWorkspace,
 } from '@workspace/api-client-react';
-import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useClerk } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
@@ -45,6 +45,8 @@ import { useSignOut } from '@/hooks/useSignOut';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { getNativeApiBaseUrl, getNativeClerkProxyUrl } from '@/lib/nativeConfig';
 import { getClerkPublishableKey } from '@/lib/clerkPublishableKey';
+import { NativeAppAuthProvider, WebAppAuthProvider, useAppAuth } from '@/auth/AppAuthProvider';
+import { NativeHostedSignInPage } from '@/components/NativeHostedSignInPage';
 import {
   clearOnboardingConfirmation,
   readOnboardingConfirmation,
@@ -720,7 +722,7 @@ export function BusinessProfileEditor({ businessName, retellPhoneNumber }: { bus
 function SettingsPage({ businessName, retellPhoneNumber }: { businessName: string; retellPhoneNumber: string | null }) {
   const { enabled: billingOn } = useBillingAvailability();
   const billingProfile=useGetBusinessProfile({query:{queryKey:getGetBusinessProfileQueryKey(),retry:false}});
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const { status: pushStatus, error: pushError, register, revoke } = usePushNotifications(user?.id);
   const webPush = useWebPushNotifications(user?.id);
   const revokeBeforeSignOut = Capacitor.isNativePlatform() ? revoke : webPush.revoke;
@@ -796,7 +798,7 @@ export function UnconfiguredAccountScreen({
 }: {
   navigate?: PublicRootNavigator;
 } = {}) {
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const { revoke } = usePushNotifications(user?.id);
   const { handleSignOut, isSigningOut } = useSignOut(revoke, navigate);
 
@@ -863,24 +865,21 @@ function PrivacyPage() {
 }
 
 function HomeRedirect() {
-  return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><PublicHome /></Show></>;
+  const { isSignedIn } = useAppAuth();
+  return isSignedIn ? <Redirect to="/dashboard" /> : <PublicHome />;
 }
 
 function SignInPage() {
   if (new URLSearchParams(window.location.search).get('accountDeleted') === '1') {
     return <DeletedAccountSignOut />;
   }
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">{Capacitor.isNativePlatform() ? (
-    // @ts-expect-error Clerk's installed types omit the virtual routing strategy required by Capacitor.
-    <SignIn routing="virtual" forceRedirectUrl={`${basePath}/dashboard`} />
-  ) : <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} />}</div>;
+  if (Capacitor.isNativePlatform()) return <NativeHostedSignInPage mode="signIn" />;
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} /></div>;
 }
 
 export function SignUpPage() {
-  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">{Capacitor.isNativePlatform() ? (
-    // @ts-expect-error Clerk's installed types omit the virtual routing strategy required by Capacitor.
-    <SignUp routing="virtual" forceRedirectUrl={`${basePath}/welcome`} />
-  ) : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/welcome`} />}</div>;
+  if (Capacitor.isNativePlatform()) return <NativeHostedSignInPage mode="signUp" />;
+  return <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/welcome`} /></div>;
 }
 
 function LeadDataRouter() {
@@ -904,7 +903,7 @@ function LeadDataRouter() {
     refetchInterval: () => leadsRefreshInterval(routeLocation, document.visibilityState),
     refetchIntervalInBackground: false,
   });
-  const { user } = useUser();
+  const { user } = useAppAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const updateStatus = useUpdateLeadStatus();
@@ -1007,7 +1006,8 @@ function OnboardingRoute() {
 }
 
 function AuthenticatedRouter() {
-  return <><Show when="signed-in"><LeadDataRouter /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
+  const { isSignedIn } = useAppAuth();
+  return isSignedIn ? <LeadDataRouter /> : <Redirect to="/" />;
 }
 
 export function AdminGuard({ children }: { children: ReactNode }) {
@@ -1049,8 +1049,9 @@ function AdminFallbackPhoneSettingsRoute() {
 }
 
 function BillingRoute() {
-  if (Capacitor.isNativePlatform()) return <><Show when="signed-in"><NativeBillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
-  return <><Show when="signed-in"><BillingPage /></Show><Show when="signed-out"><Redirect to="/" /></Show></>;
+  const { isSignedIn } = useAppAuth();
+  if (!isSignedIn) return <Redirect to="/" />;
+  return Capacitor.isNativePlatform() ? <NativeBillingPage /> : <BillingPage />;
 }
 
 function AdminBusinessRoute() {
@@ -1084,7 +1085,46 @@ function ClerkQueryCacheInvalidator() {
   return null;
 }
 
-function ClerkRoutes() {
+function AppRoutes() {
+  return <>
+    <NativeClerkStartupGate>
+      <PushDeepLinkListener />
+      <TooltipProvider>
+        <Switch>
+          <Route path="/" component={HomeRedirect} />
+          <Route path="/welcome" component={WelcomeRoute} />
+          <Route path="/onboarding" component={OnboardingRoute} />
+          <Route path="/privacy" component={PrivacyPage} />
+          <Route path="/terms" component={TermsPage} />
+          <Route path="/support" component={SupportPage} />
+          <Route path="/client-agreement" component={ClientAgreementPage} />
+          <Route path="/sign-in/*?" component={SignInPage} />
+          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} />
+          <Route path="/admin/invoices" component={AdminInvoicesRoute} />
+          <Route path="/admin/billing" component={AdminBillingRoute} />
+          <Route path="/admin/sms" component={AdminSmsRoute} />
+          <Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} />
+          <Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} />
+          <Route path="/admin/health-check" component={AdminHealthCheckRoute} />
+          <Route path="/billing" component={BillingRoute} />
+          <Route path="/admin/activity" component={AdminActivityRoute} />
+          <Route path="/admin" component={AdminOverviewRoute} />
+          <Route path="/dashboard" component={AuthenticatedRouter} />
+          <Route path="/completed" component={AuthenticatedRouter} />
+          <Route path="/spam" component={AuthenticatedRouter} />
+          <Route path="/leads/:id" component={AuthenticatedRouter} />
+          <Route path="/stats" component={AuthenticatedRouter} />
+          <Route path="/settings" component={AuthenticatedRouter} />
+          <Route component={NotFound} />
+        </Switch>
+        <Toaster />
+      </TooltipProvider>
+    </NativeClerkStartupGate>
+  </>;
+}
+
+function WebClerkRoutes() {
   const [, setLocation] = useLocation();
   return <ClerkProvider
     publishableKey={clerkPubKey}
@@ -1097,47 +1137,28 @@ function ClerkRoutes() {
     routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
   >
     <QueryClientProvider client={queryClient}>
-      <NativeClerkStartupGate>
+      <WebAppAuthProvider>
         <ClerkQueryCacheInvalidator />
-        <PushDeepLinkListener />
-        <TooltipProvider>
-          <Switch>
-            <Route path="/" component={HomeRedirect} />
-            <Route path="/welcome" component={WelcomeRoute} />
-            <Route path="/onboarding" component={OnboardingRoute} />
-            <Route path="/privacy" component={PrivacyPage} />
-            <Route path="/terms" component={TermsPage} />
-            <Route path="/support" component={SupportPage} />
-            <Route path="/client-agreement" component={ClientAgreementPage} />
-            <Route path="/sign-in/*?" component={SignInPage} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
-            <Route path="/admin/businesses/:businessId" component={AdminBusinessRoute} />
-            <Route path="/admin/invoices" component={AdminInvoicesRoute} />
-            <Route path="/admin/billing" component={AdminBillingRoute} />
-            <Route path="/admin/sms" component={AdminSmsRoute} />
-            <Route path="/admin/settings" component={AdminFallbackPhoneSettingsRoute} />
-            <Route path="/admin/system-alerts" component={AdminSystemAlertsRoute} />
-            <Route path="/admin/health-check" component={AdminHealthCheckRoute} />
-            <Route path="/billing" component={BillingRoute} />
-            <Route path="/admin/activity" component={AdminActivityRoute} />
-            <Route path="/admin" component={AdminOverviewRoute} />
-            <Route path="/dashboard" component={AuthenticatedRouter} />
-            <Route path="/completed" component={AuthenticatedRouter} />
-            <Route path="/spam" component={AuthenticatedRouter} />
-            <Route path="/leads/:id" component={AuthenticatedRouter} />
-            <Route path="/stats" component={AuthenticatedRouter} />
-            <Route path="/settings" component={AuthenticatedRouter} />
-            <Route component={NotFound} />
-          </Switch>
-          <Toaster />
-        </TooltipProvider>
-      </NativeClerkStartupGate>
+        <AppRoutes />
+      </WebAppAuthProvider>
     </QueryClientProvider>
   </ClerkProvider>;
 }
 
+function NativeClerkRoutes() {
+  return <QueryClientProvider client={queryClient}>
+    <NativeAppAuthProvider publishableKey={clerkPubKey}>
+      <AppRoutes />
+    </NativeAppAuthProvider>
+  </QueryClientProvider>;
+}
+
+function ClerkRoutes() {
+  return Capacitor.isNativePlatform() ? <NativeClerkRoutes /> : <WebClerkRoutes />;
+}
+
 function NativeClerkStartupGate({ children }: { children: ReactNode }) {
-  const { isLoaded } = useUser();
+  const { isLoaded } = useAppAuth();
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {

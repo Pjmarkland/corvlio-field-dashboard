@@ -1,12 +1,12 @@
 import { useGetNativeBusinessSetupStatus, getGetNativeBusinessSetupStatusQueryKey } from '@workspace/api-client-react';
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { CheckCircle2 } from 'lucide-react';
 import { Link, Redirect } from 'wouter';
 import { CallForwardingHelp } from '@/components/CallForwardingHelp';
 import { NativeOnboardingForm } from '@/pages/onboarding';
 
 export default function NativeBusinessSetupGate() {
-  const { isLoaded, isSignedIn, user } = useUser();
+  const { isLoaded, isSignedIn, user } = useAppAuth();
   const status = useGetNativeBusinessSetupStatus({ query: {
     queryKey: [...getGetNativeBusinessSetupStatusQueryKey(), user?.id],
     enabled: isLoaded && isSignedIn,

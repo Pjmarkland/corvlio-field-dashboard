@@ -1,10 +1,10 @@
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { Capacitor } from '@capacitor/core';
 import { getGetAdminOverviewQueryKey, useGetAdminOverview } from '@workspace/api-client-react';
 
 /** Use the same server-side allowlist/verified-email gate as the admin pages. */
 export function useAdminAccess(options: { forceRefresh?: boolean } = {}) {
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn } = useAppAuth();
   const enabled = Boolean(isSignedIn && user?.id) && !Capacitor.isNativePlatform();
   const query = useGetAdminOverview({ query: {
     queryKey: [...getGetAdminOverviewQueryKey(), user?.id],

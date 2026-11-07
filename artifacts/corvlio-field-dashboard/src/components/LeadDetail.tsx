@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { getGetBillingAvailabilityQueryKey, getGetLeadDetailQueryKey, getGetLeadsQueryKey, useFlagLeadInformation, useGetBillingAvailability, useGetLeadDetail, useSetLeadSpamStatus, useUpdateLeadNotes, type LeadDetail } from '@workspace/api-client-react';
 import { ArrowLeft, Check, ChevronDown, Copy, MapPin, ShieldAlert } from 'lucide-react';
 import { LeadContactActions } from '@/components/LeadContactActions';
@@ -174,7 +174,7 @@ function Notes({ lead, queryKey }: { lead: LeadDetail; queryKey: readonly unknow
 }
 
 export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: string; onStatus: (id: string, s: Status) => void; savingLeadId: string | null }) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAppAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const flagMutation = useFlagLeadInformation();

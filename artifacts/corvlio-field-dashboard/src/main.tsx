@@ -1,8 +1,8 @@
-import './lib/nativeClerkCookieBridge';
 import { useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
+import { getNativeClerkToken } from '@/auth/nativeClerkAuth';
 
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
 import { StartupFailureScreen } from '@/components/StartupFailureScreen';
@@ -27,19 +27,9 @@ try {
 if (native) {
   setBaseUrl(getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL));
 
-  // window.Clerk is the Clerk JS SDK singleton, available after ClerkProvider
-  // mounts. The getter is invoked lazily on every fetch so it always returns
-  // the current session token, even after sign-in or token rotation.
-  setAuthTokenGetter(async () => {
-    try {
-      type ClerkWindow = Window & typeof globalThis & {
-        Clerk?: { session?: { getToken(): Promise<string | null> } };
-      };
-      return (await (window as ClerkWindow).Clerk?.session?.getToken()) ?? null;
-    } catch {
-      return null;
-    }
-  });
+  // ClerkKit owns the native session in Keychain; attach its current token to
+  // API requests without reading or writing browser cookies.
+  setAuthTokenGetter(getNativeClerkToken);
 }
 
 if (!native && 'serviceWorker' in navigator && import.meta.env.PROD) {

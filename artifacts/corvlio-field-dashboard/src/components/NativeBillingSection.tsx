@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { useUser } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { getGetBusinessProfileQueryKey, useGetBusinessProfile, getGetNativeBillingSummaryQueryKey, useGetNativeBillingSummary } from '@workspace/api-client-react';
 
 export default function NativeBillingSection() {
@@ -8,7 +8,7 @@ export default function NativeBillingSection() {
 }
 
 function NativeBillingContent() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useAppAuth();
   const profile = useGetBusinessProfile({ query: { queryKey: getGetBusinessProfileQueryKey(), retry: false } });
   const internal = profile.data?.isInternal === true;
   const query = useGetNativeBillingSummary({ query: {

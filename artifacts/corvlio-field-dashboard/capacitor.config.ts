@@ -1,5 +1,10 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
+// Capacitor 7 does not expose an iOS deployment-target option. Keep this
+// release invariant aligned with the Podfile and Xcode project; preflight
+// verifies all three before native assets are synced.
+export const IOS_MINIMUM_DEPLOYMENT_TARGET = '17.0';
+
 const config: CapacitorConfig = {
   // Bundle ID must match the App ID registered in Apple Developer / Google Play.
   // iOS: com.corvlio.fielddashboard

@@ -23,6 +23,7 @@ public class PushEnvironmentPlugin: CAPPlugin, CAPBridgedPlugin {
 class AppViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(PushEnvironmentPlugin())
+        bridge?.registerPluginInstance(ClerkNativeAuthPlugin())
     }
 }
 

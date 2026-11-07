@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useClerk } from '@clerk/react';
+import { useAppAuth } from '@/auth/AppAuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeleteMyAccount, useGetAccountDeletionEligibility, getGetAccountDeletionEligibilityQueryKey } from '@workspace/api-client-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -13,7 +13,7 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
   const [error, setError] = useState('');
   const deletion = useDeleteMyAccount();
   const eligibility=useGetAccountDeletionEligibility({query:{queryKey:getGetAccountDeletionEligibilityQueryKey(),retry:false}});
-  const { signOut } = useClerk();
+  const { signOut } = useAppAuth();
   const client = useQueryClient();
   const submit = async () => {
     if (confirmation !== 'DELETE' || deletion.isPending || eligibility.data?.allowed!==true) return;
@@ -71,7 +71,7 @@ export default function AccountDeletionPanel({ navigate = publicNavigate }: { na
 }
 
 export function DeletedAccountSignOut() {
-  const { signOut } = useClerk();
+  const { signOut } = useAppAuth();
   const [accepted] = useState(() => {
     try { return sessionStorage.getItem(deletionSignOutMarker) === '1'; } catch { return false; }
   });

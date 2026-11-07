@@ -15,6 +15,7 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 - Required env: `DATABASE_URL` — Postgres connection string; `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` — Web Push key pair (Replit Secrets; `VAPID_SUBJECT` is optional and defaults to Corvlio support)
 - Required native build secret: `VITE_CLERK_PUBLISHABLE_KEY`; the iOS preflight reports only whether it is configured and never prints its value.
 - `VITE_NATIVE_API_BASE_URL` — the configured public API origin used by native Capacitor builds. Keep it aligned with `PUBLIC_API_BASE_URL`; web PWA builds leave it unset and use same-origin relative paths.
+- iOS requires 17.0 or later for ClerkKit. Use the Development Clerk publishable key for local device testing and the Production key for TestFlight; the native SDK stores sessions in Keychain and API calls use bearer session tokens.
 
 ## Native iOS build safety
 
@@ -61,7 +62,7 @@ _Populate as you build — sharp edges, "always run X before Y" rules._
 
 - Keep `/api/admin/*` and `/admin` protected by server-side Clerk authorization. Non-admins receive the same generic 404 as unknown routes; client-side visibility is not authorization.
 - Admin access requires the signed-in user's primary verified Clerk email to match `ADMIN_EMAILS`. The owner must enable MFA on every admin account and ensure `ADMIN_EMAILS` contains each admin's verified primary email; never print or expose secret values.
-- Preserve Clerk's virtual routing and native cookie bridge behavior. Only allow the fixed native app origins, same-origin Clerk proxy paths, and length- and character-validated `__client` cookie values.
+- Keep the web Clerk path-based sign-in unchanged. Native sign-in uses ClerkKit hosted authentication and a Keychain-backed session; only its short-lived session token is sent as a bearer token to protected app APIs.
 - Retell webhooks must keep their existing compatibility rule: missing signatures remain accepted during rollout, while present invalid or stale signatures are rejected. Keep call/event deduplication and business scoping intact.
 - Do not log raw auth headers, cookies, Clerk tokens, caller names, transcripts, full phone numbers, or unfiltered provider/database errors. Mask phone/email text and prefer stable error names and allowlisted operational details.
 - Android app backups stay disabled in both the manifest and Android data-extraction rules.
