@@ -13,7 +13,7 @@ export function parseArgs(args) {
   const forwardedArgs = args[0] === "--" ? args.slice(1) : args;
   let clerkUserId;
   let remove = false;
-  let production = false;
+  let allowProduction = false;
 
   for (let index = 0; index < forwardedArgs.length; index += 1) {
     const arg = forwardedArgs[index];
@@ -35,11 +35,11 @@ export function parseArgs(args) {
     } else if (arg === "--remove") {
       if (remove) throw new ReviewDemoSeedError("Supply --remove only once.");
       remove = true;
-    } else if (arg === "--production") {
-      if (production) throw new ReviewDemoSeedError("Supply --production only once.");
-      production = true;
+    } else if (arg === "--allow-production") {
+      if (allowProduction) throw new ReviewDemoSeedError("Supply --allow-production only once.");
+      allowProduction = true;
     } else if (arg === "--help") {
-      return { help: true, clerkUserId: null, remove: false, production: false };
+      return { help: true, clerkUserId: null, remove: false, allowProduction: false };
     } else {
       throw new ReviewDemoSeedError("Unrecognized option. Use --help for usage.");
     }
@@ -48,7 +48,7 @@ export function parseArgs(args) {
   if (typeof clerkUserId !== "string" || !/^user_[A-Za-z0-9_-]+$/.test(clerkUserId)) {
     throw new ReviewDemoSeedError("A valid --clerk-user-id=<id> is required.");
   }
-  return { help: false, clerkUserId, remove, production };
+  return { help: false, clerkUserId, remove, allowProduction };
 }
 
 function isSet(value) {
@@ -60,18 +60,18 @@ export function assertRunTarget(options, env = process.env) {
     || env.REPLIT_ENVIRONMENT?.toLowerCase() === "production"
     || isSet(env.REPLIT_DEPLOYMENT);
 
-  if (options.production) {
-    if (!productionRuntime) {
-      throw new ReviewDemoSeedError(
-        "--production is accepted only in a Replit Production runtime. No database was opened.",
-      );
-    }
+  if (productionRuntime && !options.allowProduction) {
+    throw new ReviewDemoSeedError(
+      "Refusing to run in Production unless --allow-production is passed. No database was opened.",
+    );
+  }
+  if (productionRuntime) {
     return "production";
   }
 
-  if (productionRuntime || !isSet(env.REPLIT_DEV_DOMAIN)) {
+  if (!isSet(env.REPLIT_DEV_DOMAIN)) {
     throw new ReviewDemoSeedError(
-      "Refusing to seed outside Replit Development. Use --production only when intentionally running in the Production runtime.",
+      "Refusing to seed outside Replit Development. No database was opened.",
     );
   }
   return "development";
@@ -467,7 +467,7 @@ export async function removeReviewDemo(client, clerkUserId) {
 export async function main(args = process.argv.slice(2), env = process.env) {
   const options = parseArgs(args);
   if (options.help) {
-    console.log("Usage: pnpm run seed:review-demo -- --clerk-user-id=<id> [--remove] [--production]");
+    console.log("Usage: pnpm run seed:review-demo -- --clerk-user-id=<id> [--remove] [--allow-production]");
     return;
   }
   const target = assertRunTarget(options, env);

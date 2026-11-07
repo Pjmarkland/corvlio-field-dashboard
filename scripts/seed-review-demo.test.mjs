@@ -23,31 +23,32 @@ test("parses seed, remove, and explicit production modes", () => {
     { help: false, clerkUserId: "user_review_demo_test", remove: false, production: false },
   );
   assert.deepEqual(
-    parseArgs(["--clerk-user-id", "user_review_demo_test", "--remove", "--production"]),
-    { help: false, clerkUserId: "user_review_demo_test", remove: true, production: true },
+    parseArgs(["--clerk-user-id", "user_review_demo_test", "--remove", "--allow-production"]),
+    { help: false, clerkUserId: "user_review_demo_test", remove: true, allowProduction: true },
   );
 });
 
-test("defaults only to Replit Development and requires an explicit Production runtime", () => {
+test("defaults to Development and requires explicit permission in a Production runtime", () => {
   assert.equal(assertRunTarget(
-    { production: false },
+    { allowProduction: false },
     { REPLIT_DEV_DOMAIN: "dev.example.test", NODE_ENV: "development" },
   ), "development");
   assert.throws(
-    () => assertRunTarget({ production: false }, { NODE_ENV: "production" }),
-    /Refusing to seed outside Replit Development/,
+    () => assertRunTarget({ allowProduction: false }, { NODE_ENV: "production" }),
+    /Refusing to run in Production unless --allow-production is passed/,
   );
   assert.throws(
-    () => assertRunTarget(
-      { production: true },
-      { REPLIT_DEV_DOMAIN: "dev.example.test", NODE_ENV: "development" },
-    ),
-    /only in a Replit Production runtime/,
+    () => assertRunTarget({ allowProduction: false }, { REPLIT_DEV_DOMAIN: "", NODE_ENV: "development" }),
+    /Refusing to seed outside Replit Development/,
   );
   assert.equal(assertRunTarget(
-    { production: true },
+    { allowProduction: true },
     { NODE_ENV: "production", REPLIT_DEPLOYMENT: "1" },
   ), "production");
+  assert.equal(assertRunTarget(
+    { allowProduction: true },
+    { REPLIT_DEV_DOMAIN: "dev.example.test", NODE_ENV: "development" },
+  ), "development");
 });
 
 test("builds eight recent fictional leads with 555 numbers, mixed urgency and status, and summaries", () => {
