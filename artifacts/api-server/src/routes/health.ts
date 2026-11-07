@@ -1,15 +1,25 @@
 import { Router, type IRouter } from "express";
 import { HealthCheckResponse } from "@workspace/api-zod";
 import { pool } from "@workspace/db";
+import { getDeletedAccountGuardStatus } from "../lib/deletedAccountGuardCheck";
 
 const router: IRouter = Router();
+
+function healthPayload(status: "ok" | "unavailable") {
+  return HealthCheckResponse.parse({
+    status,
+    details: {
+      deletedAccountGuards: getDeletedAccountGuardStatus(),
+    },
+  });
+}
 
 router.get("/healthz", async (_req, res): Promise<void> => {
   try {
     await pool.query("SELECT 1");
-    res.json(HealthCheckResponse.parse({ status: "ok" }));
+    res.json(healthPayload("ok"));
   } catch {
-    res.status(503).json(HealthCheckResponse.parse({ status: "unavailable" }));
+    res.status(503).json(healthPayload("unavailable"));
   }
 });
 

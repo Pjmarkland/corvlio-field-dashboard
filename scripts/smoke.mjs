@@ -54,4 +54,38 @@ for (const check of checks) {
   }
 }
 
+const devHost = process.env.REPLIT_DEV_DOMAIN;
+if (!devHost?.endsWith('.replit.dev')) {
+  console.error('FAIL live development guard status: REPLIT_DEV_DOMAIN is not a Replit development host');
+  failed = true;
+} else {
+  try {
+    const response = await fetch(`https://${devHost}/api/healthz`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const health = await response.json();
+    const guardStatus = health?.details?.deletedAccountGuards;
+    if (!response.ok || !guardStatus || typeof guardStatus.status !== 'string') {
+      throw new Error(`health endpoint returned HTTP ${response.status} without guard status details`);
+    }
+
+    const missing = Array.isArray(guardStatus.missing) ? guardStatus.missing : [];
+    console.log(
+      `Development API deleted-account guards: ${guardStatus.status}${missing.length ? ` (${missing.join(', ')})` : ''}`,
+    );
+    if (guardStatus.status !== 'present') {
+      console.error('FAIL live development guard status: expected all guards to be present');
+      failed = true;
+    } else {
+      console.log('PASS live development guard status');
+    }
+  } catch (error) {
+    console.error(
+      `FAIL live development guard status: ${error instanceof Error ? error.message : 'Unknown health check failure'}`,
+    );
+    failed = true;
+  }
+}
+
 if (failed) process.exitCode = 1;

@@ -33,14 +33,14 @@ async function startServer(): Promise<void> {
     await verifyDeletedAccountGuards();
   } catch (error) {
     logger.error(
-      { message: error instanceof Error ? error.message : "Unknown startup check failure" },
-      "API startup blocked by deleted-account guard self-check",
+      {
+        message: error instanceof Error ? error.message : "Unknown startup check failure",
+        repairScript: "scripts/apply-deleted-account-guards.sql",
+      },
+      "Deleted-account guard check failed unexpectedly; API startup will continue",
     );
-    process.exit(1);
-    return;
   }
 
-  logger.info("Deleted-account guard check passed: function and six enabled triggers are present");
   server = app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");

@@ -87,7 +87,13 @@ export const ClaimWelcomeResponse = zod.object({
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.enum(['ok', 'unavailable'])
+  "status": zod.enum(['ok', 'unavailable']),
+  "details": zod.object({
+  "deletedAccountGuards": zod.object({
+  "status": zod.enum(['present', 'missing', 'unknown']),
+  "missing": zod.array(zod.string())
+})
+})
 })
 
 

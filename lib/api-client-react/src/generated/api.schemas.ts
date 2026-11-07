@@ -824,8 +824,27 @@ export const HealthStatusStatus = {
   unavailable: 'unavailable',
 } as const;
 
+export type HealthStatusDetailsDeletedAccountGuardsStatus = typeof HealthStatusDetailsDeletedAccountGuardsStatus[keyof typeof HealthStatusDetailsDeletedAccountGuardsStatus];
+
+
+export const HealthStatusDetailsDeletedAccountGuardsStatus = {
+  present: 'present',
+  missing: 'missing',
+  unknown: 'unknown',
+} as const;
+
+export type HealthStatusDetailsDeletedAccountGuards = {
+  status: HealthStatusDetailsDeletedAccountGuardsStatus;
+  missing: string[];
+};
+
+export type HealthStatusDetails = {
+  deletedAccountGuards: HealthStatusDetailsDeletedAccountGuards;
+};
+
 export interface HealthStatus {
   status: HealthStatusStatus;
+  details: HealthStatusDetails;
 }
 
 export interface CallQualityRow {

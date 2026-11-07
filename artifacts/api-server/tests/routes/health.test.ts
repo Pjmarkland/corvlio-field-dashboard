@@ -2,8 +2,14 @@ import express from "express";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ query: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
+  guardStatus: vi.fn(() => ({ status: 'present', missing: [] })),
+}));
 vi.mock("@workspace/db", () => ({ pool: { query: mocks.query } }));
+vi.mock("../../src/lib/deletedAccountGuardCheck", () => ({
+  getDeletedAccountGuardStatus: mocks.guardStatus,
+}));
 import healthRouter from "../../src/routes/health";
 
 let server: Server;
@@ -25,14 +31,39 @@ describe("database-backed health check", () => {
     mocks.query.mockResolvedValue({ rows: [{ "?column?": 1 }] });
     const response = await fetch(`${base}/healthz`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "ok" });
+    expect(await response.json()).toEqual({
+      status: "ok",
+      details: { deletedAccountGuards: { status: "present", missing: [] } },
+    });
     expect(mocks.query).toHaveBeenCalledWith("SELECT 1");
+  });
+
+  it("reports missing guards without making the health route unavailable", async () => {
+    mocks.query.mockResolvedValue({ rows: [{ "?column?": 1 }] });
+    mocks.guardStatus.mockReturnValue({
+      status: "missing",
+      missing: ["public.notification_devices.guard_deleted_account_notification_devices"],
+    });
+    const response = await fetch(`${base}/healthz`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: "ok",
+      details: {
+        deletedAccountGuards: {
+          status: "missing",
+          missing: ["public.notification_devices.guard_deleted_account_notification_devices"],
+        },
+      },
+    });
   });
 
   it("returns a generic 503 without database error details", async () => {
     mocks.query.mockRejectedValue(new Error("private database hostname unavailable"));
     const response = await fetch(`${base}/healthz`);
     expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ status: "unavailable" });
+    expect(await response.json()).toEqual({
+      status: "unavailable",
+      details: { deletedAccountGuards: { status: "present", missing: [] } },
+    });
   });
 });

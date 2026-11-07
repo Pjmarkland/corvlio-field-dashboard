@@ -13,6 +13,7 @@ const fixture = vi.hoisted(() => ({
     averageReplyMinutes: null as string | null,
   },
   healthQuery: vi.fn(),
+  guardStatus: { status: 'present', missing: [] as string[] },
   registerDevice: vi.fn(),
 }));
 
@@ -38,6 +39,9 @@ vi.mock('../../src/lib/notificationService', () => ({
   listNotificationOutbox: vi.fn(),
   registerNotificationDevice: fixture.registerDevice,
   revokeNotificationDevice: vi.fn(),
+}));
+vi.mock('../../src/lib/deletedAccountGuardCheck', () => ({
+  getDeletedAccountGuardStatus: () => fixture.guardStatus,
 }));
 
 vi.mock('@workspace/db', async () => {
@@ -133,6 +137,7 @@ describe('release smoke checks', () => {
       isSpam: false,
     }];
     fixture.healthQuery.mockResolvedValue({ rows: [{ value: 1 }] });
+    fixture.guardStatus = { status: 'present', missing: [] };
     fixture.registerDevice.mockResolvedValue({
       id: 19,
       platform: 'ios',
@@ -145,7 +150,12 @@ describe('release smoke checks', () => {
     await checkSmoke('health endpoint', async () => {
       const response = await request('/healthz');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ status: 'ok' });
+      expect(await response.json()).toEqual({
+        status: 'ok',
+        details: {
+          deletedAccountGuards: { status: 'present', missing: [] },
+        },
+      });
       expect(fixture.healthQuery).toHaveBeenCalledWith('SELECT 1');
     });
   });

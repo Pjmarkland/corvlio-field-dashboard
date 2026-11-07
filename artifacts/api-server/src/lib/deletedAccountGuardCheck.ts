@@ -1,4 +1,16 @@
 import { pool } from "@workspace/db";
+import { logger } from "./logger";
+
+const REPAIR_SCRIPT = "scripts/apply-deleted-account-guards.sql";
+const EXPECTED_GUARD_OBJECTS = [
+  "public.guard_deleted_account_data()",
+  "public.businesses.guard_deleted_account_businesses",
+  "public.notification_devices.guard_deleted_account_notification_devices",
+  "public.notification_events.guard_deleted_account_notification_events",
+  "public.notification_poll_state.guard_deleted_account_notification_poll_state",
+  "public.notification_seen_leads.guard_deleted_account_notification_seen_leads",
+  "public.provisioning_attempts.guard_deleted_account_provisioning_attempts",
+] as const;
 
 const DELETED_ACCOUNT_GUARDS_QUERY = `
   WITH expected_triggers(table_name, trigger_name) AS (
@@ -42,21 +54,52 @@ interface GuardCheckRow {
   ready: boolean;
 }
 
-export async function verifyDeletedAccountGuards(): Promise<void> {
-  let rows: GuardCheckRow[];
+export interface DeletedAccountGuardStatus {
+  status: "present" | "missing" | "unknown";
+  missing: string[];
+}
+
+let currentStatus: DeletedAccountGuardStatus = {
+  status: "unknown",
+  missing: [],
+};
+
+export function getDeletedAccountGuardStatus(): DeletedAccountGuardStatus {
+  return { ...currentStatus, missing: [...currentStatus.missing] };
+}
+
+export async function verifyDeletedAccountGuards(): Promise<DeletedAccountGuardStatus> {
+  let rows: GuardCheckRow[] = [];
   try {
     ({ rows } = await pool.query<GuardCheckRow>(DELETED_ACCOUNT_GUARDS_QUERY));
   } catch {
-    throw new Error(
-      "The API cannot verify the deleted-account guards in its configured database. No database changes were attempted.",
+    currentStatus = { status: "unknown", missing: [] };
+    logger.error(
+      { repairScript: REPAIR_SCRIPT },
+      `Could not verify deleted-account guards; API startup will continue. Review ${REPAIR_SCRIPT} and /api/healthz.`,
+    );
+    return getDeletedAccountGuardStatus();
+  }
+
+  const readyByName = new Map(rows.map((row) => [row.object_name, row.ready === true]));
+  const missing = EXPECTED_GUARD_OBJECTS.filter((objectName) => readyByName.get(objectName) !== true);
+  const incomplete = rows.length !== EXPECTED_GUARD_OBJECTS.length;
+  currentStatus = {
+    status: missing.length > 0 ? "missing" : incomplete ? "unknown" : "present",
+    missing: [...missing],
+  };
+
+  if (currentStatus.status === "missing") {
+    logger.error(
+      { missing: currentStatus.missing, repairScript: REPAIR_SCRIPT },
+      `Deleted-account guards missing or disabled: ${currentStatus.missing.join(", ")}. API startup will continue; review ${REPAIR_SCRIPT} and /api/healthz.`,
+    );
+  } else if (currentStatus.status === "unknown") {
+    logger.error(
+      { repairScript: REPAIR_SCRIPT },
+      `Deleted-account guard check returned an incomplete result; API startup will continue. Review ${REPAIR_SCRIPT} and /api/healthz.`,
     );
   }
 
-  const missing = rows.filter((row) => !row.ready).map((row) => row.object_name);
-  if (rows.length !== 7 || missing.length > 0) {
-    const details = missing.length ? missing.join(", ") : "the guard check returned an incomplete result";
-    throw new Error(
-      `Required deleted-account guards are missing or disabled: ${details}. Apply scripts/apply-deleted-account-guards.sql through the approved database SQL workflow, then restart. API startup does not run database DDL.`,
-    );
-  }
+  return getDeletedAccountGuardStatus();
 }

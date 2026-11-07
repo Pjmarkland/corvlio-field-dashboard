@@ -2325,12 +2325,31 @@ components:
       required: [businessId, businessName, account, usage, plans, policy, timeline]
     HealthStatus:
       type: object
+      additionalProperties: false
       properties:
         status:
           type: string
           enum: [ok, unavailable]
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            deletedAccountGuards:
+              type: object
+              additionalProperties: false
+              properties:
+                status:
+                  type: string
+                  enum: [present, missing, unknown]
+                missing:
+                  type: array
+                  items:
+                    type: string
+              required: [status, missing]
+          required: [deletedAccountGuards]
       required:
         - status
+        - details
     AdminCallQuality:
       type: object
       required: [totalCalls, completeCalls, completePercent, calls]
