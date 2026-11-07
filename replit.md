@@ -9,8 +9,18 @@ An installable field dashboard for Corvlio clients to spot new AI receptionist l
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm run test` — run the API-server and dashboard test suites
+- `pnpm run smoke` — run release smoke checks in Replit development only; refuses production
+- `pnpm run preflight:ios` — verify the Clerk key and current native production web build before Capacitor sync
 - Required env: `DATABASE_URL` — Postgres connection string; `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` — Web Push key pair (Replit Secrets; `VAPID_SUBJECT` is optional and defaults to Corvlio support)
+- Required native build secret: `VITE_CLERK_PUBLISHABLE_KEY`; the iOS preflight reports only whether it is configured and never prints its value.
 - `VITE_NATIVE_API_BASE_URL` — the configured public API origin used by native Capacitor builds. Keep it aligned with `PUBLIC_API_BASE_URL`; web PWA builds leave it unset and use same-origin relative paths.
+
+## Native iOS build safety
+
+- From the workspace root, run `pnpm --filter @workspace/corvlio-field-dashboard run build:native`, then `pnpm run preflight:ios`, then `pnpm --filter @workspace/corvlio-field-dashboard exec cap sync ios`.
+- The convenience command `pnpm --filter @workspace/corvlio-field-dashboard run native:sync` runs those steps in order and stops before Capacitor sync if preflight fails.
+- The API startup guard check is read-only and fails closed if `guard_deleted_account_data` or any of its six required triggers is missing or disabled. Startup never applies SQL DDL. Review and run `scripts/apply-deleted-account-guards.sql` through the approved database SQL workflow, then use `scripts/verify-deleted-account-guards.sql` to verify.
 
 ## Stack
 

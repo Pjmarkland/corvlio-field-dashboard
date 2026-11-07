@@ -1,4 +1,5 @@
 import path from 'path';
+import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
@@ -28,6 +29,15 @@ if (!basePath) {
   );
 }
 
+const iosProjectSettings = readFileSync(
+  path.resolve(import.meta.dirname, 'ios/App/App.xcodeproj/project.pbxproj'),
+  'utf8',
+);
+const iosMarketingVersion = iosProjectSettings.match(/MARKETING_VERSION = ([^;]+);/)?.[1]?.trim();
+const iosBuildNumber = iosProjectSettings.match(/CURRENT_PROJECT_VERSION = ([^;]+);/)?.[1]?.trim();
+const appVersion = process.env.VITE_APP_VERSION?.trim() || iosMarketingVersion || 'unknown';
+const appBuildNumber = process.env.VITE_BUILD_NUMBER?.trim() || iosBuildNumber || 'unknown';
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -36,14 +46,32 @@ export default defineConfig({
       transformIndexHtml: {
         order: 'pre',
         handler() {
-          return [{
-            tag: 'meta',
-            attrs: {
-              'http-equiv': 'Content-Security-Policy',
-              content: dashboardMetaCsp,
+          return [
+            {
+              tag: 'meta',
+              attrs: {
+                name: 'corvlio-app-version',
+                content: appVersion,
+              },
+              injectTo: 'head',
             },
-            injectTo: 'head-prepend',
-          }];
+            {
+              tag: 'meta',
+              attrs: {
+                name: 'corvlio-build-number',
+                content: appBuildNumber,
+              },
+              injectTo: 'head',
+            },
+            {
+              tag: 'meta',
+              attrs: {
+                'http-equiv': 'Content-Security-Policy',
+                content: dashboardMetaCsp,
+              },
+              injectTo: 'head-prepend',
+            },
+          ];
         },
       },
     },

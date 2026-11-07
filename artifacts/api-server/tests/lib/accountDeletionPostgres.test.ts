@@ -157,5 +157,8 @@ describe.skipIf(!process.env.REPLIT_DEV_DOMAIN || !!process.env.REPLIT_DEPLOYMEN
     expect(await deleteAccount("user_fixture_owner", deps)).toBe("completed");
     expect(identity).toHaveBeenCalledTimes(2);
     expect((await client.query("SELECT * FROM pending_retell_releases")).rows).toHaveLength(1);
+    if (process.env.SMOKE_RUN === "1") {
+      console.log("PASS throwaway account deletion and resurrection prevention");
+    }
   });
 });

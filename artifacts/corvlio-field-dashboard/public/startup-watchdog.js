@@ -26,6 +26,14 @@
     const message = document.createElement("p");
     message.textContent = "Check your connection and try again.";
 
+    const buildInfo = document.createElement("p");
+    const version =
+      document.querySelector('meta[name="corvlio-app-version"]')?.content || "unknown";
+    const build =
+      document.querySelector('meta[name="corvlio-build-number"]')?.content || "unknown";
+    buildInfo.textContent = `Version ${version} · Build ${build}`;
+    buildInfo.style.cssText = "font-size:12px;opacity:.65";
+
     const retry = document.createElement("button");
     retry.type = "button";
     retry.textContent = "Retry";
@@ -33,7 +41,7 @@
       "min-height:44px;margin-top:16px;padding:0 20px;border:0;border-radius:12px;background:white;color:#071527;font-size:14px;font-weight:600";
     retry.addEventListener("click", () => window.location.reload());
 
-    content.append(title, message, retry);
+    content.append(title, message, buildInfo, retry);
     panel.append(content);
     root.append(panel);
   }

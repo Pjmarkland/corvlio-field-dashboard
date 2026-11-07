@@ -5,6 +5,8 @@ import { Capacitor } from '@capacitor/core';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
 
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
+import { StartupFailureScreen } from '@/components/StartupFailureScreen';
+import { getAppBuildInfo } from '@/lib/buildInfo';
 import { getNativeApiBaseUrl } from '@/lib/nativeConfig';
 
 import './index.css';
@@ -63,35 +65,16 @@ function StartupLoading() {
       aria-live="polite"
       className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
     >
-      <p className="text-sm font-medium">Loading Corvlio Field Desk…</p>
+      <div>
+        <p className="text-sm font-medium">Loading Corvlio Field Desk…</p>
+        <p className="mt-2 text-xs text-white/55">{getAppBuildInfo()}</p>
+      </div>
     </main>
   );
 }
 
 function StartupFailure({ error }: ErrorFallbackProps) {
-  return (
-    <main
-      role="alert"
-      className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
-    >
-      <div className="max-w-sm">
-        <h1 className="text-lg font-semibold">Corvlio couldn’t start</h1>
-        <p className="mt-2 text-sm text-white/75">
-          Check your connection and try again. If the problem continues, contact support.
-        </p>
-        {import.meta.env.DEV ? (
-          <p className="mt-2 break-words text-xs text-white/55">{error.message}</p>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-5 min-h-11 rounded-xl bg-white px-5 text-sm font-semibold text-[#071527]"
-        >
-          Retry
-        </button>
-      </div>
-    </main>
-  );
+  return <StartupFailureScreen error={error} />;
 }
 
 function AppBootstrap() {
@@ -127,7 +110,7 @@ function AppBootstrap() {
       />
     );
   }
-  if (!LoadedApp) return native ? <StartupLoading /> : null;
+  if (!LoadedApp) return <StartupLoading />;
   return <LoadedApp />;
 }
 

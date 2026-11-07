@@ -34,6 +34,7 @@ import { displayIssue, displayName, displayPhone, nameInitials, usablePhone, pre
 import darkLogoUrl from '@/assets/logo-dark.png';
 import lightLogoUrl from '@/assets/logo-light.png';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { getAppBuildInfo } from '@/lib/buildInfo';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -1139,7 +1140,7 @@ function NativeClerkStartupGate({ children }: { children: ReactNode }) {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || isLoaded) {
+    if (isLoaded) {
       setTimedOut(false);
       return;
     }
@@ -1147,7 +1148,7 @@ function NativeClerkStartupGate({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isLoaded]);
 
-  if (!Capacitor.isNativePlatform() || isLoaded) return children;
+  if (isLoaded) return children;
 
   return (
     <main
@@ -1164,6 +1165,7 @@ function NativeClerkStartupGate({ children }: { children: ReactNode }) {
             ? 'Check your internet connection, then retry.'
             : 'Please wait while Corvlio checks your account.'}
         </p>
+        <p className="mt-3 text-xs text-white/55">{getAppBuildInfo()}</p>
         {timedOut ? (
           <button
             type="button"
