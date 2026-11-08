@@ -9,6 +9,7 @@ const {
   mockGetBusinessProfile,
   mockUpdateBusinessProfile,
   mockNativeState,
+  mockAppAuth,
   mockGetOwnerInvoices,
   mockDashboardReports,
 } = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ const {
   mockGetBusinessProfile: vi.fn(),
   mockUpdateBusinessProfile: vi.fn(),
   mockNativeState: { value: false },
+  mockAppAuth: { value: {} as any },
   mockGetOwnerInvoices: vi.fn(),
   mockDashboardReports: {
     callUsage: { data: { count: 18, includedCalls: 100 as number | null } },
@@ -34,14 +36,7 @@ vi.mock('@clerk/react', () => ({
   SignUp: () => null,
 }));
 vi.mock('@/auth/AppAuthProvider', () => ({
-  useAppAuth: () => ({
-    user: { id: 'user_unconfigured', fullName: null, firstName: null, lastName: null, primaryEmailAddress: null, emailAddresses: [] },
-    isLoaded: true,
-    isSignedIn: true,
-    error: null,
-    signOut: mockSignOut,
-    startHostedAuth: vi.fn(),
-  }),
+  useAppAuth: () => ({ ...mockAppAuth.value, signOut: mockSignOut }),
   WebAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
   NativeAppAuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -100,7 +95,7 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage } from './App';
+import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage, NativeClerkStartupGate } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
@@ -435,6 +430,36 @@ describe('native AppShell billing boundaries', () => {
     mockGetOwnerInvoices.mockReturnValue({ data: undefined });
     renderShell();
     expect(mockGetOwnerInvoices.mock.calls.at(-1)?.[0].query.enabled).toBe(true);
+  });
+});
+
+describe('native Clerk startup retry screen', () => {
+  it('shows the initialization error and retry action instead of waiting indefinitely', () => {
+    const message = 'Native sign-in plugin did not respond after 8 seconds.';
+    mockAppAuth.value = {
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+      error: message,
+      signOut: vi.fn(),
+      startHostedAuth: vi.fn(),
+    };
+
+    const { unmount } = render(<NativeClerkStartupGate><div>Dashboard</div></NativeClerkStartupGate>);
+    expect(screen.getByRole('alert').textContent).toContain('Can’t connect to sign-in');
+    expect(screen.getByRole('alert').textContent).toContain(message);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByText('Dashboard')).toBeNull();
+    unmount();
+
+    mockAppAuth.value = {
+      user: { id: 'user_unconfigured', fullName: null, firstName: null, lastName: null, primaryEmailAddress: null, emailAddresses: [] },
+      isLoaded: true,
+      isSignedIn: true,
+      error: null,
+      signOut: mockSignOut,
+      startHostedAuth: vi.fn(),
+    };
   });
 });
 
