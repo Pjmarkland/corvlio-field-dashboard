@@ -1157,38 +1157,41 @@ function ClerkRoutes() {
   return Capacitor.isNativePlatform() ? <NativeClerkRoutes /> : <WebClerkRoutes />;
 }
 
-function NativeClerkStartupGate({ children }: { children: ReactNode }) {
-  const { isLoaded } = useAppAuth();
+export function NativeClerkStartupGate({ children }: { children: ReactNode }) {
+  const { isLoaded, error } = useAppAuth();
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded || error) {
       setTimedOut(false);
       return;
     }
     const timer = window.setTimeout(() => setTimedOut(true), 20000);
     return () => window.clearTimeout(timer);
-  }, [isLoaded]);
+  }, [error, isLoaded]);
 
-  if (isLoaded) return children;
+  const showRetry = timedOut || Boolean(error);
+  if (isLoaded && !error) return children;
 
   return (
     <main
-      role={timedOut ? 'alert' : 'status'}
-      aria-live={timedOut ? 'assertive' : 'polite'}
+      role={showRetry ? 'alert' : 'status'}
+      aria-live={showRetry ? 'assertive' : 'polite'}
       className="flex min-h-[100dvh] items-center justify-center bg-[#071527] px-6 text-center text-white"
     >
       <div className="max-w-sm">
         <h1 className="text-lg font-semibold">
-          {timedOut ? 'Can’t connect to sign-in' : 'Connecting securely…'}
+          {showRetry ? 'Can’t connect to sign-in' : 'Connecting securely…'}
         </h1>
         <p className="mt-2 text-sm text-white/75">
-          {timedOut
-            ? 'Check your internet connection, then retry.'
+          {error
+            ? error
+            : timedOut
+              ? 'Native sign-in did not respond. Please retry.'
             : 'Please wait while Corvlio checks your account.'}
         </p>
         <p className="mt-3 text-xs text-white/55">{getAppBuildInfo()}</p>
-        {timedOut ? (
+        {showRetry ? (
           <button
             type="button"
             onClick={() => window.location.reload()}

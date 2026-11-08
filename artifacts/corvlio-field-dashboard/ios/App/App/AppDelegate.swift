@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import os
 
 // Native build configuration, not Vite's web build mode, determines the token's
 // APNs environment. A TestFlight/App Store Release reports production even when
@@ -21,9 +22,21 @@ public class PushEnvironmentPlugin: CAPPlugin, CAPBridgedPlugin {
 }
 
 class AppViewController: CAPBridgeViewController {
+    private static let logger = Logger(
+        subsystem: "com.corvlio.fielddashboard",
+        category: "CapacitorBridge"
+    )
+
     override func capacitorDidLoad() {
-        bridge?.registerPluginInstance(PushEnvironmentPlugin())
-        bridge?.registerPluginInstance(ClerkNativeAuthPlugin())
+        guard let bridge else {
+            Self.logger.error("Capacitor bridge was unavailable during plugin registration")
+            return
+        }
+
+        Self.logger.info("Capacitor bridge loaded; registering native plugins")
+        bridge.registerPluginInstance(PushEnvironmentPlugin())
+        bridge.registerPluginInstance(ClerkNativeAuthPlugin())
+        Self.logger.info("ClerkNativeAuth and PushEnvironment plugins registered")
     }
 }
 
