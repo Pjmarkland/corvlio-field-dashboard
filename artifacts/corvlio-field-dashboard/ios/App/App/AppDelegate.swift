@@ -35,7 +35,9 @@ class AppViewController: CAPBridgeViewController {
 
         Self.logger.info("Capacitor bridge loaded; registering native plugins")
         bridge.registerPluginInstance(PushEnvironmentPlugin())
-        bridge.registerPluginInstance(ClerkNativeAuthPlugin())
+        let clerkNativeAuthPlugin = ClerkNativeAuthPlugin()
+        bridge.registerPluginInstance(clerkNativeAuthPlugin)
+        clerkNativeAuthPlugin.markRegistered()
         Self.logger.info("ClerkNativeAuth and PushEnvironment plugins registered")
     }
 }

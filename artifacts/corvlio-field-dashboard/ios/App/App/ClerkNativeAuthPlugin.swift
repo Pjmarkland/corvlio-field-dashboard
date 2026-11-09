@@ -3,6 +3,16 @@ import ClerkKit
 import Foundation
 import os
 
+private enum ClerkNativeAuthError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .message(let message): return message
+        }
+    }
+}
+
 @objc(ClerkNativeAuthPlugin)
 public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "ClerkNativeAuthPlugin"
@@ -10,6 +20,7 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAuthState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getDebugTrace", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startHostedAuth", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getToken", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "signOut", returnType: CAPPluginReturnPromise)
@@ -22,93 +33,135 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
     private static let redirectURL = "com.corvlio.fielddashboard://callback"
     private static let callbackScheme = "com.corvlio.fielddashboard"
 
+    private let traceLock = NSLock()
+    private var lastNativeStep = "plugin instance created"
     @MainActor private var configuredPublishableKey: String?
 
-    // Capacitor 7 invokes Objective-C selectors on its serial bridge queue.
-    // Keep these entry points nonisolated and explicitly hop to MainActor before
-    // touching ClerkKit or its main-actor state.
+    func markRegistered() {
+        recordStep("registered")
+    }
+
+    private func recordStep(_ step: String) {
+        traceLock.lock()
+        lastNativeStep = step
+        traceLock.unlock()
+        Self.logger.info("native step: \(step, privacy: .public)")
+    }
+
+    private func currentStep() -> String {
+        traceLock.lock()
+        defer { traceLock.unlock() }
+        return lastNativeStep
+    }
+
+    private func reject(_ call: CAPPluginCall, operation: String, error: Error) {
+        let reason = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = "\(operation) failed: \(reason). Last native step: \(currentStep())."
+        Self.logger.error("\(message, privacy: .public)")
+        call.reject(message)
+    }
+
+    // Capacitor 7 dispatches Objective-C selectors on its bridge queue. Keep
+    // selectors nonisolated, record arrival before hopping, and reject every
+    // thrown MainActor operation rather than leaving its JavaScript call pending.
     @objc func initialize(_ call: CAPPluginCall) {
-        Self.logger.info("initialize selector received")
+        recordStep("initialize called")
         Task { @MainActor [weak self] in
             guard let self else {
-                Self.logger.error("initialize could not reach the plugin instance")
-                call.reject("Native sign-in plugin is unavailable.")
+                call.reject("Initialize failed: native sign-in plugin is unavailable. Last native step: initialize called.")
                 return
             }
-            Self.logger.info("initialize entered MainActor")
-            await self.initializeOnMainActor(call)
+            self.recordStep("initialize entered MainActor")
+            do {
+                try self.initializeOnMainActor(call)
+            } catch {
+                self.reject(call, operation: "Initialize", error: error)
+            }
         }
     }
 
     @objc func getAuthState(_ call: CAPPluginCall) {
-        Self.logger.info("getAuthState selector received")
+        recordStep("state load called")
         Task { @MainActor [weak self] in
             guard let self else {
-                Self.logger.error("getAuthState could not reach the plugin instance")
-                call.reject("Native sign-in plugin is unavailable.")
+                call.reject("State load failed: native sign-in plugin is unavailable. Last native step: state load called.")
                 return
             }
-            await self.getAuthStateOnMainActor(call)
+            do {
+                try self.getAuthStateOnMainActor(call)
+            } catch {
+                self.reject(call, operation: "State load", error: error)
+            }
         }
     }
 
+    @objc func getDebugTrace(_ call: CAPPluginCall) {
+        let step = currentStep()
+        Self.logger.info("native step trace requested: \(step, privacy: .public)")
+        call.resolve(["lastStep": step])
+    }
+
     @objc func startHostedAuth(_ call: CAPPluginCall) {
-        Self.logger.info("startHostedAuth selector received")
+        recordStep("hosted auth called")
         Task { @MainActor [weak self] in
             guard let self else {
-                Self.logger.error("startHostedAuth could not reach the plugin instance")
-                call.reject("Native sign-in plugin is unavailable.")
+                call.reject("Hosted sign-in failed: native sign-in plugin is unavailable. Last native step: hosted auth called.")
                 return
             }
-            await self.startHostedAuthOnMainActor(call)
+            do {
+                try await self.startHostedAuthOnMainActor(call)
+            } catch {
+                self.reject(call, operation: "Hosted sign-in", error: error)
+            }
         }
     }
 
     @objc func getToken(_ call: CAPPluginCall) {
-        Self.logger.info("getToken selector received")
+        recordStep("token request called")
         Task { @MainActor [weak self] in
             guard let self else {
-                Self.logger.error("getToken could not reach the plugin instance")
-                call.reject("Native sign-in plugin is unavailable.")
+                call.reject("Token request failed: native sign-in plugin is unavailable. Last native step: token request called.")
                 return
             }
-            await self.getTokenOnMainActor(call)
+            do {
+                try await self.getTokenOnMainActor(call)
+            } catch {
+                self.reject(call, operation: "Token request", error: error)
+            }
         }
     }
 
     @objc func signOut(_ call: CAPPluginCall) {
-        Self.logger.info("signOut selector received")
+        recordStep("sign-out called")
         Task { @MainActor [weak self] in
             guard let self else {
-                Self.logger.error("signOut could not reach the plugin instance")
-                call.reject("Native sign-in plugin is unavailable.")
+                call.reject("Sign-out failed: native sign-in plugin is unavailable. Last native step: sign-out called.")
                 return
             }
-            await self.signOutOnMainActor(call)
+            do {
+                try await self.signOutOnMainActor(call)
+            } catch {
+                self.reject(call, operation: "Sign-out", error: error)
+            }
         }
     }
 
     @MainActor
-    private func initializeOnMainActor(_ call: CAPPluginCall) async {
-        Self.logger.info("initialize validating Clerk publishable key")
+    private func initializeOnMainActor(_ call: CAPPluginCall) throws {
+        recordStep("initialize validating key")
         guard let publishableKey = call.getString("publishableKey")?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             publishableKey.hasPrefix("pk_live_") || publishableKey.hasPrefix("pk_test_") else {
-            Self.logger.error("initialize rejected an invalid Clerk publishable key")
-            call.reject("A valid Clerk publishable key is required.")
-            return
+            throw ClerkNativeAuthError.message("A valid Clerk publishable key is required")
         }
 
         if let configuredPublishableKey {
             guard configuredPublishableKey == publishableKey else {
-                Self.logger.error("initialize rejected a different Clerk environment key")
-                call.reject("Clerk was already initialized with a different environment key.")
-                return
+                throw ClerkNativeAuthError.message("Clerk was already initialized with a different environment key")
             }
-            Self.logger.info("Clerk is already configured; reading current auth state")
-            let state = await authStatePayload()
-            call.resolve(state)
-            Self.logger.info("initialize resolved using the existing Clerk configuration")
+            recordStep("configure already done")
+            call.resolve(["configured": true])
+            recordStep("initialize resolved")
             return
         }
 
@@ -118,94 +171,71 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
                 callbackUrlScheme: Self.callbackScheme
             )
         )
-        Self.logger.info("Calling Clerk.configure")
+        recordStep("configure started")
         Clerk.configure(publishableKey: publishableKey, options: options)
         configuredPublishableKey = publishableKey
-        Self.logger.info("Clerk.configure returned; reading current auth state")
-
-        let state = await authStatePayload()
-        call.resolve(state)
-        Self.logger.info("initialize resolved")
+        recordStep("configure done")
+        // Initialization deliberately does not wait for session restoration,
+        // network refresh, or keychain-backed auth-state loading.
+        call.resolve(["configured": true])
+        recordStep("initialize resolved")
     }
 
     @MainActor
-    private func getAuthStateOnMainActor(_ call: CAPPluginCall) async {
-        Self.logger.info("getAuthState entered MainActor")
-        guard ensureConfigured(call) else { return }
-        let state = await authStatePayload()
+    private func getAuthStateOnMainActor(_ call: CAPPluginCall) throws {
+        recordStep("state load started")
+        try ensureConfigured()
+        let state = authStatePayload()
         call.resolve(state)
-        Self.logger.info("getAuthState resolved")
+        recordStep("state loaded")
     }
 
     @MainActor
-    private func startHostedAuthOnMainActor(_ call: CAPPluginCall) async {
+    private func startHostedAuthOnMainActor(_ call: CAPPluginCall) async throws {
         let mode = call.getString("mode") ?? "signIn"
-        Self.logger.info("startHostedAuth entered MainActor; mode=\(mode, privacy: .public)")
-        guard ensureConfigured(call) else { return }
-
-        do {
-            if mode == "signUp" {
-                try await Clerk.shared.auth.startHostedAuth(mode: .signUp)
-            } else {
-                try await Clerk.shared.auth.startHostedAuth()
-            }
-            Self.logger.info("Clerk hosted auth returned; reading current auth state")
-            let state = await authStatePayload()
-            call.resolve(state)
-            Self.logger.info("startHostedAuth resolved")
-        } catch {
-            Self.logger.error("startHostedAuth rejected: \(error.localizedDescription, privacy: .public)")
-            call.reject(error.localizedDescription)
+        recordStep("hosted auth started")
+        try ensureConfigured()
+        if mode == "signUp" {
+            try await Clerk.shared.auth.startHostedAuth(mode: .signUp)
+        } else {
+            try await Clerk.shared.auth.startHostedAuth()
         }
+        recordStep("hosted auth returned")
+        let state = authStatePayload()
+        call.resolve(state)
+        recordStep("state loaded")
     }
 
     @MainActor
-    private func getTokenOnMainActor(_ call: CAPPluginCall) async {
-        Self.logger.info("getToken entered MainActor")
-        guard ensureConfigured(call) else { return }
-
-        do {
-            let token = try await Clerk.shared.auth.getToken()
-            call.resolve(["token": token as Any? ?? NSNull()])
-            Self.logger.info("getToken resolved")
-        } catch {
-            Self.logger.error("getToken rejected: \(error.localizedDescription, privacy: .public)")
-            call.reject(error.localizedDescription)
-        }
+    private func getTokenOnMainActor(_ call: CAPPluginCall) async throws {
+        recordStep("token request started")
+        try ensureConfigured()
+        let token = try await Clerk.shared.auth.getToken()
+        call.resolve(["token": token as Any? ?? NSNull()])
+        recordStep("token loaded")
     }
 
     @MainActor
-    private func signOutOnMainActor(_ call: CAPPluginCall) async {
-        Self.logger.info("signOut entered MainActor")
-        guard ensureConfigured(call) else { return }
-
-        do {
-            try await Clerk.shared.auth.signOut()
-            let state = await authStatePayload()
-            call.resolve(state)
-            Self.logger.info("signOut resolved")
-        } catch {
-            Self.logger.error("signOut rejected: \(error.localizedDescription, privacy: .public)")
-            call.reject(error.localizedDescription)
-        }
+    private func signOutOnMainActor(_ call: CAPPluginCall) async throws {
+        recordStep("sign-out started")
+        try ensureConfigured()
+        try await Clerk.shared.auth.signOut()
+        let state = authStatePayload()
+        call.resolve(state)
+        recordStep("signed out")
     }
 
     @MainActor
-    private func ensureConfigured(_ call: CAPPluginCall) -> Bool {
+    private func ensureConfigured() throws {
         guard configuredPublishableKey != nil else {
-            Self.logger.error("Plugin method rejected because Clerk is not configured")
-            call.reject("Clerk native authentication has not been initialized.")
-            return false
+            throw ClerkNativeAuthError.message("Clerk native authentication has not been initialized")
         }
-        return true
     }
 
     @MainActor
-    private func authStatePayload() async -> [String: Any] {
-        Self.logger.info("Reading Clerk user state")
+    private func authStatePayload() -> [String: Any] {
         let clerk = Clerk.shared
         guard let user = clerk.user else {
-            Self.logger.info("Clerk reports a signed-out session")
             return ["isSignedIn": false, "user": NSNull()]
         }
 
@@ -216,7 +246,6 @@ public class ClerkNativeAuthPlugin: CAPPlugin, CAPBridgedPlugin {
             .filter { !$0.isEmpty }
             .joined(separator: " ")
 
-        Self.logger.info("Clerk reports a signed-in session")
         return [
             "isSignedIn": true,
             "user": [
