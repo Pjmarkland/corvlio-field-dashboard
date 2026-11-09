@@ -1,8 +1,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
-import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
-import { getNativeClerkToken } from '@/auth/nativeClerkAuth';
+import { setBaseUrl } from '@workspace/api-client-react';
 import '@/lib/nativeClerkCookieBridge';
 
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
@@ -23,14 +22,11 @@ try {
 
 // ─── Native API bootstrap ─────────────────────────────────────────────────────
 // Web builds stay on same-origin cookies and relative /api/… paths.
-// Native Capacitor builds need an absolute API origin and an explicit bearer
-// token because the WebView has no session cookie.
+// Native Capacitor builds need an absolute API origin. NativeAppAuthProvider
+// selects the bearer-token source for the enabled auth mode before protected
+// routes render.
 if (native) {
   setBaseUrl(getNativeApiBaseUrl(import.meta.env.VITE_NATIVE_API_BASE_URL));
-
-  // ClerkKit owns the native session in Keychain; attach its current token to
-  // API requests without reading or writing browser cookies.
-  setAuthTokenGetter(getNativeClerkToken);
 }
 
 if (!native && 'serviceWorker' in navigator && import.meta.env.PROD) {

@@ -11,6 +11,7 @@ const {
   mockNativeState,
   mockAppAuth,
   mockGetOwnerInvoices,
+  mockClerkProviderProps,
   mockDashboardReports,
 } = vi.hoisted(() => ({
   mockRevoke: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockNativeState: { value: false },
   mockAppAuth: { value: {} as any },
   mockGetOwnerInvoices: vi.fn(),
+  mockClerkProviderProps: vi.fn(),
   mockDashboardReports: {
     callUsage: { data: { count: 18, includedCalls: 100 as number | null } },
     monthlyReport: { isLoading: false, isError: false, data: { enabled: false, month: '2026-11-01', calls: 0, leadsCaptured: 0, urgentLeads: 0, contactedLeads: 0, pendingLeads: 0, busiestDays: [] } },
@@ -30,7 +32,10 @@ const {
 vi.mock('@clerk/react', () => ({
   useClerk: () => ({ signOut: mockSignOut }),
   useUser: () => ({ user: { id: 'user_unconfigured' } }),
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  ClerkProvider: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
+    mockClerkProviderProps(props);
+    return children;
+  },
   Show: ({ children }: { children: React.ReactNode }) => children,
   SignIn: () => null,
   SignUp: () => null,
@@ -95,12 +100,58 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage, NativeClerkStartupGate } from './App';
+import App, { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage, NativeClerkStartupGate } from './App';
 import { Router as TestRouter, Route } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+
+describe('iOS Clerk configuration', () => {
+  let previousMatchMedia: PropertyDescriptor | undefined;
+
+  afterEach(() => {
+    mockNativeState.value = false;
+    if (previousMatchMedia) {
+      Object.defineProperty(window, 'matchMedia', previousMatchMedia);
+      previousMatchMedia = undefined;
+    } else {
+      Reflect.deleteProperty(window, 'matchMedia');
+    }
+  });
+
+  it('uses persistent non-browser Clerk sessions and hides social sign-in methods', async () => {
+    mockNativeState.value = true;
+    mockAppAuth.value = { isLoaded: true, isSignedIn: false, user: null, error: null };
+    mockClerkProviderProps.mockClear();
+    previousMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockImplementation((media: string) => ({
+        matches: false,
+        media,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false),
+      })) as unknown as typeof window.matchMedia,
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(mockClerkProviderProps).toHaveBeenCalled());
+    const nativeProps = mockClerkProviderProps.mock.calls.at(-1)?.[0] as Record<string, any>;
+    expect(nativeProps.standardBrowser).toBe(false);
+    expect(nativeProps.experimental).toMatchObject({ persistClient: true });
+    expect(nativeProps.appearance.elements.socialButtons).toEqual({ display: 'none' });
+    expect(nativeProps.appearance.elements.socialButtonsBlockButton).toEqual({ display: 'none' });
+    expect(nativeProps.appearance.elements.dividerRow).toEqual({ display: 'none' });
+    expect(nativeProps.appearance.elements.dividerText).toEqual({ display: 'none' });
+  });
+});
 
 const sampleProfile = {
   isInternal: false,
@@ -433,9 +484,9 @@ describe('native AppShell billing boundaries', () => {
   });
 });
 
-describe('native Clerk startup retry screen', () => {
-  it('shows the initialization error and retry action instead of waiting indefinitely', () => {
-    const message = 'Native sign-in plugin did not respond after 3 seconds.';
+describe('Clerk startup retry screen', () => {
+  it('shows the sign-in error and retry action instead of waiting indefinitely', () => {
+    const message = 'Sign-in is taking longer than expected. Please try again.';
     mockAppAuth.value = {
       user: null,
       isLoaded: true,

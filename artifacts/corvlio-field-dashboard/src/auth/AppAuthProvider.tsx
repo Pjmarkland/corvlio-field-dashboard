@@ -12,11 +12,13 @@ import { useAuth, useClerk, useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import {
-  getNativeClerkFailureMessage,
+  getNativeClerkToken,
   nativeClerkAuth,
   type NativeClerkAuthState,
   type NativeClerkUser,
 } from './nativeClerkAuth';
+
+const USE_NATIVE_CLERK = false;
 
 export type AppAuthUser = {
   id: string;
@@ -33,7 +35,6 @@ export type AppAuthValue = {
   isSignedIn: boolean;
   error: string | null;
   authMode: 'web' | 'native' | 'web-fallback';
-  nativeFallbackReason: string | null;
   signOut: () => Promise<void>;
   startHostedAuth: (mode: 'signIn' | 'signUp') => Promise<void>;
 };
@@ -44,7 +45,6 @@ const signedOut: AppAuthValue = {
   isSignedIn: false,
   error: null,
   authMode: 'web',
-  nativeFallbackReason: null,
   signOut: async () => {},
   startHostedAuth: async () => {
     throw new Error('Native sign-in is unavailable.');
@@ -73,7 +73,6 @@ export function WebAppAuthProvider({ children }: { children: ReactNode }) {
     isSignedIn: Boolean(isSignedIn),
     error: null,
     authMode: 'web',
-    nativeFallbackReason: null,
     signOut: async () => { await signOut(); },
     startHostedAuth: async () => {
       throw new Error('Hosted native authentication is only available in the iOS app.');
@@ -111,8 +110,7 @@ export function NativeAppAuthProvider({
     user: null,
   });
   const [nativeIsLoaded, setNativeIsLoaded] = useState(false);
-  const [fallbackMode, setFallbackMode] = useState(false);
-  const [nativeFallbackReason, setNativeFallbackReason] = useState<string | null>(null);
+  const [fallbackMode, setFallbackMode] = useState(!USE_NATIVE_CLERK);
   const [fallbackError, setFallbackError] = useState<string | null>(null);
   const previousUserId = useRef<string | null | undefined>(undefined);
 
@@ -125,16 +123,25 @@ export function NativeAppAuthProvider({
     setAuthState(next);
   }, [queryClient]);
 
-  const activateWebFallback = useCallback(async (reason: unknown) => {
-    const tracedReason = await getNativeClerkFailureMessage(reason);
+  const activateWebFallback = useCallback((reason: unknown) => {
+    const diagnostic = reason instanceof Error
+      ? reason.message
+      : 'Unknown native authentication error.';
+    console.warn('[Corvlio auth] Native authentication failed; using Clerk web auth.', diagnostic);
     setAuthTokenGetter(() => getToken());
-    setNativeFallbackReason(tracedReason);
     setFallbackError(null);
     setFallbackMode(true);
   }, [getToken]);
 
   useEffect(() => {
     let mounted = true;
+    if (!USE_NATIVE_CLERK) {
+      console.info('[Corvlio auth] USE_NATIVE_CLERK=false; using the in-app Clerk form.');
+      setAuthTokenGetter(() => getToken());
+      return () => { mounted = false; };
+    }
+
+    setAuthTokenGetter(getNativeClerkToken);
     void (async () => {
       try {
         await nativeClerkAuth.initialize({
@@ -148,11 +155,11 @@ export function NativeAppAuthProvider({
         setNativeIsLoaded(true);
       } catch (reason) {
         if (!mounted) return;
-        await activateWebFallback(reason);
+        activateWebFallback(reason);
       }
     })();
     return () => { mounted = false; };
-  }, [activateWebFallback, applyState, publishableKey]);
+  }, [activateWebFallback, applyState, getToken, publishableKey]);
 
   useEffect(() => {
     if (!fallbackMode || isWebAuthLoaded) {
@@ -160,12 +167,12 @@ export function NativeAppAuthProvider({
       return;
     }
     const timer = window.setTimeout(() => {
-      setFallbackError(
-        `Clerk web sign-in did not finish loading. ${nativeFallbackReason ?? 'Native sign-in did not respond.'}`,
-      );
+      const message = 'Sign-in is taking longer than expected. Check your connection and try again.';
+      console.warn('[Corvlio auth] Clerk web sign-in did not finish loading.');
+      setFallbackError(message);
     }, 12_000);
     return () => window.clearTimeout(timer);
-  }, [fallbackMode, isWebAuthLoaded, nativeFallbackReason]);
+  }, [fallbackMode, isWebAuthLoaded]);
 
   useEffect(() => {
     if (!fallbackMode) return;
@@ -216,7 +223,6 @@ export function NativeAppAuthProvider({
     isSignedIn,
     error,
     authMode: fallbackMode ? 'web-fallback' : 'native',
-    nativeFallbackReason,
     signOut,
     startHostedAuth,
   }), [
@@ -225,7 +231,6 @@ export function NativeAppAuthProvider({
     fallbackMode,
     isLoaded,
     isSignedIn,
-    nativeFallbackReason,
     signOut,
     startHostedAuth,
     webAuthUser,

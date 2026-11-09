@@ -205,6 +205,19 @@ const clerkAppearance = {
   },
 };
 
+const nativeClerkAppearance = {
+  ...clerkAppearance,
+  elements: {
+    ...clerkAppearance.elements,
+    socialButtons: { display: 'none' },
+    socialButtonsBlockButton: { display: 'none' },
+    socialButtonsIconButton: { display: 'none' },
+    dividerRow: { display: 'none' },
+    dividerText: { display: 'none' },
+    dividerLine: { display: 'none' },
+  },
+};
+
 type SettingsState = { notifications: boolean; dailyDigest: boolean };
 
 function loadSettings(): SettingsState {
@@ -1150,7 +1163,9 @@ function NativeClerkRoutes() {
   return <ClerkProvider
     publishableKey={clerkPubKey}
     proxyUrl={clerkProxyUrl}
-    appearance={clerkAppearance}
+    appearance={nativeClerkAppearance}
+    standardBrowser={false}
+    experimental={{ persistClient: true }}
     signInUrl={`${basePath}/sign-in`}
     signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }}
@@ -1199,7 +1214,7 @@ export function NativeClerkStartupGate({ children }: { children: ReactNode }) {
           {error
             ? error
             : timedOut
-              ? 'Native sign-in did not respond. Please retry.'
+              ? 'Sign-in is taking longer than expected. Please try again.'
             : 'Please wait while Corvlio checks your account.'}
         </p>
         <p className="mt-3 text-xs text-white/55">{getAppBuildInfo()}</p>

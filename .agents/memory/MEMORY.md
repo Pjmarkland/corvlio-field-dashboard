@@ -1,5 +1,5 @@
 - [Clerk PWA auth](clerk-pwa-auth.md) — keep Clerk’s proxy wiring and Tailwind layer order intact when adding branded web sign-in.
-- [Native Clerk environments](native-clerk-environments.md) — Capacitor must use its configured Clerk key directly; localhost host-derived keys do not identify the production Frontend API.
+- [Native Clerk environments](native-clerk-environments.md) — use the configured native key and keep iOS on embedded Clerk auth until the native plugin passes device validation.
 - [Owner routing safety](owner-routing-safety.md) — routing guards cannot repair missing production ownership; never silently relink businesses by email.
 - [PWA data-source migrations](pwa-data-source-migrations.md) — invalidate installed app shells and legacy client data when replacing a persisted data source.
 - [Google Sheets row writes](google-sheets-row-writes.md) — stable-ID lookup handles normal reorders; strict simultaneous-sort safety needs a lock-bearing Apps Script.

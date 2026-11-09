@@ -75,14 +75,13 @@ const signedInState = {
 };
 
 function AuthProbe() {
-  const { isLoaded, isSignedIn, user, signOut, authMode, nativeFallbackReason } = useAppAuth();
+  const { isLoaded, isSignedIn, user, signOut, authMode } = useAppAuth();
   return (
     <div>
       <p data-testid="native-auth-state">
         {isLoaded ? (isSignedIn ? `signed-in:${user?.id}` : 'signed-out') : 'loading'}
       </p>
       <p data-testid="native-auth-mode">{authMode}</p>
-      <p data-testid="native-fallback-reason">{nativeFallbackReason}</p>
       <button type="button" onClick={() => void signOut()}>Sign out in test</button>
     </div>
   );
@@ -120,60 +119,23 @@ beforeEach(() => {
   mocks.webAuth = { user: null, isLoaded: true, isSignedIn: false };
 });
 
-describe('native Clerk hosted authentication', () => {
-  it('initializes the registered key and enters the dashboard after hosted sign-in', async () => {
-    renderNative(
-      <Switch>
-        <Route path="/sign-in">
-          <NativeHostedSignInPage mode="signIn" />
-        </Route>
-        <Route path="/dashboard">Native dashboard</Route>
-      </Switch>,
-    );
-
-    await waitFor(() => expect(mocks.initialize).toHaveBeenCalledWith({
-      publishableKey: 'pk_test_native-test',
-      redirectUrl: 'com.corvlio.fielddashboard://callback',
-      callbackUrlScheme: 'com.corvlio.fielddashboard',
-    }));
-    fireEvent.click(await screen.findByTestId('button-native-clerk-hosted-auth'));
-    expect(await screen.findByText('Native dashboard')).toBeTruthy();
-    expect(mocks.startHostedAuth).toHaveBeenCalledWith({ mode: 'signIn' });
-  });
-
-  it('loads Keychain state separately and forwards sign-out', async () => {
-    mocks.getAuthState.mockResolvedValue(signedInState);
-    renderNative(<AuthProbe />, '/dashboard');
-
-    expect((await screen.findByTestId('native-auth-state')).textContent).toContain('signed-in:user_native_test');
-    fireEvent.click(screen.getByText('Sign out in test'));
-    await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
-    await waitFor(() => expect(screen.getByTestId('native-auth-state').textContent).toContain('signed-out'));
-  });
-
-  it('automatically shows Clerk email/password sign-in after native initialization fails', async () => {
-    mocks.initialize.mockRejectedValue(new Error('Native configure did not respond.'));
+describe('iOS in-app Clerk authentication', () => {
+  it('renders sign-in immediately without initializing or tracing the native plugin', async () => {
     const routes = (
       <Switch>
         <Route path="/"><div data-testid="public-home">Public homepage</div></Route>
-        <Route path="/sign-in">
-          <>
-            <AuthProbe />
-            <NativeHostedSignInPage mode="signIn" />
-          </>
-        </Route>
+        <Route path="/sign-in"><NativeHostedSignInPage mode="signIn" /></Route>
         <Route path="/dashboard">Native dashboard</Route>
       </Switch>
     );
-    const { location, rerenderNative } = renderNative(routes);
+    const { location } = renderNative(routes);
 
     expect(await screen.findByTestId('clerk-fallback-sign-in')).toBeTruthy();
-    expect(screen.getByTestId('native-auth-mode').textContent).toBe('web-fallback');
-    expect(screen.getByTestId('native-fallback-reason').textContent)
-      .toBe('Native configure did not respond. Last native step: initialize called.');
-    expect(screen.getByText(/Continue with your Corvlio email and password/)).toBeTruthy();
+    expect(mocks.initialize).not.toHaveBeenCalled();
+    expect(mocks.getDebugTrace).not.toHaveBeenCalled();
     expect(location.history?.at(-1)).toBe('/sign-in');
     expect(screen.queryByTestId('public-home')).toBeNull();
+    expect(screen.queryByText(/Clerk in-app sign-in fallback|Native sign-in did not respond|Native diagnostic trace/)).toBeNull();
 
     const signInProps = mocks.signInProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(signInProps).toMatchObject({
@@ -186,34 +148,59 @@ describe('native Clerk hosted authentication', () => {
     const tokenGetter = mocks.setAuthTokenGetter.mock.calls.at(-1)?.[0] as (() => Promise<string | null>) | undefined;
     expect(tokenGetter).toBeTypeOf('function');
     await expect(tokenGetter?.()).resolves.toBe('session-token-test');
+  });
 
+  it('restores a Clerk web session on startup, attaches its bearer token, and signs out through Clerk', async () => {
     mocks.webAuth = {
       user: {
-        id: 'user_web_fallback',
-        fullName: 'Web Fallback',
-        firstName: 'Web',
-        lastName: 'Fallback',
-        primaryEmailAddress: { emailAddress: 'fallback@example.test' },
-        emailAddresses: [{ emailAddress: 'fallback@example.test' }],
+        id: 'user_restored',
+        fullName: 'Restored User',
+        firstName: 'Restored',
+        lastName: 'User',
+        primaryEmailAddress: { emailAddress: 'restored@example.test' },
+        emailAddresses: [{ emailAddress: 'restored@example.test' }],
       },
       isLoaded: true,
       isSignedIn: true,
     };
-    rerenderNative(routes);
+    const routes = (
+      <Switch>
+        <Route path="/"><div data-testid="public-home">Public homepage</div></Route>
+        <Route path="/sign-in"><NativeHostedSignInPage mode="signIn" /></Route>
+        <Route path="/dashboard">
+          <>
+            <p>Native dashboard</p>
+            <AuthProbe />
+          </>
+        </Route>
+      </Switch>
+    );
+    const { location } = renderNative(routes);
+
     expect(await screen.findByText('Native dashboard')).toBeTruthy();
     expect(location.history?.at(-1)).toBe('/dashboard');
+    expect(screen.getByTestId('native-auth-state').textContent).toBe('signed-in:user_restored');
+    expect(screen.queryByTestId('public-home')).toBeNull();
+    expect(mocks.initialize).not.toHaveBeenCalled();
+
+    const tokenGetter = mocks.setAuthTokenGetter.mock.calls.at(-1)?.[0] as (() => Promise<string | null>) | undefined;
+    await expect(tokenGetter?.()).resolves.toBe('session-token-test');
+    fireEvent.click(screen.getByText('Sign out in test'));
+    await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
   });
 
-  it('uses virtual routing for sign-up fallback and keeps the welcome redirect', async () => {
-    mocks.initialize.mockRejectedValue(new Error('Native configure did not respond.'));
-    renderNative(
+  it('keeps email-code sign-up in the app and routes a completed session to welcome', async () => {
+    const routes = (
       <Switch>
         <Route path="/sign-up"><NativeHostedSignInPage mode="signUp" /></Route>
-      </Switch>,
-      '/sign-up',
+        <Route path="/welcome">Welcome setup</Route>
+      </Switch>
     );
+    const { rerenderNative, location } = renderNative(routes, '/sign-up');
 
     expect(await screen.findByTestId('clerk-fallback-sign-up')).toBeTruthy();
+    expect(mocks.initialize).not.toHaveBeenCalled();
+    expect(mocks.getDebugTrace).not.toHaveBeenCalled();
     const signUpProps = mocks.signUpProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(signUpProps).toMatchObject({
       routing: 'virtual',
@@ -221,5 +208,21 @@ describe('native Clerk hosted authentication', () => {
       forceRedirectUrl: expect.stringMatching(/\/welcome$/),
     });
     expect(signUpProps).not.toHaveProperty('path');
+
+    mocks.webAuth = {
+      user: {
+        id: 'user_new_signup',
+        fullName: 'New User',
+        firstName: 'New',
+        lastName: 'User',
+        primaryEmailAddress: { emailAddress: 'new@example.test' },
+        emailAddresses: [{ emailAddress: 'new@example.test' }],
+      },
+      isLoaded: true,
+      isSignedIn: true,
+    };
+    rerenderNative(routes);
+    expect(await screen.findByText('Welcome setup')).toBeTruthy();
+    expect(location.history?.at(-1)).toBe('/welcome');
   });
 });
