@@ -4,8 +4,12 @@ import { resolve } from "node:path";
 
 export const REVIEW_DEMO_BUSINESS_NAME = "App Review Demo";
 export const REVIEW_DEMO_MARKER = "app-review-demo-seed:v1";
+export const SEPARATE_REVIEW_DEMO_BUSINESS_NAME = "Corvlio Reviewer Demo";
+export const SEPARATE_REVIEW_DEMO_MARKER = "corvlio-reviewer-demo:v1";
 const BUSINESS_MARKER_KEY = "_appReviewDemoSeed";
 const CALL_ID_PREFIX = "corvlio-review-demo-cli:";
+const SEPARATE_BUSINESS_MARKER_KEY = "_corvlioReviewerDemo";
+const SEPARATE_CALL_ID_PREFIX = "corvlio-reviewer-demo:";
 
 export class ReviewDemoSeedError extends Error {}
 
@@ -16,6 +20,9 @@ export function parseArgs(args) {
   let allowProduction = false;
   let reconcileExisting = false;
   let dryRun = false;
+  let createSeparate = false;
+  let businessName = SEPARATE_REVIEW_DEMO_BUSINESS_NAME;
+  let businessNameProvided = false;
 
   for (let index = 0; index < forwardedArgs.length; index += 1) {
     const arg = forwardedArgs[index];
@@ -46,6 +53,26 @@ export function parseArgs(args) {
     } else if (arg === "--dry-run") {
       if (dryRun) throw new ReviewDemoSeedError("Supply --dry-run only once.");
       dryRun = true;
+    } else if (arg === "--create-separate") {
+      if (createSeparate) throw new ReviewDemoSeedError("Supply --create-separate only once.");
+      createSeparate = true;
+    } else if (arg === "--business-name") {
+      if (
+        businessNameProvided
+        || !forwardedArgs[index + 1]
+        || forwardedArgs[index + 1].startsWith("--")
+      ) {
+        throw new ReviewDemoSeedError("Supply one non-empty --business-name.");
+      }
+      businessName = forwardedArgs[index + 1];
+      businessNameProvided = true;
+      index += 1;
+    } else if (arg.startsWith("--business-name=")) {
+      if (businessNameProvided) {
+        throw new ReviewDemoSeedError("Supply --business-name only once.");
+      }
+      businessName = arg.slice("--business-name=".length);
+      businessNameProvided = true;
     } else if (arg === "--help") {
       return {
         help: true,
@@ -54,6 +81,8 @@ export function parseArgs(args) {
         allowProduction: false,
         reconcileExisting: false,
         dryRun: false,
+        createSeparate: false,
+        businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
       };
     } else {
       throw new ReviewDemoSeedError("Unrecognized option. Use --help for usage.");
@@ -66,7 +95,32 @@ export function parseArgs(args) {
   if (remove && reconcileExisting) {
     throw new ReviewDemoSeedError("--remove and --reconcile-existing cannot be used together.");
   }
-  return { help: false, clerkUserId, remove, allowProduction, reconcileExisting, dryRun };
+  if (createSeparate && (remove || reconcileExisting)) {
+    throw new ReviewDemoSeedError("--create-separate cannot be combined with --remove or --reconcile-existing.");
+  }
+  if (businessNameProvided && !createSeparate) {
+    throw new ReviewDemoSeedError("--business-name requires --create-separate.");
+  }
+  if (createSeparate) {
+    const normalizedName = typeof businessName === "string" ? businessName.trim() : "";
+    if (!normalizedName || normalizedName.length > 120) {
+      throw new ReviewDemoSeedError("--business-name must contain 1 to 120 characters.");
+    }
+    if (normalizedName.toLowerCase() === REVIEW_DEMO_BUSINESS_NAME.toLowerCase()) {
+      throw new ReviewDemoSeedError("--create-separate requires a name different from App Review Demo.");
+    }
+    businessName = normalizedName;
+  }
+  return {
+    help: false,
+    clerkUserId,
+    remove,
+    allowProduction,
+    reconcileExisting,
+    dryRun,
+    createSeparate,
+    businessName,
+  };
 }
 
 function isSet(value) {
@@ -692,6 +746,146 @@ async function insertMissingLeads(client, businessId, expectedIds, presentIds, n
   return createdCount;
 }
 
+/**
+ * Insert-only reviewer demo path. It never selects a business by name for reuse
+ * and never updates or deletes any existing business or lead.
+ */
+export async function createSeparateReviewDemo(client, clerkUserId, {
+  businessName = SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
+  now = new Date(),
+  dryRun = false,
+  onReport = console.log,
+} = {}) {
+  const name = typeof businessName === "string" ? businessName.trim() : "";
+  if (!name || name.length > 120) {
+    throw new ReviewDemoSeedError("The separate demo business name must contain 1 to 120 characters.");
+  }
+  if (name.toLowerCase() === REVIEW_DEMO_BUSINESS_NAME.toLowerCase()) {
+    throw new ReviewDemoSeedError("The separate demo business must not use the existing App Review Demo name.");
+  }
+  if (typeof clerkUserId !== "string" || !/^user_[A-Za-z0-9_-]+$/.test(clerkUserId)) {
+    throw new ReviewDemoSeedError("A valid existing Clerk user ID is required.");
+  }
+
+  await client.query(
+    dryRun
+      ? "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY"
+      : "BEGIN ISOLATION LEVEL SERIALIZABLE",
+  );
+  try {
+    if (!dryRun) {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`${SEPARATE_REVIEW_DEMO_MARKER}:${clerkUserId}`],
+      );
+    }
+
+    // This is deliberately the first data check. Any existing business for
+    // this identity, sample or otherwise, makes this create-only operation stop.
+    const owned = await client.query(
+      `SELECT id
+       FROM businesses
+       WHERE clerk_user_id = $1
+       LIMIT 1${dryRun ? "" : " FOR UPDATE"}`,
+      [clerkUserId],
+    );
+    if (owned.rows.length > 0) {
+      throw new ReviewDemoSeedError(
+        "The demo Clerk user already owns a business. No business or lead was changed.",
+      );
+    }
+
+    const leads = reviewDemoLeads(now);
+    const marker = JSON.stringify({ [SEPARATE_BUSINESS_MARKER_KEY]: SEPARATE_REVIEW_DEMO_MARKER });
+    if (dryRun) {
+      emitReport(onReport, {
+        dry_run: true,
+        business: {
+          name,
+          owner_clerk_id: clerkUserId,
+          is_sample: true,
+          marker: SEPARATE_REVIEW_DEMO_MARKER,
+        },
+        plan: [
+          "Insert one new fictional sample business; no existing business is selected or reused.",
+          `Insert ${leads.length} fictional leads linked to the new business.`,
+        ],
+        result: "No database changes made.",
+      });
+      await client.query("ROLLBACK");
+      return {
+        dryRun: true,
+        businessId: null,
+        createdBusiness: true,
+        createdLeads: leads.length,
+        totalLeads: leads.length,
+      };
+    }
+
+    const inserted = await client.query(
+      `INSERT INTO businesses
+         (business_name, business_hours, time_zone, agent_name, clerk_user_id, owner_email,
+          is_internal, billing_mode, chosen_plan, manual_payment_state, first_invoice_paid_at,
+          owner_phone, sms_alerts_consent, lead_alerts_enabled, retell_phone_number,
+          retell_agent_id, is_sample, provisioning_state, service_area, business_type,
+          services_offered, major_issue_examples, services_not_offered, managed_reports_enabled,
+          website_enrichment_sources)
+       VALUES
+         ($1, 'Mon-Fri 08:00-18:00', 'America/New_York', 'Aria', $2, NULL,
+          false, 'manual', NULL, NULL, NULL, NULL, false, false, NULL, NULL,
+          true, 'sample', 'Example City, Florida', 'Home services',
+          'Fictional plumbing and HVAC reviewer demo only.',
+          'Leaks, cooling issues, drains, and water heaters. Fictional demo data only.',
+          'No appointments or emergency dispatch are offered by this demo.',
+          false, $3::jsonb)
+       RETURNING id`,
+      [name, clerkUserId, marker],
+    );
+    const businessId = Number(inserted.rows[0]?.id);
+    if (!Number.isSafeInteger(businessId) || businessId <= 0) {
+      throw new ReviewDemoSeedError("The separate demo business insert returned no valid ID.");
+    }
+
+    for (const [index, lead] of leads.entries()) {
+      const callId = `${SEPARATE_CALL_ID_PREFIX}${businessId}:${String(index + 1).padStart(3, "0")}`;
+      await client.query(
+        `INSERT INTO leads
+           (business_id, caller_name, retell_call_id, phone_number, callback_number,
+            issue_reason, address, urgency_level, availability, status,
+            contacted_at, contacted_by, summary, created_at)
+         VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          businessId,
+          lead.name,
+          callId,
+          lead.phone,
+          lead.issue,
+          lead.address,
+          lead.urgency,
+          lead.availability,
+          lead.status,
+          lead.contactedAt,
+          lead.contactedAt ? name : null,
+          lead.summary ?? "Fictional reviewer demo lead. No real call was placed.",
+          lead.createdAt,
+        ],
+      );
+    }
+
+    await client.query("COMMIT");
+    return {
+      dryRun: false,
+      businessId,
+      createdBusiness: true,
+      createdLeads: leads.length,
+      totalLeads: leads.length,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 export async function seedReviewDemo(client, clerkUserId, {
   now = new Date(),
   reconcileExisting = false,
@@ -982,7 +1176,7 @@ export async function removeReviewDemo(client, clerkUserId, {
 export async function main(args = process.argv.slice(2), env = process.env) {
   const options = parseArgs(args);
   if (options.help) {
-    console.log("Usage: pnpm run seed:review-demo -- --clerk-user-id=<id> [--reconcile-existing] [--dry-run] [--remove] [--allow-production]");
+    console.log("Usage: pnpm run seed:review-demo -- --clerk-user-id=<id> [--reconcile-existing] [--dry-run] [--remove] [--allow-production]\n       pnpm run seed:review-demo -- --create-separate --business-name=\"Corvlio Reviewer Demo\" --clerk-user-id=<id> [--dry-run] [--allow-production]");
     return;
   }
   const target = assertRunTarget(options, env);
@@ -995,14 +1189,23 @@ export async function main(args = process.argv.slice(2), env = process.env) {
   const client = new Client({ connectionString: env.DATABASE_URL });
   try {
     await client.connect();
-    const result = options.remove
-      ? await removeReviewDemo(client, options.clerkUserId, { dryRun: options.dryRun })
-      : await seedReviewDemo(client, options.clerkUserId, {
+    const result = options.createSeparate
+      ? await createSeparateReviewDemo(client, options.clerkUserId, {
+          businessName: options.businessName,
+          dryRun: options.dryRun,
+        })
+      : options.remove
+        ? await removeReviewDemo(client, options.clerkUserId, { dryRun: options.dryRun })
+        : await seedReviewDemo(client, options.clerkUserId, {
           reconcileExisting: options.reconcileExisting,
           dryRun: options.dryRun,
         });
     if (options.dryRun) {
       console.log(`Dry run completed against ${target}; no database changes were made.`);
+    } else if (options.createSeparate) {
+      console.log(
+        `Created separate fictional ${options.businessName} business #${result.businessId} with ${result.createdLeads} leads in ${target}. No calls, messages, email, billing, Stripe, or phone provisioning were triggered.`,
+      );
     } else if (options.remove) {
       if (!result.removed) {
         console.log(`No script-created ${REVIEW_DEMO_BUSINESS_NAME} was found in ${target}; nothing was removed.`);

@@ -7,9 +7,12 @@ import {
   REVIEW_DEMO_MARKER,
   reviewDemoLeads,
   SAFE_DEMO_BUSINESS_PROFILE,
+  SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
+  SEPARATE_REVIEW_DEMO_MARKER,
   ReviewDemoSeedError,
   seedReviewDemo,
   removeReviewDemo,
+  createSeparateReviewDemo,
 } from "./seed-review-demo.mjs";
 
 const TARGET_USER = "user_review_demo_target";
@@ -51,6 +54,7 @@ class FakeClient {
     this.mutations = [];
     this.statements = [];
     this.nextLeadId = 1;
+    this.nextBusinessId = 7002;
   }
 
   async query(sql, params = []) {
@@ -60,11 +64,34 @@ class FakeClient {
     if (/^(begin|commit|rollback)\b/i.test(statement) || lower.includes("pg_advisory_xact_lock")) {
       return { rows: [], rowCount: 0 };
     }
+    if (lower.startsWith("select id from businesses where clerk_user_id")) {
+      const rows = [this.business, ...this.extraBusinesses]
+        .filter((row) => row && row.clerk_user_id === params[0])
+        .slice(0, 1)
+        .map(({ id }) => ({ id }));
+      return { rows, rowCount: rows.length };
+    }
     if (lower.startsWith("select * from businesses")) {
       const [name, userId] = params;
       const rows = [this.business, ...this.extraBusinesses]
         .filter((row) => row && (row.business_name === name || row.clerk_user_id === userId));
       return { rows, rowCount: rows.length };
+    }
+    if (lower.startsWith("insert into businesses")) {
+      this.mutations.push(statement);
+      const id = this.nextBusinessId++;
+      const created = {
+        id,
+        business_name: params[0],
+        clerk_user_id: params[1],
+        is_sample: true,
+        is_internal: false,
+        retell_phone_number: null,
+        retell_agent_id: null,
+        website_enrichment_sources: JSON.parse(params[2]),
+      };
+      this.extraBusinesses.push(created);
+      return { rows: [{ id }], rowCount: 1 };
     }
     if (lower.startsWith("select * from leads")) {
       const rows = this.leads
@@ -206,6 +233,8 @@ test("parses seed, remove, and explicit production modes", () => {
       allowProduction: false,
       reconcileExisting: false,
       dryRun: false,
+      createSeparate: false,
+      businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
     },
   );
   assert.deepEqual(
@@ -223,6 +252,8 @@ test("parses seed, remove, and explicit production modes", () => {
       allowProduction: true,
       reconcileExisting: false,
       dryRun: true,
+      createSeparate: false,
+      businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
     },
   );
   assert.deepEqual(
@@ -239,6 +270,8 @@ test("parses seed, remove, and explicit production modes", () => {
       allowProduction: true,
       reconcileExisting: true,
       dryRun: true,
+      createSeparate: false,
+      businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
     },
   );
   assert.throws(
@@ -248,6 +281,48 @@ test("parses seed, remove, and explicit production modes", () => {
   assert.throws(
     () => parseArgs(["--clerk-user-id=user_review_demo_test", "--dry-run", "--dry-run"]),
     /only once/,
+  );
+  assert.deepEqual(
+    parseArgs([
+      "--create-separate",
+      "--business-name",
+      "Corvlio Reviewer Demo",
+      "--clerk-user-id=user_review_demo_test",
+      "--dry-run",
+    ]),
+    {
+      help: false,
+      clerkUserId: "user_review_demo_test",
+      remove: false,
+      allowProduction: false,
+      reconcileExisting: false,
+      dryRun: true,
+      createSeparate: true,
+      businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
+    },
+  );
+  assert.throws(
+    () => parseArgs([
+      "--create-separate",
+      "--business-name=App Review Demo",
+      "--clerk-user-id=user_review_demo_test",
+    ]),
+    /different from App Review Demo/,
+  );
+  assert.throws(
+    () => parseArgs([
+      "--business-name=Corvlio Reviewer Demo",
+      "--clerk-user-id=user_review_demo_test",
+    ]),
+    /requires --create-separate/,
+  );
+  assert.throws(
+    () => parseArgs([
+      "--create-separate",
+      "--remove",
+      "--clerk-user-id=user_review_demo_test",
+    ]),
+    /cannot be combined/,
   );
 });
 
@@ -297,6 +372,121 @@ test("builds eight recent fictional leads with 555 numbers, mixed urgency and st
     assert.match(lead.address, /Example City/);
     assert.match(lead.summary ?? "No summary", /Fictional|No summary/);
   }
+});
+
+test("separate demo dry-run is read-only and does not select the existing App Review Demo", async () => {
+  const client = new FakeClient();
+  const reports = [];
+  const result = await createSeparateReviewDemo(client, TARGET_USER, {
+    businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
+    now: FIXED_NOW,
+    dryRun: true,
+    onReport: (report) => reports.push(JSON.parse(report)),
+  });
+
+  assert.deepEqual(result, {
+    dryRun: true,
+    businessId: null,
+    createdBusiness: true,
+    createdLeads: 8,
+    totalLeads: 8,
+  });
+  assert.equal(client.mutations.length, 0);
+  assert.ok(client.statements.includes("BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY"));
+  assert.ok(client.statements.includes("ROLLBACK"));
+  assert.equal(
+    client.statements.some((statement) => statement.startsWith("SELECT * FROM businesses")),
+    false,
+  );
+  const ownershipCheck = client.statements.find((statement) =>
+    statement.startsWith("SELECT id FROM businesses WHERE clerk_user_id"),
+  );
+  assert.ok(ownershipCheck);
+  assert.match(ownershipCheck, /LIMIT 1$/);
+  assert.doesNotMatch(ownershipCheck, /FOR UPDATE/i);
+  assert.equal(reports[0].business.name, SEPARATE_REVIEW_DEMO_BUSINESS_NAME);
+  assert.equal(reports[0].business.owner_clerk_id, TARGET_USER);
+  assert.equal(reports[0].plan.length, 2);
+  assert.match(reports[0].plan[0], /no existing business is selected or reused/i);
+  assert.match(reports[0].plan[1], /8 fictional leads/);
+  assert.match(reports[0].result, /No database changes/);
+  assert.deepEqual(client.business, makeBusiness());
+});
+
+test("separate demo inserts a new marked business and eight fictional leads without altering App Review Demo", async () => {
+  const client = new FakeClient();
+  const originalBusiness = structuredClone(client.business);
+  const result = await createSeparateReviewDemo(client, TARGET_USER, {
+    businessName: SEPARATE_REVIEW_DEMO_BUSINESS_NAME,
+    now: FIXED_NOW,
+    onReport: () => {},
+  });
+
+  assert.deepEqual(result, {
+    dryRun: false,
+    businessId: 7002,
+    createdBusiness: true,
+    createdLeads: 8,
+    totalLeads: 8,
+  });
+  assert.deepEqual(client.business, originalBusiness);
+  assert.equal(client.extraBusinesses.length, 1);
+  assert.equal(client.extraBusinesses[0].business_name, SEPARATE_REVIEW_DEMO_BUSINESS_NAME);
+  assert.equal(client.extraBusinesses[0].clerk_user_id, TARGET_USER);
+  assert.equal(client.extraBusinesses[0].is_sample, true);
+  assert.deepEqual(client.extraBusinesses[0].website_enrichment_sources, {
+    _corvlioReviewerDemo: SEPARATE_REVIEW_DEMO_MARKER,
+  });
+  assert.equal(client.leads.length, 8);
+  assert.equal(
+    new Set(client.leads.map((lead) => lead.retell_call_id)).size,
+    8,
+  );
+  assert.ok(client.leads.every((lead) =>
+    lead.business_id === 7002
+      && lead.retell_call_id.startsWith("corvlio-reviewer-demo:7002:")
+      && lead.summary?.includes("Fictional"),
+  ));
+  assert.equal(client.mutations.filter((sql) => sql.startsWith("INSERT INTO businesses")).length, 1);
+  assert.equal(client.mutations.filter((sql) => sql.startsWith("INSERT INTO leads")).length, 8);
+  assert.equal(
+    client.mutations.some((sql) => /^(UPDATE|DELETE)\b/i.test(sql)),
+    false,
+  );
+  assert.equal(
+    client.mutations.every((sql) =>
+      sql.startsWith("INSERT INTO businesses") || sql.startsWith("INSERT INTO leads")),
+    true,
+  );
+  assert.ok(client.statements.includes("COMMIT"));
+  assert.ok(
+    client.statements.indexOf(
+      client.statements.find((statement) =>
+        statement.startsWith("SELECT id FROM businesses WHERE clerk_user_id")),
+    ) < client.statements.findIndex((statement) => statement.startsWith("INSERT INTO businesses")),
+  );
+  assert.equal(
+    client.statements.some((statement) =>
+      /FROM businesses WHERE business_name = \$1/i.test(statement)),
+    false,
+  );
+});
+
+test("separate demo aborts without mutations when the Clerk user already owns any business", async () => {
+  const existing = makeBusiness({ owner: TARGET_USER, isSample: false });
+  const client = new FakeClient({ business: existing });
+  const original = structuredClone(client.business);
+
+  await assert.rejects(
+    () => createSeparateReviewDemo(client, TARGET_USER, {
+      onReport: () => {},
+    }),
+    /already owns a business/,
+  );
+  assert.equal(client.mutations.length, 0);
+  assert.deepEqual(client.business, original);
+  assert.ok(client.statements.includes("ROLLBACK"));
+  assert.equal(client.statements.some((statement) => statement.startsWith("INSERT INTO")), false);
 });
 
 test("reconcile dry-run prints the existing row and exact plan without writing", async () => {
