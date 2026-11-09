@@ -213,4 +213,48 @@ describe('usePushDeepLink', () => {
     expect(actionPerformedRemove).toHaveBeenCalled();
     expect(receivedRemove).toHaveBeenCalled();
   });
+
+  it('contains synchronous bridge failures and rejected listener registration', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockAddListener
+      .mockImplementationOnce(() => { throw new Error('Bridge unavailable'); })
+      .mockRejectedValueOnce(new Error('Push plugin unavailable'));
+    renderHook(() => usePushDeepLink());
+    await act(async () => { await Promise.resolve(); });
+    expect(log).toHaveBeenCalledTimes(2);
+    log.mockRestore();
+  });
+
+  it('removes a listener that finishes registering after unmount', async () => {
+    let resolve!: (value: { remove: typeof actionPerformedRemove }) => void;
+    mockAddListener.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const { unmount } = renderHook(() => usePushDeepLink());
+    unmount();
+    await act(async () => {
+      resolve({ remove: actionPerformedRemove });
+      await Promise.resolve();
+    });
+    expect(actionPerformedRemove).toHaveBeenCalledOnce();
+    expect(receivedRemove).toHaveBeenCalledOnce();
+  });
+
+  it('contains listener cleanup failures', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    actionPerformedRemove.mockRejectedValue(new Error('Bridge disconnected'));
+    const { unmount } = renderHook(() => usePushDeepLink());
+    await act(async () => { await Promise.resolve(); });
+    unmount();
+    await act(async () => { await Promise.resolve(); });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Could not remove'), expect.any(Error));
+    log.mockRestore();
+  });
+
+  it('ignores cross-origin and malformed deep links under the Capacitor scheme', async () => {
+    renderHook(() => usePushDeepLink());
+    await act(async () => { await Promise.resolve(); });
+    for (const deepLink of ['https://corvlio.com/leads/1', '//corvlio.com/leads/1', 123]) {
+      act(() => { actionPerformedCb?.({ notification: { data: { deepLink } } }); });
+    }
+    expect(mockSetLocation).not.toHaveBeenCalled();
+  });
 });

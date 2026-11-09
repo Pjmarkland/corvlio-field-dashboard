@@ -1,4 +1,5 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import { getLastStartupError, subscribeStartupErrors } from '@/lib/startupErrors';
+import { useEffect, useState, useSyncExternalStore, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { setBaseUrl } from '@workspace/api-client-react';
@@ -65,6 +66,7 @@ function StartupFailure({ error }: ErrorFallbackProps) {
 }
 
 function AppBootstrap() {
+  const globalError = useSyncExternalStore(subscribeStartupErrors, getLastStartupError, getLastStartupError);
   const [LoadedApp, setLoadedApp] = useState<ComponentType | null>(null);
   const [startupError, setStartupError] = useState<Error | null>(null);
 
@@ -89,10 +91,10 @@ function AppBootstrap() {
     };
   }, []);
 
-  if (startupError) {
+  if (globalError || startupError) {
     return (
       <StartupFailure
-        error={startupError}
+        error={globalError?.error ?? startupError!}
         resetError={() => window.location.reload()}
       />
     );
@@ -103,8 +105,8 @@ function AppBootstrap() {
 
 const root = createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
-  onCaughtError: () => {
-    console.error("Unexpected dashboard render error");
+  onCaughtError: (error, info) => {
+    console.error("Unexpected dashboard render error", error, info.componentStack);
   },
 });
 

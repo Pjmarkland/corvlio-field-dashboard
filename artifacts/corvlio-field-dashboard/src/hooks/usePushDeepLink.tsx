@@ -21,7 +21,7 @@
  */
 
 import { useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { useLocation } from 'wouter';
 import { ToastAction } from '@/components/ui/toast';
@@ -32,25 +32,47 @@ export function usePushDeepLink(): void {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    let disposed = false;
+    const handles: PluginListenerHandle[] = [];
+    const remove = async (handle: PluginListenerHandle) => {
+      try {
+        await handle.remove();
+      } catch (error) {
+        console.error('[Corvlio push] Could not remove notification listener', error);
+      }
+    };
+    const attach = async (register: () => Promise<PluginListenerHandle>) => {
+      try {
+        const handle = await register();
+        if (disposed) await remove(handle);
+        else handles.push(handle);
+      } catch (error) {
+        // Push is optional: a failed bridge must not prevent signing in.
+        console.error('[Corvlio push] Could not attach notification listener', error);
+      }
+    };
+    const localDeepLink = (value: unknown): string | undefined =>
+      typeof value === 'string' && /^\/(?!\/)/.test(value) ? value : undefined;
 
     // actionPerformed: user tapped a notification (background or cold-start).
     // Navigate to the deep-link path embedded in the APNs payload.
-    const actionPerformedHandle = PushNotifications.addListener(
+    void attach(() => PushNotifications.addListener(
       'pushNotificationActionPerformed',
       (action) => {
-        const deepLink = action.notification.data?.deepLink as string | undefined;
-        if (deepLink) {
+        const deepLink = localDeepLink(action?.notification?.data?.deepLink);
+        if (!disposed && deepLink) {
           setLocation(deepLink);
         }
       },
-    );
+    ));
 
     // received: notification arrived while the app is in the foreground.
     // Show an in-app banner so the owner isn't silently missed.
-    const receivedHandle = PushNotifications.addListener(
+    void attach(() => PushNotifications.addListener(
       'pushNotificationReceived',
       (notification) => {
-        const deepLink = notification.data?.deepLink as string | undefined;
+        if (disposed) return;
+        const deepLink = localDeepLink(notification?.data?.deepLink);
         toast({
           title: notification.title ?? 'New lead',
           description: notification.body ?? undefined,
@@ -64,11 +86,11 @@ export function usePushDeepLink(): void {
           ) : undefined,
         });
       },
-    );
+    ));
 
     return () => {
-      void actionPerformedHandle.then((h) => h.remove());
-      void receivedHandle.then((h) => h.remove());
+      disposed = true;
+      handles.forEach((handle) => { void remove(handle); });
     };
   }, [setLocation]);
 }
