@@ -435,7 +435,7 @@ describe('native AppShell billing boundaries', () => {
 
 describe('native Clerk startup retry screen', () => {
   it('shows the initialization error and retry action instead of waiting indefinitely', () => {
-    const message = 'Native sign-in plugin did not respond after 8 seconds.';
+    const message = 'Native sign-in plugin did not respond after 3 seconds.';
     mockAppAuth.value = {
       user: null,
       isLoaded: true,

@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react';
+import { SignIn, SignUp } from '@clerk/react';
 import { useLocation } from 'wouter';
 import { useAppAuth } from '@/auth/AppAuthProvider';
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 export function NativeHostedSignInPage({ mode }: { mode: 'signIn' | 'signUp' }) {
-  const { isLoaded, isSignedIn, error, startHostedAuth } = useAppAuth();
+  const {
+    isLoaded,
+    isSignedIn,
+    error,
+    authMode,
+    nativeFallbackReason,
+    startHostedAuth,
+  } = useAppAuth();
   const [, setLocation] = useLocation();
   const [busy, setBusy] = useState(false);
   const isSignUp = mode === 'signUp';
@@ -26,6 +36,45 @@ export function NativeHostedSignInPage({ mode }: { mode: 'signIn' | 'signUp' }) 
   };
 
   if (isLoaded && isSignedIn) return null;
+
+  if (authMode === 'web-fallback') {
+    return (
+      <main className="min-h-[100dvh] bg-background px-4 py-8 text-foreground">
+        <div className="mx-auto mb-5 max-w-md">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+            Clerk in-app sign-in fallback
+          </p>
+          <p role="status" className="mt-2 text-sm text-muted-foreground">
+            Native sign-in did not respond. Continue with your Corvlio email and password.
+          </p>
+          {nativeFallbackReason ? (
+            <details className="mt-3 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer font-semibold">Native diagnostic trace</summary>
+              <p className="mt-2 break-words">{nativeFallbackReason}</p>
+            </details>
+          ) : null}
+          {error ? <p role="alert" className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</p> : null}
+        </div>
+        <div className="flex justify-center">
+          {isSignUp ? (
+            <SignUp
+              routing="path"
+              path={`${basePath}/sign-up`}
+              signInUrl={`${basePath}/sign-in`}
+              forceRedirectUrl={`${basePath}/welcome`}
+            />
+          ) : (
+            <SignIn
+              routing="path"
+              path={`${basePath}/sign-in`}
+              signUpUrl={`${basePath}/sign-up`}
+              forceRedirectUrl={`${basePath}/dashboard`}
+            />
+          )}
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-5 py-8 text-foreground">

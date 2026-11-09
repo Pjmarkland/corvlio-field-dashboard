@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
 import { getNativeClerkToken } from '@/auth/nativeClerkAuth';
+import '@/lib/nativeClerkCookieBridge';
 
 import { ErrorBoundary, type ErrorFallbackProps } from '@/components/error-boundary';
 import { StartupFailureScreen } from '@/components/StartupFailureScreen';

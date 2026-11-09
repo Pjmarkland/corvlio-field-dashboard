@@ -4,6 +4,7 @@ const { plugin, registerPlugin } = vi.hoisted(() => ({
   plugin: {
     initialize: vi.fn(),
     getAuthState: vi.fn(),
+    getDebugTrace: vi.fn(),
     startHostedAuth: vi.fn(),
     getToken: vi.fn(),
     signOut: vi.fn(),
@@ -30,14 +31,14 @@ describe('native Clerk bridge initialization', () => {
   });
 
   it('registers the native plugin and forwards its initialization result', async () => {
-    const state = { isSignedIn: false, user: null };
-    plugin.initialize.mockResolvedValue(state);
+    const result = { configured: true };
+    plugin.initialize.mockResolvedValue(result);
 
     await expect(nativeClerkAuth.initialize({
       publishableKey: 'pk_test_native-test',
       redirectUrl: 'com.corvlio.fielddashboard://callback',
       callbackUrlScheme: 'com.corvlio.fielddashboard',
-    })).resolves.toEqual(state);
+    })).resolves.toEqual(result);
 
     expect(registerPlugin).toHaveBeenCalledWith('ClerkNativeAuth');
     expect(plugin.initialize).toHaveBeenCalledWith(expect.objectContaining({
@@ -69,5 +70,15 @@ describe('native Clerk bridge initialization', () => {
       redirectUrl: 'com.corvlio.fielddashboard://callback',
       callbackUrlScheme: 'com.corvlio.fielddashboard',
     })).rejects.toBe(error);
+  });
+
+  it('applies a short independent timeout to native auth-state loading', async () => {
+    vi.useFakeTimers();
+    plugin.getAuthState.mockReturnValue(new Promise(() => {}));
+
+    const stateLoad = nativeClerkAuth.getAuthState();
+    const rejection = expect(stateLoad).rejects.toThrow('Native sign-in state did not load after 2 seconds.');
+    await vi.advanceTimersByTimeAsync(2_000);
+    await rejection;
   });
 });

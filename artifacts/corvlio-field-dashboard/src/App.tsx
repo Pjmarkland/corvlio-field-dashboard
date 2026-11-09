@@ -1146,11 +1146,23 @@ function WebClerkRoutes() {
 }
 
 function NativeClerkRoutes() {
-  return <QueryClientProvider client={queryClient}>
-    <NativeAppAuthProvider publishableKey={clerkPubKey}>
-      <AppRoutes />
-    </NativeAppAuthProvider>
-  </QueryClientProvider>;
+  const [, setLocation] = useLocation();
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={clerkAppearance}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your field dashboard' } }, signUp: { start: { title: 'Create your owner account', subtitle: 'Get started with Corvlio Field Desk' } } }}
+    routerPush={(to) => setLocation(stripBase(to))}
+    routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  >
+    <QueryClientProvider client={queryClient}>
+      <NativeAppAuthProvider publishableKey={clerkPubKey}>
+        <AppRoutes />
+      </NativeAppAuthProvider>
+    </QueryClientProvider>
+  </ClerkProvider>;
 }
 
 function ClerkRoutes() {
