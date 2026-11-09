@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getToken: vi.fn(),
   webGetToken: vi.fn(),
   signOut: vi.fn(),
+  signInProps: vi.fn(),
+  signUpProps: vi.fn(),
   webAuth: {
     user: null as null | {
       id: string;
@@ -42,8 +44,14 @@ vi.mock('@clerk/react', async () => {
     useAuth: () => ({ getToken: mocks.webGetToken }),
     useUser: () => mocks.webAuth,
     useClerk: () => ({ signOut: mocks.signOut }),
-    SignIn: () => React.createElement('div', { 'data-testid': 'clerk-fallback-sign-in' }, 'Clerk email/password sign-in'),
-    SignUp: () => React.createElement('div', { 'data-testid': 'clerk-fallback-sign-up' }, 'Clerk email/password sign-up'),
+    SignIn: (props: Record<string, unknown>) => {
+      mocks.signInProps(props);
+      return React.createElement('div', { 'data-testid': 'clerk-fallback-sign-in' }, 'Clerk email/password sign-in');
+    },
+    SignUp: (props: Record<string, unknown>) => {
+      mocks.signUpProps(props);
+      return React.createElement('div', { 'data-testid': 'clerk-fallback-sign-up' }, 'Clerk email/password sign-up');
+    },
   };
 });
 vi.mock('@workspace/api-client-react', () => ({
@@ -82,17 +90,20 @@ function AuthProbe() {
 
 function renderNative(children: React.ReactNode, startPath = '/sign-in') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const location = memoryLocation({ path: startPath });
+  const location = memoryLocation({ path: startPath, record: true });
+  const wrap = (content: React.ReactNode) => (
+    <QueryClientProvider client={queryClient}>
+      <NativeAppAuthProvider publishableKey="pk_test_native-test">
+        <Router hook={location.hook}>
+          {content}
+        </Router>
+      </NativeAppAuthProvider>
+    </QueryClientProvider>
+  );
+  const result = render(wrap(children));
   return {
-    ...render(
-      <QueryClientProvider client={queryClient}>
-        <NativeAppAuthProvider publishableKey="pk_test_native-test">
-          <Router hook={location.hook}>
-            {children}
-          </Router>
-        </NativeAppAuthProvider>
-      </QueryClientProvider>,
-    ),
+    ...result,
+    rerenderNative: (content: React.ReactNode) => result.rerender(wrap(content)),
     location,
   };
 }
@@ -142,24 +153,73 @@ describe('native Clerk hosted authentication', () => {
 
   it('automatically shows Clerk email/password sign-in after native initialization fails', async () => {
     mocks.initialize.mockRejectedValue(new Error('Native configure did not respond.'));
-    renderNative(
-      <>
-        <AuthProbe />
-        <Switch>
-          <Route path="/sign-in"><NativeHostedSignInPage mode="signIn" /></Route>
-          <Route path="/dashboard">Native dashboard</Route>
-        </Switch>
-      </>,
+    const routes = (
+      <Switch>
+        <Route path="/"><div data-testid="public-home">Public homepage</div></Route>
+        <Route path="/sign-in">
+          <>
+            <AuthProbe />
+            <NativeHostedSignInPage mode="signIn" />
+          </>
+        </Route>
+        <Route path="/dashboard">Native dashboard</Route>
+      </Switch>
     );
+    const { location, rerenderNative } = renderNative(routes);
 
     expect(await screen.findByTestId('clerk-fallback-sign-in')).toBeTruthy();
     expect(screen.getByTestId('native-auth-mode').textContent).toBe('web-fallback');
     expect(screen.getByTestId('native-fallback-reason').textContent)
       .toBe('Native configure did not respond. Last native step: initialize called.');
     expect(screen.getByText(/Continue with your Corvlio email and password/)).toBeTruthy();
+    expect(location.history?.at(-1)).toBe('/sign-in');
+    expect(screen.queryByTestId('public-home')).toBeNull();
+
+    const signInProps = mocks.signInProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(signInProps).toMatchObject({
+      routing: 'virtual',
+      signUpUrl: expect.stringMatching(/\/sign-up$/),
+      forceRedirectUrl: expect.stringMatching(/\/dashboard$/),
+    });
+    expect(signInProps).not.toHaveProperty('path');
 
     const tokenGetter = mocks.setAuthTokenGetter.mock.calls.at(-1)?.[0] as (() => Promise<string | null>) | undefined;
     expect(tokenGetter).toBeTypeOf('function');
     await expect(tokenGetter?.()).resolves.toBe('session-token-test');
+
+    mocks.webAuth = {
+      user: {
+        id: 'user_web_fallback',
+        fullName: 'Web Fallback',
+        firstName: 'Web',
+        lastName: 'Fallback',
+        primaryEmailAddress: { emailAddress: 'fallback@example.test' },
+        emailAddresses: [{ emailAddress: 'fallback@example.test' }],
+      },
+      isLoaded: true,
+      isSignedIn: true,
+    };
+    rerenderNative(routes);
+    expect(await screen.findByText('Native dashboard')).toBeTruthy();
+    expect(location.history?.at(-1)).toBe('/dashboard');
+  });
+
+  it('uses virtual routing for sign-up fallback and keeps the welcome redirect', async () => {
+    mocks.initialize.mockRejectedValue(new Error('Native configure did not respond.'));
+    renderNative(
+      <Switch>
+        <Route path="/sign-up"><NativeHostedSignInPage mode="signUp" /></Route>
+      </Switch>,
+      '/sign-up',
+    );
+
+    expect(await screen.findByTestId('clerk-fallback-sign-up')).toBeTruthy();
+    const signUpProps = mocks.signUpProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(signUpProps).toMatchObject({
+      routing: 'virtual',
+      signInUrl: expect.stringMatching(/\/sign-in$/),
+      forceRedirectUrl: expect.stringMatching(/\/welcome$/),
+    });
+    expect(signUpProps).not.toHaveProperty('path');
   });
 });

@@ -16,5 +16,9 @@ import { SignUpPage } from './App';
 
 it('sends completed sign-ups to /welcome', () => {
   render(<SignUpPage />);
-  expect(String(signUpProps.mock.calls[0][0].forceRedirectUrl)).toMatch(/\/welcome$/);
+  const props = signUpProps.mock.calls[0][0];
+  expect(String(props.forceRedirectUrl)).toMatch(/\/welcome$/);
+  expect(props.routing).toBe('path');
+  expect(String(props.path)).toMatch(/\/sign-up$/);
+  expect(String(props.signInUrl)).toMatch(/\/sign-in$/);
 });

@@ -4,6 +4,9 @@ import { useLocation } from 'wouter';
 import { useAppAuth } from '@/auth/AppAuthProvider';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+// The Clerk runtime supports virtual routing, but SignIn/SignUp's current
+// component typings only expose path and hash routing.
+const nativeFallbackRouting = 'virtual' as never;
 
 export function NativeHostedSignInPage({ mode }: { mode: 'signIn' | 'signUp' }) {
   const {
@@ -58,15 +61,13 @@ export function NativeHostedSignInPage({ mode }: { mode: 'signIn' | 'signUp' }) 
         <div className="flex justify-center">
           {isSignUp ? (
             <SignUp
-              routing="path"
-              path={`${basePath}/sign-up`}
+              routing={nativeFallbackRouting}
               signInUrl={`${basePath}/sign-in`}
               forceRedirectUrl={`${basePath}/welcome`}
             />
           ) : (
             <SignIn
-              routing="path"
-              path={`${basePath}/sign-in`}
+              routing={nativeFallbackRouting}
               signUpUrl={`${basePath}/sign-up`}
               forceRedirectUrl={`${basePath}/dashboard`}
             />
