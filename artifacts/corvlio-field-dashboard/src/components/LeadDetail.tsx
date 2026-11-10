@@ -5,6 +5,7 @@ import { useUser } from '@clerk/react';
 import { getGetLeadDetailQueryKey, useGetLeadDetail, useUpdateLeadNotes, type LeadDetail } from '@workspace/api-client-react';
 import { ArrowLeft, CalendarClock, Check, Clock3, Copy, MapPin, Phone } from 'lucide-react';
 import { LeadContactActions } from '@/components/LeadContactActions';
+import { LeadNotesLog } from '@/components/LeadNotesLog';
 import { displayIssue, displayName, displayPhone, nameInitials, usablePhone } from '@/lib/leadDisplay';
 
 const MAX_NOTES = 10000;
@@ -180,6 +181,7 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
       {arrival ? <li className="flex items-center gap-2"><Clock3 size={14} className="text-muted-foreground" />Call arrived {arrival}</li> : null}
       {contactedAt ? <li className="flex items-center gap-2" data-testid="activity-contacted"><Check size={14} className="text-[#49a979]" />Contacted {contactedAt}{byYou ? ` by You${user?.fullName ? ` (${user.fullName})` : ''}` : actor ? ` by account ${actor}` : ''}</li> : null}
     </ul></Section>
+    <LeadNotesLog key={lead.id} leadId={lead.id} />
     <Notes key={`${user?.id}:${lead.id}`} lead={lead} queryKey={scopedKey} />
     <div className="detail-action-spacer" />
     <div className="detail-action-bar border-t border-border bg-card/95 px-4 py-3 backdrop-blur-md" data-testid="bar-detail-actions"><div className="mx-auto max-w-[1160px]">
