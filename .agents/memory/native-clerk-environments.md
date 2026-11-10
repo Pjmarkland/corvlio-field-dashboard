@@ -14,3 +14,9 @@ For native iOS authentication, use Clerk's in-app web form as the default path. 
 **Why:** the user reported that native plugin initialization times out on-device after about three seconds and its debug trace is unavailable.
 
 **How to apply:** do not re-enable the plugin based only on unit tests; validate the complete session lifecycle in an installed iOS build first.
+
+Supply Clerk's locally bundled UI explicitly to both web and native providers; do not rely on automatic UI downloading in non-browser mode.
+
+**Why:** Clerk Core 3 separates the core and UI bundles. With `standardBrowser=false`, the React SDK skips automatic UI loading unless a UI constructor is supplied, causing the on-device “Clerk was not loaded with Ui components” error.
+
+**How to apply:** use the documented `ui` export from `@clerk/ui` as the provider's `ui` prop. Keep compatible Clerk shared types without unsafe casts, and verify the production bundle graph includes the sign-in/sign-up UI chunks.

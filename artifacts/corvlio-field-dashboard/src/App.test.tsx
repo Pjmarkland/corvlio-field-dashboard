@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { preferLeadCallback } from '@/lib/leadDisplay';
+import { ui } from '@clerk/ui';
 
 const {
   mockRevoke,
@@ -30,7 +31,7 @@ const {
 }));
 
 vi.mock('@clerk/react', () => ({
-  useClerk: () => ({ signOut: mockSignOut }),
+  useClerk: () => ({ signOut: mockSignOut, addListener: () => () => {} }),
   useUser: () => ({ user: { id: 'user_unconfigured' } }),
   ClerkProvider: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
     mockClerkProviderProps(props);
@@ -110,20 +111,7 @@ import { ThemeProvider } from 'next-themes';
 describe('iOS Clerk configuration', () => {
   let previousMatchMedia: PropertyDescriptor | undefined;
 
-  afterEach(() => {
-    mockNativeState.value = false;
-    if (previousMatchMedia) {
-      Object.defineProperty(window, 'matchMedia', previousMatchMedia);
-      previousMatchMedia = undefined;
-    } else {
-      Reflect.deleteProperty(window, 'matchMedia');
-    }
-  });
-
-  it('uses persistent non-browser Clerk sessions and hides social sign-in methods', async () => {
-    mockNativeState.value = true;
-    mockAppAuth.value = { isLoaded: true, isSignedIn: false, user: null, error: null };
-    mockClerkProviderProps.mockClear();
+  beforeEach(() => {
     previousMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -139,17 +127,46 @@ describe('iOS Clerk configuration', () => {
         dispatchEvent: vi.fn(() => false),
       })) as unknown as typeof window.matchMedia,
     });
+  });
 
+  afterEach(() => {
+    mockNativeState.value = false;
+    if (previousMatchMedia) {
+      Object.defineProperty(window, 'matchMedia', previousMatchMedia);
+      previousMatchMedia = undefined;
+    } else {
+      Reflect.deleteProperty(window, 'matchMedia');
+    }
+  });
+
+  it('uses persistent non-browser Clerk sessions and hides social sign-in methods', async () => {
+    mockNativeState.value = true;
+    mockAppAuth.value = { isLoaded: true, isSignedIn: false, user: null, error: null };
+    mockClerkProviderProps.mockClear();
     render(<App />);
 
     await waitFor(() => expect(mockClerkProviderProps).toHaveBeenCalled());
     const nativeProps = mockClerkProviderProps.mock.calls.at(-1)?.[0] as Record<string, any>;
     expect(nativeProps.standardBrowser).toBe(false);
+    expect(nativeProps.ui).toBe(ui);
+    expect(typeof nativeProps.ui.ClerkUI).toBe('function');
     expect(nativeProps.experimental).toMatchObject({ persistClient: true });
     expect(nativeProps.appearance.elements.socialButtons).toEqual({ display: 'none' });
     expect(nativeProps.appearance.elements.socialButtonsBlockButton).toEqual({ display: 'none' });
     expect(nativeProps.appearance.elements.dividerRow).toEqual({ display: 'none' });
     expect(nativeProps.appearance.elements.dividerText).toEqual({ display: 'none' });
+  });
+
+  it('supplies the same locally bundled UI to the web provider', async () => {
+    mockNativeState.value = false;
+    mockAppAuth.value = { isLoaded: true, isSignedIn: false, user: null, error: null };
+    mockClerkProviderProps.mockClear();
+    render(<App />);
+    await waitFor(() => expect(mockClerkProviderProps).toHaveBeenCalled());
+    const props = mockClerkProviderProps.mock.calls.at(-1)?.[0] as Record<string, any>;
+    expect(props.ui).toBe(ui);
+    expect(typeof props.ui.ClerkUI).toBe('function');
+    expect(props.standardBrowser).toBeUndefined();
   });
 });
 

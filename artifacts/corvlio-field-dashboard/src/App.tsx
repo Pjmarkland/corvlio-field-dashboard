@@ -18,6 +18,7 @@ import {
   type LeadWorkspace,
 } from '@workspace/api-client-react';
 import { ClerkProvider, SignIn, SignUp, useClerk } from '@clerk/react';
+import { ui } from '@clerk/ui';
 import { shadcn } from '@clerk/themes';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Capacitor } from '@capacitor/core';
@@ -1140,6 +1141,7 @@ function AppRoutes() {
 function WebClerkRoutes() {
   const [, setLocation] = useLocation();
   return <ClerkProvider
+    ui={ui}
     publishableKey={clerkPubKey}
     proxyUrl={clerkProxyUrl}
     appearance={clerkAppearance}
@@ -1161,6 +1163,9 @@ function WebClerkRoutes() {
 function NativeClerkRoutes() {
   const [, setLocation] = useLocation();
   return <ClerkProvider
+    // Non-browser mode skips Clerk's automatic UI download. Bundle it locally
+    // so virtual SignIn/SignUp work under capacitor:// without a UI CDN script.
+    ui={ui}
     publishableKey={clerkPubKey}
     proxyUrl={clerkProxyUrl}
     appearance={nativeClerkAppearance}
