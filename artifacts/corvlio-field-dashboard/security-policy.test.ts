@@ -9,6 +9,8 @@ describe('bundled native content security policy', () => {
     expect(dashboardMetaCsp).toContain('https://challenges.cloudflare.com');
     expect(dashboardMetaCsp).toContain('form-action');
     expect(dashboardMetaCsp).toContain('script-src');
-    expect(dashboardMetaCsp).toContain('connect-src');
+    const connectSrc = dashboardMetaCsp.split(';').find((directive) => directive.trim().startsWith('connect-src '));
+    expect(connectSrc).toContain('https://zlymcdjkzfizwxjcmccs.supabase.co');
+    expect(dashboardMetaCsp.split(';').filter((directive) => directive.includes('https://zlymcdjkzfizwxjcmccs.supabase.co'))).toEqual([connectSrc]);
   });
 });

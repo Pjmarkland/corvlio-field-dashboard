@@ -89,6 +89,7 @@ export function LeadNotesLog({ leadId }: { leadId: string }) {
           }}
           placeholder="Add a note about the next step…"
           className="min-h-24 w-full resize-y rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-900 placeholder:text-gray-400"
+          style={{ color: '#111827', backgroundColor: '#ffffff', WebkitTextFillColor: '#111827' }}
         />
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {isSaving ? <p className="text-xs text-gray-500" role="status" data-testid="status-follow-up-saving">Saving note…</p> : <span />}
@@ -121,7 +122,7 @@ export function LeadNotesLog({ leadId }: { leadId: string }) {
                   <time dateTime={entry.created_at} className="block text-xs font-medium text-gray-500" data-testid={`time-follow-up-note-${entry.id}`}>
                     {formatCreatedAt(entry.created_at)}
                   </time>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800">{entry.note}</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800" style={{ color: '#111827' }}>{entry.note}</p>
                 </li>)}
               </ol>}
       </div>

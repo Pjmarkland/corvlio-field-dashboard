@@ -7,7 +7,7 @@ const sharedDirectives = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://corvlio-field-dashboard--pjmarkland08.replit.app https://*.clerk.dev https://*.clerk.accounts.dev https://clerk-telemetry.com https://challenges.cloudflare.com wss://*.clerk.accounts.dev",
+  "connect-src 'self' https://corvlio-field-dashboard--pjmarkland08.replit.app https://zlymcdjkzfizwxjcmccs.supabase.co https://*.clerk.dev https://*.clerk.accounts.dev https://clerk-telemetry.com https://challenges.cloudflare.com wss://*.clerk.accounts.dev",
   "frame-src https://*.clerk.dev https://*.clerk.accounts.dev https://accounts.google.com https://challenges.cloudflare.com",
   "manifest-src 'self'",
   "worker-src 'self' blob:",

@@ -33,6 +33,10 @@ describe('LeadNotesLog', () => {
 
     expect(await screen.findByTestId('text-follow-up-empty')).toBeTruthy();
     expect(supabaseMocks.list).toHaveBeenCalledWith('lead-1');
+    const textarea = screen.getByTestId('input-follow-up-note') as HTMLTextAreaElement;
+    expect(textarea.style.color).toBe('rgb(17, 24, 39)');
+    expect(textarea.style.backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(textarea.style.getPropertyValue('-webkit-text-fill-color')).toBe('rgb(17, 24, 39)');
 
     fireEvent.change(screen.getByTestId('input-follow-up-note'), {
       target: { value: 'Call back Tuesday' },
@@ -41,6 +45,7 @@ describe('LeadNotesLog', () => {
 
     expect(supabaseMocks.insert).toHaveBeenCalledWith('lead-1', 'Call back Tuesday');
     expect(await screen.findByText('Call back Tuesday')).toBeTruthy();
+    expect((screen.getByText('Call back Tuesday') as HTMLParagraphElement).style.color).toBe('rgb(17, 24, 39)');
     expect(screen.getByTestId('time-follow-up-note-note-1').getAttribute('dateTime')).toBe(savedNote.created_at);
     expect((screen.getByTestId('input-follow-up-note') as HTMLTextAreaElement).value).toBe('');
   });

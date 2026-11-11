@@ -54,6 +54,11 @@ describe("dashboard production security headers", () => {
       expect(response.headers.get("content-security-policy")).toContain(
         "https://fonts.gstatic.com",
       );
+      const connectSrc = response.headers
+        .get("content-security-policy")
+        ?.split(";")
+        .find((directive) => directive.trim().startsWith("connect-src "));
+      expect(connectSrc).toContain("https://zlymcdjkzfizwxjcmccs.supabase.co");
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
       expect(response.headers.get("referrer-policy")).toBe(

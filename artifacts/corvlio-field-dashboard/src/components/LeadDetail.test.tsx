@@ -94,6 +94,13 @@ describe('LeadDetailView', () => {
     fireEvent.click(screen.getByTestId('button-save-notes'));
     expect(mutate).toHaveBeenCalledWith({ leadId: 'L1', data: { privateNotes: 'gate code' } }, expect.anything());
   });
+  it('keeps private notes dark and readable in iOS textareas', () => {
+    view();
+    const textarea = screen.getByTestId('input-notes') as HTMLTextAreaElement;
+    expect(textarea.style.color).toBe('rgb(17, 24, 39)');
+    expect(textarea.style.backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(textarea.style.getPropertyValue('-webkit-text-fill-color')).toBe('rgb(17, 24, 39)');
+  });
   it('saves notes on blur and enforces the 500-character limit', () => {
     view();
     const input = screen.getByTestId('input-notes') as HTMLTextAreaElement;
