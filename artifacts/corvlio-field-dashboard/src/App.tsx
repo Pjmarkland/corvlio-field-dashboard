@@ -116,10 +116,7 @@ type StatusHandler = (id: string, status: LeadStatus) => void;
 const queryClient = new QueryClient();
 const SETTINGS_KEY = 'corvlio-settings-v1';
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
+const clerkPubKey = window.location.hostname.endsWith('corvlio.com') ? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY : publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 if (!clerkPubKey) {
