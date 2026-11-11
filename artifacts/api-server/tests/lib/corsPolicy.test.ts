@@ -27,6 +27,7 @@ describe("credentialed CORS policy", () => {
   it("allows only the configured app origin and Capacitor localhost origins", () => {
     const env = { PUBLIC_API_BASE_URL: "https://app.example.test/dashboard" };
     expect(isAllowedCorsOrigin("https://app.example.test", env)).toBe(true);
+    expect(isAllowedCorsOrigin("https://app.corvlio.com", env)).toBe(true);
     expect(isAllowedCorsOrigin("https://app.example.test.evil.test", env)).toBe(false);
     expect(isAllowedCorsOrigin("https://other.example.test", env)).toBe(false);
     expect(isAllowedCorsOrigin("http://localhost", env)).toBe(true);
@@ -57,5 +58,10 @@ describe("credentialed CORS policy", () => {
     const sameOrigin = await fetch(`${base}/private`, { headers: { Origin: base } });
     expect(sameOrigin.status).toBe(200);
     expect(sameOrigin.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("allows requests with no Origin header", async () => {
+    const response = await fetch(`${base}/private`);
+    expect(response.status).toBe(200);
   });
 });

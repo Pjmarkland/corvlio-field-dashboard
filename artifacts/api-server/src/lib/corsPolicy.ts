@@ -7,6 +7,10 @@ const CAPACITOR_ORIGINS = new Set([
   "https://localhost",
 ]);
 
+const ADDITIONAL_APP_ORIGINS = new Set([
+  "https://app.corvlio.com",
+]);
+
 function configuredAppOrigin(env: Record<string, string | undefined>): string | null {
   const configuredBaseUrl = env.PUBLIC_API_BASE_URL?.trim() || env.VITE_NATIVE_API_BASE_URL?.trim();
   if (!configuredBaseUrl) return null;
@@ -24,7 +28,7 @@ export function isAllowedCorsOrigin(
   origin: string,
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  if (CAPACITOR_ORIGINS.has(origin)) return true;
+  if (CAPACITOR_ORIGINS.has(origin) || ADDITIONAL_APP_ORIGINS.has(origin)) return true;
   return configuredAppOrigin(env) === origin;
 }
 

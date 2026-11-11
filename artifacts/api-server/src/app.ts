@@ -3,12 +3,12 @@ import cors from "cors";
 import { clerkDeletionWebhook } from "./routes/clerkWebhook";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { retellMalformedJsonAlertHandler } from "./lib/retellWebhookAlerts";
 import { billingWebhook } from "./billing/webhook";
 import { corsOptions, rejectUnexpectedOrigin } from "./lib/corsPolicy";
+import { getClerkPublishableKeyForHost } from "./lib/clerkPublishableKey";
 import { publicWebhookRateLimit } from "./middlewares/publicWebhookRateLimit";
 import { apiSecurityHeaders } from "./middlewares/securityHeaders";
 import {
@@ -58,8 +58,8 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
+    publishableKey: getClerkPublishableKeyForHost(
+      getClerkProxyHost(req),
       process.env.CLERK_PUBLISHABLE_KEY,
     ),
   })),
