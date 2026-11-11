@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAppAuth } from '@/auth/AppAuthProvider';
@@ -7,6 +8,7 @@ import { ArrowLeft, Check, ChevronDown, Copy, MapPin, ShieldAlert } from 'lucide
 import { LeadContactActions } from '@/components/LeadContactActions';
 import { displayPhone, usablePhone } from '@/lib/leadDisplay';
 
+const LeadNotesLog = lazy(() => import('@/components/LeadNotesLog').then(({ LeadNotesLog: component }) => ({ default: component })));
 const MAX_NOTES = 500;
 type Status = 'pending' | 'contacted' | 'new' | 'called_back' | 'booked' | 'closed';
 type OwnerCallStatus = 'new' | 'called_back' | 'booked' | 'closed';
@@ -337,6 +339,9 @@ export function LeadDetailView({ leadId, onStatus, savingLeadId }: { leadId: str
         </section> : null}
 
         <Notes key={`${user?.id}:${lead.id}`} lead={lead} queryKey={scopedKey} />
+        {!Capacitor.isNativePlatform() ? <Suspense fallback={null}>
+          <LeadNotesLog key={lead.id} leadId={lead.id} />
+        </Suspense> : null}
 
         <Section title="Lead information" testId="section-lead-information">
           <p className="text-sm leading-relaxed text-gray-600">If a detail looks inaccurate, report it for review. Your reason is optional.</p>

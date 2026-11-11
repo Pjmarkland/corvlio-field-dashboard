@@ -8,9 +8,14 @@ const flagMutate = vi.fn();
 const deleteMutate = vi.fn();
 const spamMutate = vi.fn();
 const billing = { smsAvailable: true };
+const platform = vi.hoisted(() => ({ native: false }));
 vi.mock('@clerk/react', () => ({ useUser: () => ({ isLoaded: true, user: { id: 'u1', fullName: 'Sam Roe' } }) }));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => platform.native } }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ setQueryData: vi.fn(), invalidateQueries: vi.fn() }) }));
 vi.mock('wouter', () => ({ Link: ({ href, children, ...p }: { href: string; children: React.ReactNode }) => <a href={href} {...p}>{children}</a>, useLocation: () => ['/leads/L1', vi.fn()] }));
+vi.mock('@/components/LeadNotesLog', () => ({
+  LeadNotesLog: ({ leadId }: { leadId: string }) => <div data-testid="follow-up-notes-lead">{leadId}</div>,
+}));
 vi.mock('@workspace/api-client-react', () => ({
   getGetLeadDetailQueryKey: (id: string) => [`/api/leads/${id}`],
   getGetLeadsQueryKey: () => ['/api/leads'],
@@ -29,7 +34,7 @@ const view = () => render(<LeadDetailView leadId="L1" onStatus={vi.fn()} savingL
 const type = (v: string) => fireEvent.change(screen.getByTestId('input-notes'), { target: { value: v } });
 
 describe('LeadDetailView', () => {
-  beforeEach(() => { state.data = base; state.isError = false; billing.smsAvailable = true; mutate.mockReset(); flagMutate.mockReset(); deleteMutate.mockReset(); spamMutate.mockReset(); });
+  beforeEach(() => { state.data = base; state.isError = false; billing.smsAvailable = true; platform.native = false; mutate.mockReset(); flagMutate.mockReset(); deleteMutate.mockReset(); spamMutate.mockReset(); });
   it('renders a blank lead safely', () => {
     view();
     expect(screen.queryByTestId('text-detail-name')).toBeNull();
@@ -109,6 +114,11 @@ describe('LeadDetailView', () => {
     view();
     expect(screen.queryByTestId('button-delete-lead')).toBeNull();
     expect(deleteMutate).not.toHaveBeenCalled();
+  });
+  it('keeps the Supabase follow-up log out of the native Capacitor detail screen', () => {
+    platform.native = true;
+    view();
+    expect(screen.queryByTestId('follow-up-notes-lead')).toBeNull();
   });
   it('lets the owner mark spam and exposes an undo action on the same detail page', () => {
     const { rerender } = view();
