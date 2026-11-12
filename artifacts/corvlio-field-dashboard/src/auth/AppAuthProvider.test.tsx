@@ -51,7 +51,16 @@ vi.mock('@clerk/react', async () => {
     },
     SignUp: (props: Record<string, unknown>) => {
       mocks.signUpProps(props);
-      return React.createElement('div', { 'data-testid': 'clerk-fallback-sign-up' }, 'Clerk email/password sign-up');
+      return React.createElement(
+        'div',
+        { 'data-testid': 'clerk-fallback-sign-up' },
+        'Clerk email/password sign-up',
+        React.createElement(
+          'a',
+          { href: String(props.signInUrl), 'data-testid': 'clerk-sign-up-sign-in-link' },
+          'Already have an account? Sign in',
+        ),
+      );
     },
   };
 });
@@ -194,27 +203,27 @@ describe('iOS in-app Clerk authentication', () => {
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
   });
 
-  it('opens web sign-up externally and provides a clear return to native sign-in', async () => {
+  it('renders the in-app virtual Clerk sign-up with a link back to sign-in', async () => {
     const routes = (
       <Switch>
         <Route path="/sign-up"><NativeHostedSignInPage mode="signUp" /></Route>
-        <Route path="/sign-in"><NativeHostedSignInPage mode="signIn" /></Route>
       </Switch>
     );
-    const { location } = renderNative(routes, '/sign-up');
+    renderNative(routes, '/sign-up');
 
-    expect(screen.getByRole('heading', { name: 'Create your account on the web, then sign in here' })).toBeTruthy();
-    expect(screen.getByTestId('link-native-sign-in').textContent).toBe('Sign in');
-    expect(screen.queryByTestId('clerk-fallback-sign-up')).toBeNull();
-    fireEvent.click(screen.getByTestId('button-native-open-web-sign-up'));
-    await waitFor(() => expect(mocks.browserOpen).toHaveBeenCalledWith({
-      url: 'https://corvlio-field-dashboard--pjmarkland08.replit.app/sign-up',
-    }));
+    expect(await screen.findByTestId('clerk-fallback-sign-up')).toBeTruthy();
+    expect(screen.getByText('Already have an account? Sign in').getAttribute('href')).toMatch(/\/sign-in$/);
+    expect(screen.queryByTestId('button-native-open-web-sign-up')).toBeNull();
+    expect(mocks.browserOpen).not.toHaveBeenCalled();
     expect(mocks.initialize).not.toHaveBeenCalled();
     expect(mocks.getDebugTrace).not.toHaveBeenCalled();
-    expect(mocks.signUpProps).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('link-native-sign-in'));
-    expect(await screen.findByTestId('clerk-fallback-sign-in')).toBeTruthy();
-    expect(location.history?.at(-1)).toBe('/sign-in');
+
+    const signUpProps = mocks.signUpProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(signUpProps).toMatchObject({
+      routing: 'virtual',
+      signInUrl: expect.stringMatching(/\/sign-in$/),
+      forceRedirectUrl: expect.stringMatching(/\/welcome$/),
+    });
+    expect(signUpProps).not.toHaveProperty('path');
   });
 });
