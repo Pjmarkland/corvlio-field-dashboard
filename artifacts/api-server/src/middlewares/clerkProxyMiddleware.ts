@@ -36,13 +36,13 @@ const NATIVE_APP_ORIGINS = new Set([
 ]);
 const DEFAULT_ALLOW_METHODS = 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOW_HEADERS = 'Content-Type, Authorization, X-Native-Clerk-Client';
-const MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH = 4096;
-const NATIVE_CLERK_CLIENT_COOKIE_PATTERN = /^[A-Za-z0-9._~%-]+$/;
+const MAX_NATIVE_CLERK_CLIENT_VALUE_LENGTH = 4096;
+const NATIVE_CLERK_CLIENT_VALUE_PATTERN = /^[A-Za-z0-9._~%-]+$/;
 
-export function isValidNativeClerkClientCookie(value: string): boolean {
+export function isValidNativeClerkClientValue(value: string): boolean {
   return value.length > 0
-    && value.length <= MAX_NATIVE_CLERK_CLIENT_COOKIE_LENGTH
-    && NATIVE_CLERK_CLIENT_COOKIE_PATTERN.test(value);
+    && value.length <= MAX_NATIVE_CLERK_CLIENT_VALUE_LENGTH
+    && NATIVE_CLERK_CLIENT_VALUE_PATTERN.test(value);
 }
 
 function getNativeAppOrigin(origin: string | string[] | undefined): string | undefined {
@@ -85,6 +85,21 @@ function firstHeaderValue(value: string | string[] | undefined): string | undefi
   return Array.isArray(value) ? value.join(', ') : value;
 }
 
+function getNativeClientTokenFromAuthorization(
+  authorization: string | string[] | undefined,
+): string | undefined {
+  const value = firstHeaderValue(authorization)?.trim();
+  if (!value) return undefined;
+
+  // Native FAPI may return either the token itself or a conventional Bearer
+  // value. The client bridge stores only the token and the proxy restores the
+  // Bearer scheme on the next request.
+  const token = /^Bearer\s+/i.test(value)
+    ? value.replace(/^Bearer\s+/i, '').trim()
+    : value;
+  return isValidNativeClerkClientValue(token) ? token : undefined;
+}
+
 function getNativeClientCookieValue(
   setCookieHeaders: string | string[] | undefined,
 ): string | undefined {
@@ -122,7 +137,7 @@ function getNativeClientCookieValue(
 
     if (value === '' || isExpired) {
       clientValue = '';
-    } else if (isValidNativeClerkClientCookie(value)) {
+    } else if (isValidNativeClerkClientValue(value)) {
       clientValue = value;
     } else {
       clientValue = '';
@@ -249,26 +264,32 @@ export function clerkProxyMiddleware(): RequestHandler {
         proxyReq.setHeader('Clerk-Proxy-Url', proxyUrl);
         proxyReq.setHeader('Clerk-Secret-Key', secretKey);
         if (getNativeAppOrigin(req.headers.origin)) {
-          // Native Frontend API requests identify themselves with
-          // _is_native=1 and the client Authorization token. Clerk rejects
-          // requests that contain both Origin and Authorization.
-          if (isNativeFrontendApiPath(req.url ?? '')) {
+          const isNativeFrontendApi = isNativeFrontendApiPath(req.url ?? '');
+          if (isNativeFrontendApi) {
+            // Clerk rejects requests that contain both Origin and
+            // Authorization. The installed native client persists its client
+            // token through X-Native-Clerk-Client, so restore the Authorization
+            // header expected by Native API mode. Never send the bridged value
+            // as a cookie on Frontend API requests.
             proxyReq.removeHeader('Origin');
+            proxyReq.removeHeader('Cookie');
+            proxyReq.removeHeader('Authorization');
+            if (req.headers.authorization !== undefined) {
+              // Preserve a token format supplied directly by the app.
+              proxyReq.setHeader('Authorization', req.headers.authorization);
+            } else {
+              const nativeClientValue = firstHeaderValue(
+                req.headers['x-native-clerk-client'],
+              )?.trim();
+              if (nativeClientValue && isValidNativeClerkClientValue(nativeClientValue)) {
+                proxyReq.setHeader('Authorization', `Bearer ${nativeClientValue}`);
+              }
+            }
           } else {
             proxyReq.setHeader('Origin', publicOrigin);
-          }
-          if (req.headers.authorization !== undefined) {
-            proxyReq.setHeader('Authorization', req.headers.authorization);
-          }
-          const nativeClientValue = firstHeaderValue(
-            req.headers['x-native-clerk-client'],
-          )?.trim();
-          if (nativeClientValue && isValidNativeClerkClientCookie(nativeClientValue)) {
-            // This is Clerk's non-authenticating __client identifier, not a
-            // session cookie. It is strictly allowlisted; all other WebView
-            // cookies are discarded, and native API auth uses a bearer token.
-            proxyReq.setHeader('Cookie', `__client=${nativeClientValue}`);
-          } else {
+            // Client credentials belong only on native Frontend API requests,
+            // never on proxied Clerk assets.
+            proxyReq.removeHeader('Authorization');
             proxyReq.removeHeader('Cookie');
           }
         }
@@ -295,11 +316,18 @@ export function clerkProxyMiddleware(): RequestHandler {
         const nativeOrigin = getNativeAppOrigin(req.headers.origin);
         if (nativeOrigin) {
           setNativeCorsHeaders(req, headers, nativeOrigin);
-          const nativeClientValue = getNativeClientCookieValue(
-            proxyRes.headers['set-cookie'],
-          );
-          if (nativeClientValue !== undefined) {
-            headers['x-native-clerk-client'] = nativeClientValue;
+          if (isNativeFrontendApiPath(req.url ?? '')) {
+            delete headers['x-native-clerk-client'];
+            const authorizationToken = getNativeClientTokenFromAuthorization(
+              proxyRes.headers.authorization,
+            );
+            const cookieValue = getNativeClientCookieValue(
+              proxyRes.headers['set-cookie'],
+            );
+            const nativeClientValue = authorizationToken ?? cookieValue;
+            if (nativeClientValue !== undefined) {
+              headers['x-native-clerk-client'] = nativeClientValue;
+            }
           }
         }
         // Transfer-Encoding/Connection are hop-by-hop (RFC 7230 §6.1).
@@ -356,9 +384,9 @@ export function clerkProxyMiddleware(): RequestHandler {
     if (
       nativeOrigin
       && nativeClientHeader !== undefined
-      && !isValidNativeClerkClientCookie(nativeClientHeader.trim())
+      && !isValidNativeClerkClientValue(nativeClientHeader.trim())
     ) {
-      res.status(400).json({ error: 'Invalid native Clerk client cookie' });
+      res.status(400).json({ error: 'Invalid native Clerk client token' });
       return;
     }
     if (req.method === 'OPTIONS' && nativeOrigin) {

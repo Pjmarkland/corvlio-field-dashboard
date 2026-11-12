@@ -15,7 +15,7 @@ vi.mock("http-proxy-middleware", () => ({
 
 import {
   clerkProxyMiddleware,
-  isValidNativeClerkClientCookie,
+  isValidNativeClerkClientValue,
 } from "../../src/middlewares/clerkProxyMiddleware";
 import {
   DEFAULT_CLERK_FRONTEND_API_URL,
@@ -29,7 +29,7 @@ beforeEach(() => {
   proxyState.options = undefined;
 });
 
-describe("native Clerk proxy cookie validation", () => {
+describe("native Clerk proxy client token handling", () => {
   it("defaults to Clerk's standard Frontend API and accepts the configured production Frontend API", () => {
     expect(getClerkFrontendApiUrl()).toBe(DEFAULT_CLERK_FRONTEND_API_URL);
     expect(getClerkFrontendApiUrl(" https://clerk.corvlio.com/ ")).toBe(
@@ -84,7 +84,7 @@ describe("native Clerk proxy cookie validation", () => {
               on: ReturnType<typeof vi.fn>;
               pipe: ReturnType<typeof vi.fn>;
             },
-            req: { method: string; headers: Record<string, string> },
+            req: { method: string; url: string; headers: Record<string, string> },
             res: {
               writeHead: ReturnType<typeof vi.fn>;
               end: ReturnType<typeof vi.fn>;
@@ -150,24 +150,26 @@ describe("native Clerk proxy cookie validation", () => {
           on: vi.fn(),
           pipe: vi.fn(),
         },
-        { method: "GET", headers: { origin } },
+        { method: "GET", url: path, headers: { origin } },
         downstream,
       );
       const responseHeaders = downstream.writeHead.mock.calls[0]?.[1] as Record<string, string>;
       expect(responseHeaders.authorization).toBe("Bearer client-token-next");
+      expect(responseHeaders["x-native-clerk-client"]).toBe("client-token-next");
       expect(responseHeaders["access-control-expose-headers"]).toContain("Authorization");
+      expect(responseHeaders["access-control-expose-headers"]).toContain("X-Native-Clerk-Client");
     },
   );
 
-  it("accepts only bounded cookie values with a safe character set", () => {
-    expect(isValidNativeClerkClientCookie("client_abc-123.%~")).toBe(true);
-    expect(isValidNativeClerkClientCookie("")).toBe(false);
-    expect(isValidNativeClerkClientCookie("client; Secure")).toBe(false);
-    expect(isValidNativeClerkClientCookie("client\r\nCookie: injected")).toBe(false);
-    expect(isValidNativeClerkClientCookie("a".repeat(4097))).toBe(false);
+  it("accepts only bounded client token values with a safe character set", () => {
+    expect(isValidNativeClerkClientValue("client_abc-123.%~")).toBe(true);
+    expect(isValidNativeClerkClientValue("")).toBe(false);
+    expect(isValidNativeClerkClientValue("client; Secure")).toBe(false);
+    expect(isValidNativeClerkClientValue("client\r\nCookie: injected")).toBe(false);
+    expect(isValidNativeClerkClientValue("a".repeat(4097))).toBe(false);
   });
 
-  it("rejects malformed native cookie headers before proxying", () => {
+  it("rejects malformed native client token headers before proxying", () => {
     const middleware = clerkProxyMiddleware();
     const response = {
       status: vi.fn().mockReturnThis(),
@@ -188,12 +190,12 @@ describe("native Clerk proxy cookie validation", () => {
 
     expect(response.status).toHaveBeenCalledWith(400);
     expect(response.json).toHaveBeenCalledWith({
-      error: "Invalid native Clerk client cookie",
+      error: "Invalid native Clerk client token",
     });
     expect(proxyState.handler).not.toHaveBeenCalled();
   });
 
-  it("replaces any WebView-supplied __client cookie with the validated bridge value", () => {
+  it("restores the bridged token as Bearer Authorization without forwarding cookies", () => {
     const middleware = clerkProxyMiddleware();
     middleware(
       {
@@ -216,6 +218,7 @@ describe("native Clerk proxy cookie validation", () => {
             removeHeader: ReturnType<typeof vi.fn>;
           },
           req: {
+            url: string;
             headers: Record<string, string>;
             socket: { remoteAddress: string };
           },
@@ -230,13 +233,15 @@ describe("native Clerk proxy cookie validation", () => {
         cookie: "__client=forged; theme=dark",
         "x-native-clerk-client": "client_valid-123",
       },
+      url: "/api/__clerk/v1/client/sign_ups/signup_test/prepare_verification",
       socket: { remoteAddress: "127.0.0.1" },
     });
 
-    const cookieHeader = proxyReq.setHeader.mock.calls.find(
-      ([name]) => name.toLowerCase() === "cookie",
-    )?.[1];
-    expect(cookieHeader).toBe("__client=client_valid-123");
+    expect(proxyReq.setHeader).toHaveBeenCalledWith(
+      "Authorization",
+      "Bearer client_valid-123",
+    );
+    expect(proxyReq.removeHeader).toHaveBeenCalledWith("Cookie");
     expect(proxyReq.removeHeader).toHaveBeenCalledWith("X-Native-Clerk-Client");
   });
 });
