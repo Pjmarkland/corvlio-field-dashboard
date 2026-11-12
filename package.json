@@ -7,9 +7,11 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "test": "pnpm run test:review-demo-seed && pnpm --filter @workspace/api-server run test && pnpm --filter @workspace/corvlio-field-dashboard run test",
+    "test": "pnpm run test:review-demo-seed && pnpm run test:app-review-owner-seed && pnpm --filter @workspace/api-server run test && pnpm --filter @workspace/corvlio-field-dashboard run test",
     "seed:review-demo": "node scripts/seed-review-demo.mjs",
+    "seed:app-review-owner": "node scripts/seed-app-review-owner.mjs",
     "test:review-demo-seed": "node --test scripts/seed-review-demo.test.mjs",
+    "test:app-review-owner-seed": "node --test scripts/seed-app-review-owner.test.mjs",
     "smoke": "node scripts/smoke.mjs",
     "preflight:ios": "pnpm --filter @workspace/corvlio-field-dashboard run preflight:ios"
   },
