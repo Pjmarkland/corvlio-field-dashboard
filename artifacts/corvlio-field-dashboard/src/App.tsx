@@ -878,8 +878,9 @@ function PrivacyPage() {
   );
 }
 
-function HomeRedirect() {
+export function HomeRedirect() {
   const { isSignedIn } = useAppAuth();
+  if (Capacitor.isNativePlatform()) return <Redirect to={isSignedIn ? '/dashboard' : '/sign-in'} />;
   return isSignedIn ? <Redirect to="/dashboard" /> : <PublicHome />;
 }
 

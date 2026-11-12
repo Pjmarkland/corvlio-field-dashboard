@@ -101,8 +101,8 @@ vi.mock('@/pages/onboarding', () => ({ default: () => null, NativeOnboardingForm
 vi.mock('@/pages/terms', () => ({ default: () => null }));
 vi.mock('@/pages/client-agreement', () => ({ default: () => null }));
 
-import App, { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage, NativeClerkStartupGate } from './App';
-import { Router as TestRouter, Route } from 'wouter';
+import App, { UnconfiguredAccountScreen, DetailPage, LeadCard, BusinessWelcomeCard, AppShell, CallUsageLine, ManagedMonthlyResultsReport, LoadMoreLeadsButton, CompletedPage, NativeClerkStartupGate, HomeRedirect } from './App';
+import { Router as TestRouter, Route, Switch } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { BusinessProfileEditor } from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -167,6 +167,31 @@ describe('iOS Clerk configuration', () => {
     expect(props.ui).toBe(ui);
     expect(typeof props.ui.ClerkUI).toBe('function');
     expect(props.standardBrowser).toBeUndefined();
+  });
+
+  it('opens the native app on sign-in while keeping the web homepage unchanged', async () => {
+    mockAppAuth.value = { isLoaded: true, isSignedIn: false, user: null, error: null };
+    mockNativeState.value = true;
+    const nativeLocation = memoryLocation({ path: '/' });
+    const nativeView = render(
+      <TestRouter hook={nativeLocation.hook}>
+        <Switch>
+          <Route path="/" component={HomeRedirect} />
+          <Route path="/sign-in"><div data-testid="native-sign-in-route">Sign-in route</div></Route>
+        </Switch>
+      </TestRouter>,
+    );
+    expect(await screen.findByTestId('native-sign-in-route')).toBeTruthy();
+    nativeView.unmount();
+
+    mockNativeState.value = false;
+    const webLocation = memoryLocation({ path: '/' });
+    render(
+      <TestRouter hook={webLocation.hook}>
+        <HomeRedirect />
+      </TestRouter>,
+    );
+    expect(screen.getByText('Your next job, one tap away.')).toBeTruthy();
   });
 });
 

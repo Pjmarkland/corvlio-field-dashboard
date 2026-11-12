@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   signInProps: vi.fn(),
   signUpProps: vi.fn(),
+  browserOpen: vi.fn(),
   webAuth: {
     user: null as null | {
       id: string;
@@ -54,6 +55,9 @@ vi.mock('@clerk/react', async () => {
     },
   };
 });
+vi.mock('@capacitor/browser', () => ({
+  Browser: { open: mocks.browserOpen },
+}));
 vi.mock('@workspace/api-client-react', () => ({
   setAuthTokenGetter: mocks.setAuthTokenGetter,
 }));
@@ -116,6 +120,7 @@ beforeEach(() => {
   mocks.getToken.mockResolvedValue({ token: 'session-token-test' });
   mocks.webGetToken.mockResolvedValue('session-token-test');
   mocks.signOut.mockResolvedValue(signedOutState);
+  mocks.browserOpen.mockResolvedValue(undefined);
   mocks.webAuth = { user: null, isLoaded: true, isSignedIn: false };
 });
 
@@ -189,40 +194,27 @@ describe('iOS in-app Clerk authentication', () => {
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
   });
 
-  it('keeps email-code sign-up in the app and routes a completed session to welcome', async () => {
+  it('opens web sign-up externally and provides a clear return to native sign-in', async () => {
     const routes = (
       <Switch>
         <Route path="/sign-up"><NativeHostedSignInPage mode="signUp" /></Route>
-        <Route path="/welcome">Welcome setup</Route>
+        <Route path="/sign-in"><NativeHostedSignInPage mode="signIn" /></Route>
       </Switch>
     );
-    const { rerenderNative, location } = renderNative(routes, '/sign-up');
+    const { location } = renderNative(routes, '/sign-up');
 
-    expect(await screen.findByTestId('clerk-fallback-sign-up')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Create your account on the web, then sign in here' })).toBeTruthy();
+    expect(screen.getByTestId('link-native-sign-in').textContent).toBe('Sign in');
+    expect(screen.queryByTestId('clerk-fallback-sign-up')).toBeNull();
+    fireEvent.click(screen.getByTestId('button-native-open-web-sign-up'));
+    await waitFor(() => expect(mocks.browserOpen).toHaveBeenCalledWith({
+      url: 'https://corvlio-field-dashboard--pjmarkland08.replit.app/sign-up',
+    }));
     expect(mocks.initialize).not.toHaveBeenCalled();
     expect(mocks.getDebugTrace).not.toHaveBeenCalled();
-    const signUpProps = mocks.signUpProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(signUpProps).toMatchObject({
-      routing: 'virtual',
-      signInUrl: expect.stringMatching(/\/sign-in$/),
-      forceRedirectUrl: expect.stringMatching(/\/welcome$/),
-    });
-    expect(signUpProps).not.toHaveProperty('path');
-
-    mocks.webAuth = {
-      user: {
-        id: 'user_new_signup',
-        fullName: 'New User',
-        firstName: 'New',
-        lastName: 'User',
-        primaryEmailAddress: { emailAddress: 'new@example.test' },
-        emailAddresses: [{ emailAddress: 'new@example.test' }],
-      },
-      isLoaded: true,
-      isSignedIn: true,
-    };
-    rerenderNative(routes);
-    expect(await screen.findByText('Welcome setup')).toBeTruthy();
-    expect(location.history?.at(-1)).toBe('/welcome');
+    expect(mocks.signUpProps).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('link-native-sign-in'));
+    expect(await screen.findByTestId('clerk-fallback-sign-in')).toBeTruthy();
+    expect(location.history?.at(-1)).toBe('/sign-in');
   });
 });
