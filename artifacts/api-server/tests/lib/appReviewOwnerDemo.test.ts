@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppReviewOwnerDemoSeed, type ReviewSeedClient } from "../../src/lib/appReviewOwnerDemoCore";
+import { createAppReviewOwnerDemoSeed, type ReviewSeedClient, type ReviewUser } from "../../src/lib/appReviewOwnerDemoCore";
 import { LEAD_CALL_ID_PREFIX, makeDemoLeads, SEED_MARKER, TARGET_EMAIL } from "../../src/lib/appReviewOwnerDemoData.mjs";
 
 const now = new Date("2026-11-12T04:00:00Z");
@@ -49,14 +49,20 @@ function fixture() {
       state.discard = discard ?? false;
     },
   };
-  const getUser = vi.fn(async () => ({
+  const getUser = vi.fn(async (): Promise<ReviewUser> => ({
     id: userId,
+    bypassClientTrust: false,
     emailAddresses: [{ emailAddress: TARGET_EMAIL.toUpperCase(), verification: { status: "verified" } }],
   }));
   const connect = vi.fn(async () => client);
   const log = vi.fn();
-  const seed = createAppReviewOwnerDemoSeed({ getUser, connect, log, now: () => now, identityTimeoutMs: 10 });
-  return { state, client, getUser, connect, log, seed };
+  const enableClientTrustBypass = vi.fn(async (_id: string) => {});
+  const logClientTrustBypass = vi.fn();
+  const seed = createAppReviewOwnerDemoSeed({
+    getUser, connect, log, enableClientTrustBypass, logClientTrustBypass,
+    now: () => now, identityTimeoutMs: 10,
+  });
+  return { state, client, getUser, connect, log, enableClientTrustBypass, logClientTrustBypass, seed };
 }
 
 describe("deployed App Review owner demo initialization", () => {
@@ -99,9 +105,11 @@ describe("deployed App Review owner demo initialization", () => {
     ["mismatched Clerk result", TARGET_EMAIL, "verified", "user_other"],
   ])("does not touch the database for %s", async (_, emailAddress, status, id) => {
     const f = fixture();
-    f.getUser.mockResolvedValue({ id, emailAddresses: [{ emailAddress, verification: { status } }] });
+    f.getUser.mockResolvedValue({ id, bypassClientTrust: false, emailAddresses: [{ emailAddress, verification: { status } }] });
     expect(await f.seed(userId, business)).toBe("skipped");
     expect(f.connect).not.toHaveBeenCalled();
+    expect(f.enableClientTrustBypass).not.toHaveBeenCalled();
+    expect(f.logClientTrustBypass).not.toHaveBeenCalled();
     expect(f.log).not.toHaveBeenCalled();
   });
 
@@ -113,6 +121,7 @@ describe("deployed App Review owner demo initialization", () => {
     expect(await f.seed("", business)).toBe("skipped");
     expect(f.getUser).not.toHaveBeenCalled();
     expect(f.connect).not.toHaveBeenCalled();
+    expect(f.enableClientTrustBypass).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -154,6 +163,67 @@ describe("deployed App Review owner demo initialization", () => {
     expect(f.state.leads).toHaveLength(9);
     expect(f.state.statements.filter((sql) => sql.startsWith("INSERT INTO leads"))).toHaveLength(1);
     expect(f.log).toHaveBeenCalledTimes(1);
+    expect(f.enableClientTrustBypass).toHaveBeenCalledExactlyOnceWith(userId);
+    expect(f.logClientTrustBypass).toHaveBeenCalledTimes(1);
+  });
+
+  it("exempts the verified review account even when its business already has real leads", async () => {
+    const f = fixture();
+    f.state.leads = [{ id: 99, retell_call_id: "real-call" }];
+    expect(await f.seed(userId, business)).toBe("skipped");
+    expect(f.enableClientTrustBypass).toHaveBeenCalledExactlyOnceWith(userId);
+    expect(f.logClientTrustBypass).toHaveBeenCalledExactlyOnceWith();
+    expect(f.state.values).toHaveLength(0);
+    expect(f.state.leads).toEqual([{ id: 99, retell_call_id: "real-call" }]);
+  });
+
+  it.each([true, undefined])("does not PATCH when the bypass flag is %s", async (bypassClientTrust) => {
+    const f = fixture();
+    const user = await f.getUser();
+    f.getUser.mockResolvedValue({ ...user, bypassClientTrust });
+    expect(await f.seed(userId, business)).toBe("inserted");
+    expect(f.enableClientTrustBypass).not.toHaveBeenCalled();
+    expect(f.logClientTrustBypass).not.toHaveBeenCalled();
+  });
+
+  it("silently ignores exemption errors, keeps seeding/reads working, and never retries within the process", async () => {
+    const f = fixture();
+    f.enableClientTrustBypass.mockRejectedValue(new Error("private provider information"));
+    expect(await f.seed(userId, business)).toBe("inserted");
+    expect(await f.seed(userId, business)).toBe("skipped");
+    expect(f.enableClientTrustBypass).toHaveBeenCalledTimes(1);
+    expect(f.logClientTrustBypass).not.toHaveBeenCalled();
+    expect(f.log).toHaveBeenCalledExactlyOnceWith("inserted");
+    expect(f.state.leads).toHaveLength(9);
+  });
+
+  it("bounds a hung exemption request and does not retry it on later requests", async () => {
+    const f = fixture();
+    f.enableClientTrustBypass.mockReturnValue(new Promise(() => {}));
+    expect(await f.seed(userId, business)).toBe("inserted");
+    expect(await f.seed(userId, business)).toBe("skipped");
+    expect(f.enableClientTrustBypass).toHaveBeenCalledTimes(1);
+    expect(f.logClientTrustBypass).not.toHaveBeenCalled();
+  });
+
+  it("keeps exemption success logging independent of lead seed outcomes and safe if the logger throws", async () => {
+    const f = fixture();
+    f.logClientTrustBypass.mockImplementation(() => { throw new Error("logger unavailable"); });
+    expect(await f.seed(userId, business)).toBe("inserted");
+    expect(await f.seed(userId, business)).toBe("skipped");
+    expect(f.logClientTrustBypass).toHaveBeenCalledTimes(1);
+    expect(f.enableClientTrustBypass).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reuse a completed exemption as authorization for a different user", async () => {
+    const f = fixture();
+    await f.seed(userId, business);
+    f.getUser.mockResolvedValue({
+      id: "user_other", bypassClientTrust: false,
+      emailAddresses: [{ emailAddress: "other@example.test", verification: { status: "verified" } }],
+    });
+    expect(await f.seed("user_other", { ...business, clerkUserId: "user_other" })).toBe("skipped");
+    expect(f.enableClientTrustBypass).toHaveBeenCalledExactlyOnceWith(userId);
   });
 
   it("serializes simultaneous requests through the shared transaction lock", async () => {
@@ -163,6 +233,8 @@ describe("deployed App Review owner demo initialization", () => {
       getUser: f.getUser,
       now: () => now,
       log: f.log,
+      enableClientTrustBypass: f.enableClientTrustBypass,
+      logClientTrustBypass: f.logClientTrustBypass,
       connect: async () => {
         let unlock: (() => void) | undefined;
         return {
@@ -186,6 +258,8 @@ describe("deployed App Review owner demo initialization", () => {
     ]);
     expect(outcomes.sort()).toEqual(["inserted", "skipped"]);
     expect(f.state.leads).toHaveLength(9);
+    expect(f.enableClientTrustBypass).toHaveBeenCalledExactlyOnceWith(userId);
+    expect(f.logClientTrustBypass).toHaveBeenCalledTimes(1);
     expect(f.state.statements.filter((sql) => sql.startsWith("INSERT INTO leads"))).toHaveLength(1);
   });
 
@@ -223,6 +297,7 @@ describe("deployed App Review owner demo initialization", () => {
     f.getUser.mockReturnValueOnce(new Promise(() => {}));
     expect(await f.seed(userId, business)).toBe("failed");
     expect(f.connect).not.toHaveBeenCalled();
+    expect(f.enableClientTrustBypass).not.toHaveBeenCalled();
     expect(f.log).toHaveBeenCalledExactlyOnceWith("failed");
   });
 

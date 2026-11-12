@@ -22,7 +22,7 @@
 - [Editable route state](editable-route-state.md) — keep form routes stable across live lead refreshes to avoid discarding unsaved drafts.
 - [Billing policy boundary](billing-policy-boundary.md) — preserve the agreed billing rules and keep authorized live Stripe behind a separate default-off gate.
 - [Stripe SDK compatibility](stripe-sdk-compatibility.md) — use version-specific payment parameters; invalidate pending Checkout fingerprints and idempotency keys when restrictions change.
-- [Native reviewer boundaries](native-reviewer-boundaries.md) — keep native billing price-free, launch the portal externally only on tap, and isolate review data.
+- [Native reviewer boundaries](native-reviewer-boundaries.md) — keep native billing price-free, isolate review data, and limit the approved Device Trust exemption to the review account.
 - [Account deletion boundaries](account-deletion-boundaries.md) — preserve Retell for manual release; paid-support refusal needs Apple policy review before submission.
 - [Lead alert latency](lead-alert-latency.md) — database-cost reductions may slow retry sweeps, never creation-triggered alerts for new leads.
 - [Production DB diagnostics](production-db-diagnostics.md) — unavailable read replicas do not establish primary database health, suspension, or schema state.

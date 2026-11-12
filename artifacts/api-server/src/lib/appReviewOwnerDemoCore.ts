@@ -5,8 +5,9 @@ export interface ReviewSeedClient {
   release(destroy?: boolean): void;
 }
 
-interface ReviewUser {
+export interface ReviewUser {
   id: string;
+  bypassClientTrust?: boolean;
   emailAddresses: {
     emailAddress: string;
     verification: { status: string } | null;
@@ -15,6 +16,8 @@ interface ReviewUser {
 
 interface Dependencies {
   getUser(id: string): Promise<ReviewUser>;
+  enableClientTrustBypass(id: string): Promise<void>;
+  logClientTrustBypass(): void;
   connect(): Promise<ReviewSeedClient>;
   log(outcome: "inserted" | "failed"): void;
   now?: () => Date;
@@ -41,9 +44,11 @@ async function withTimeout<T>(work: Promise<T>, milliseconds: number): Promise<T
   }
 }
 
-// Best-effort, insert-only request hook. It never changes the ordinary leads response.
+// Best-effort review-account setup. Lead writes remain insert-only.
 export function createAppReviewOwnerDemoSeed(deps: Dependencies) {
   const nonReviewUsers = new Map<string, number>();
+  let trustChecked = false;
+  let trustAttempt: Promise<void> | undefined;
   const logged = new Set<"inserted" | "failed">();
   const logOnce = (outcome: "inserted" | "failed") => {
     if (logged.has(outcome)) return;
@@ -75,6 +80,22 @@ export function createAppReviewOwnerDemoSeed(deps: Dependencies) {
         nonReviewUsers.set(userId, now.getTime() + 60_000);
         return "skipped";
       }
+
+      // The owner approved this exemption for this verified account only.
+      // Run before the lead-count check, so an existing seed does not prevent setup.
+      // Claim the attempt before awaiting anything: concurrent requests cannot PATCH twice.
+      if (!trustChecked) {
+        trustChecked = true;
+        trustAttempt = (async () => {
+          // Missing/malformed flags fail closed; never infer a false value from metadata.
+          if (user.bypassClientTrust !== false) return;
+          try {
+            await withTimeout(deps.enableClientTrustBypass(userId), deps.identityTimeoutMs ?? 2_000);
+            try { deps.logClientTrustBypass(); } catch { /* Logging is optional. */ }
+          } catch { /* Optional exemption failures are silent and never affect lead reads/seeding. */ }
+        })();
+      }
+      await trustAttempt;
 
       client = await deps.connect();
       // READ COMMITTED sees any real lead committed while the business lock was awaited.
