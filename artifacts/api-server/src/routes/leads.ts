@@ -10,6 +10,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { findBusinessByClerkUserId } from "../lib/businessDirectory";
 import { databaseErrorFields } from "@workspace/db/errors";
+import { maybeSeedAppReviewOwnerDemo } from "../lib/appReviewOwnerDemo";
 
 const router: IRouter = Router();
 const DEFAULT_PAGE_SIZE = 25;
@@ -102,6 +103,12 @@ router.get("/leads", async (req, res): Promise<void> => {
         leads: [],
       }));
       return;
+    }
+
+    try {
+      await maybeSeedAppReviewOwnerDemo(userId, business);
+    } catch {
+      // Optional demo initialization must never replace the normal lead-list response.
     }
 
     const timeZone = safeTimeZone(business.timeZone);

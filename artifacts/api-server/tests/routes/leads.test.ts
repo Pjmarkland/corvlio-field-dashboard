@@ -19,8 +19,12 @@ const fixture = vi.hoisted(() => ({
   isSample: false,
   fail: false,
   error: vi.fn(),
+  seed: vi.fn(),
 }));
 
+vi.mock("../../src/lib/appReviewOwnerDemo", () => ({
+  maybeSeedAppReviewOwnerDemo: fixture.seed,
+}));
 vi.mock("@clerk/express", () => ({
   getAuth: (req: express.Request) => ({ userId: req.get("x-test-user") ?? null }),
 }));
@@ -28,6 +32,8 @@ vi.mock("../../src/lib/businessDirectory", () => ({
   findBusinessByClerkUserId: async (userId: string) => userId === "owner"
     ? {
         id: 11,
+        clerkUserId: "owner",
+        isInternal: false,
         businessName: "Northside Plumbing",
         retellPhoneNumber: "+15550000000",
         timeZone: "America/Chicago",
@@ -109,6 +115,13 @@ beforeEach(() => {
   fixture.aggregateWhereSql = "";
   fixture.isSample = false;
   fixture.fail = false;
+  fixture.aggregate = {
+    totalLeads: "5",
+    contactedLeads: "2",
+    thisWeekLeads: "4",
+    averageReplyMinutes: "12.6",
+  };
+  fixture.seed.mockResolvedValue("skipped");
   fixture.rows = Array.from({ length: 5 }, (_, index) => ({
     id: index + 1,
     callerName: `Caller ${index + 1}`,
@@ -137,6 +150,36 @@ async function request(path: string, user?: string) {
 }
 
 describe("paginated owner lead list", () => {
+  it("continues the normal owner response if optional demo initialization fails", async () => {
+    fixture.seed.mockRejectedValueOnce(new Error("private seed failure"));
+    const response = await request("/leads", "owner");
+    expect(response.status).toBe(200);
+    expect(response.body.configured).toBe(true);
+    expect(response.body.leads).toHaveLength(5);
+    expect(JSON.stringify(response.body)).not.toContain("private seed failure");
+  });
+
+  it("runs demo initialization before reading the lead list so inserted samples appear immediately", async () => {
+    fixture.seed.mockImplementationOnce(async () => {
+      expect(fixture.selectCount).toBe(0);
+      fixture.rows = [fixture.rows[0]];
+      fixture.aggregate.totalLeads = "1";
+      fixture.aggregate.contactedLeads = "0";
+      return "inserted";
+    });
+    const response = await request("/leads", "owner");
+    expect(fixture.seed).toHaveBeenCalledWith("owner", expect.objectContaining({ id: 11, clerkUserId: "owner" }));
+    expect(response.status).toBe(200);
+    expect(response.body.leads).toHaveLength(1);
+    expect(response.body.summary.totalLeads).toBe(1);
+  });
+
+  it("does not initialize demo data for an unauthenticated or unconfigured account", async () => {
+    expect((await request("/leads")).status).toBe(401);
+    expect((await request("/leads", "unconfigured")).body.configured).toBe(false);
+    expect(fixture.seed).not.toHaveBeenCalled();
+  });
+
   it("returns a bounded page and global metrics without transcripts or summaries", async () => {
     const response = await request("/leads?page=1&pageSize=2", "owner");
     expect(response.status).toBe(200);
