@@ -9,6 +9,12 @@ For Corvlio's Capacitor app, use the configured publishable key directly. The We
 
 **How to apply:** when changing native Clerk setup, branch key selection for Capacitor, keep the native API proxy and its target aligned with the selected Clerk environment, and leave browser host-based resolution untouched unless the app domain configuration changes.
 
+For Clerk Frontend API calls from native origins, use the documented `_is_native=1` marker and never forward both `Origin` and `Authorization`. The native client token can be returned in the response `Authorization` header and reused on later requests.
+
+**Why:** Clerk's Frontend API recognizes native requests through the marker and rejects requests containing both `Origin` and `Authorization`; native client state must not depend on third-party WebView cookies.
+
+**How to apply:** mark native Frontend API routes only, omit upstream `Origin` on those requests, and preserve/expose `Authorization` in both directions while leaving web traffic unchanged.
+
 For native iOS authentication, use Clerk's in-app web form as the default path. Keep the Capacitor native Clerk plugin opt-in until a real-device test confirms initialization, sign-in, sign-out, and session restoration.
 
 **Why:** the user reported that native plugin initialization times out on-device after about three seconds and its debug trace is unavailable.

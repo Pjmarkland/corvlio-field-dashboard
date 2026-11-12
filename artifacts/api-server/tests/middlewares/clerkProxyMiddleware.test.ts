@@ -56,6 +56,109 @@ describe("native Clerk proxy cookie validation", () => {
     );
   });
 
+  it.each(["capacitor://localhost", "ionic://localhost"])(
+    "marks %s Frontend API requests native and round-trips the client Authorization token",
+    (origin) => {
+      const middleware = clerkProxyMiddleware();
+      const options = proxyState.options as {
+        pathRewrite: (
+          path: string,
+          req: { headers: Record<string, string> },
+        ) => string;
+        on: {
+          proxyReq: (
+            proxyReq: {
+              setHeader: ReturnType<typeof vi.fn>;
+              removeHeader: ReturnType<typeof vi.fn>;
+            },
+            req: {
+              url: string;
+              headers: Record<string, string>;
+              socket: { remoteAddress: string };
+            },
+          ) => void;
+          proxyRes: (
+            proxyRes: {
+              headers: Record<string, string>;
+              statusCode: number;
+              on: ReturnType<typeof vi.fn>;
+              pipe: ReturnType<typeof vi.fn>;
+            },
+            req: { method: string; headers: Record<string, string> },
+            res: {
+              writeHead: ReturnType<typeof vi.fn>;
+              end: ReturnType<typeof vi.fn>;
+              destroy: ReturnType<typeof vi.fn>;
+            },
+          ) => void;
+        };
+      };
+      const path = "/api/__clerk/v1/client/sign_ups?strategy=email_code";
+
+      expect(options.pathRewrite(path, { headers: { origin } })).toBe(
+        "/v1/client/sign_ups?strategy=email_code&_is_native=1",
+      );
+      expect(options.pathRewrite("/api/__clerk/v1/client/sign_ins", { headers: { origin } })).toBe(
+        "/v1/client/sign_ins?_is_native=1",
+      );
+      expect(options.pathRewrite(path, { headers: { origin: "https://corvlio.com" } })).toBe(
+        "/v1/client/sign_ups?strategy=email_code",
+      );
+      expect(options.pathRewrite("/api/__clerk/npm/@clerk/clerk-js.js", { headers: { origin } })).toBe(
+        "/npm/@clerk/clerk-js.js",
+      );
+
+      middleware(
+        {
+          method: "POST",
+          url: "/api/__clerk/v1/client/sign_ups",
+          headers: { origin, authorization: "Bearer client-token-test", host: "dashboard.example" },
+        } as unknown as Request,
+        {} as Response,
+        vi.fn(),
+      );
+
+      const proxyReq = { setHeader: vi.fn(), removeHeader: vi.fn() };
+      options.on.proxyReq(proxyReq, {
+        url: "/api/__clerk/v1/client/sign_ups",
+        headers: {
+          origin,
+          authorization: "Bearer client-token-test",
+          host: "dashboard.example",
+        },
+        socket: { remoteAddress: "127.0.0.1" },
+      });
+      expect(proxyReq.setHeader).toHaveBeenCalledWith(
+        "Authorization",
+        "Bearer client-token-test",
+      );
+      expect(proxyReq.removeHeader).toHaveBeenCalledWith("Origin");
+      expect(proxyReq.setHeader).not.toHaveBeenCalledWith("Origin", expect.anything());
+
+      const downstream = {
+        writeHead: vi.fn(),
+        end: vi.fn(),
+        destroy: vi.fn(),
+      };
+      options.on.proxyRes(
+        {
+          headers: {
+            authorization: "Bearer client-token-next",
+            "content-length": "0",
+          },
+          statusCode: 200,
+          on: vi.fn(),
+          pipe: vi.fn(),
+        },
+        { method: "GET", headers: { origin } },
+        downstream,
+      );
+      const responseHeaders = downstream.writeHead.mock.calls[0]?.[1] as Record<string, string>;
+      expect(responseHeaders.authorization).toBe("Bearer client-token-next");
+      expect(responseHeaders["access-control-expose-headers"]).toContain("Authorization");
+    },
+  );
+
   it("accepts only bounded cookie values with a safe character set", () => {
     expect(isValidNativeClerkClientCookie("client_abc-123.%~")).toBe(true);
     expect(isValidNativeClerkClientCookie("")).toBe(false);

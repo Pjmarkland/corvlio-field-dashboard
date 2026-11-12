@@ -13,8 +13,9 @@
  * IMPORTANT:
  * - Only active in production (Clerk proxying doesn't work for dev instances)
  * - Must be mounted BEFORE express.json() middleware
- * - Native WebViews cannot store Clerk's cross-site __client cookie; normalize
- *   their Origin and bridge that cookie through X-Native-Clerk-Client.
+ * - Native WebViews use Clerk's _is_native Frontend API mode. The client token
+ *   travels through Authorization; the __client cookie is bridged only when
+ *   Clerk returns it, and native API requests omit Origin.
  *
  * Usage in app.ts:
  *   import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
@@ -48,6 +49,36 @@ function getNativeAppOrigin(origin: string | string[] | undefined): string | und
   return typeof origin === 'string' && NATIVE_APP_ORIGINS.has(origin)
     ? origin
     : undefined;
+}
+
+function getClerkPath(path: string): string {
+  return path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), '') || '/';
+}
+
+function isNativeFrontendApiPath(path: string): boolean {
+  const pathname = getClerkPath(path).split('?', 1)[0];
+  return pathname === '/v1'
+    || pathname.startsWith('/v1/')
+    || pathname === '/oauth'
+    || pathname.startsWith('/oauth/');
+}
+
+function rewriteClerkProxyPath(
+  path: string,
+  origin: string | string[] | undefined,
+): string {
+  const rewrittenPath = getClerkPath(path);
+  if (!getNativeAppOrigin(origin) || !isNativeFrontendApiPath(path)) {
+    return rewrittenPath;
+  }
+
+  const queryIndex = rewrittenPath.indexOf('?');
+  const pathname = queryIndex < 0 ? rewrittenPath : rewrittenPath.slice(0, queryIndex);
+  const query = queryIndex < 0 ? '' : rewrittenPath.slice(queryIndex + 1);
+  const searchParams = new URLSearchParams(query);
+  searchParams.set('_is_native', '1');
+
+  return `${pathname}?${searchParams.toString()}`;
 }
 
 function firstHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -208,8 +239,8 @@ export function clerkProxyMiddleware(): RequestHandler {
     // Take over the response so it can be re-sent with a Content-Length (see
     // proxyRes); the deployment edge rejects chunked proxied responses.
     selfHandleResponse: true,
-    pathRewrite: (path: string) =>
-      path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ''),
+    pathRewrite: (path: string, req) =>
+      rewriteClerkProxyPath(path, req.headers.origin),
     on: {
       proxyReq: (proxyReq, req) => {
         const publicOrigin = getProxyPublicOrigin(req);
@@ -218,7 +249,14 @@ export function clerkProxyMiddleware(): RequestHandler {
         proxyReq.setHeader('Clerk-Proxy-Url', proxyUrl);
         proxyReq.setHeader('Clerk-Secret-Key', secretKey);
         if (getNativeAppOrigin(req.headers.origin)) {
-          proxyReq.setHeader('Origin', publicOrigin);
+          // Native Frontend API requests identify themselves with
+          // _is_native=1 and the client Authorization token. Clerk rejects
+          // requests that contain both Origin and Authorization.
+          if (isNativeFrontendApiPath(req.url ?? '')) {
+            proxyReq.removeHeader('Origin');
+          } else {
+            proxyReq.setHeader('Origin', publicOrigin);
+          }
           if (req.headers.authorization !== undefined) {
             proxyReq.setHeader('Authorization', req.headers.authorization);
           }
