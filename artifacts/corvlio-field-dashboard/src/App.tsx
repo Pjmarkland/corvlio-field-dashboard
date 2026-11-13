@@ -509,6 +509,7 @@ function SpamPage() {
   const leads = query.data?.pages.flatMap((page) => page.leads) ?? [];
   return <>
     <PageHeading eyebrow="Review" title="Spam leads" description="These leads are hidden from your active lists. Calls are still allowed. Open one to restore it." />
+    <p role="note" className="mb-5 rounded-xl bg-muted/50 px-4 py-3 text-sm leading-relaxed text-muted-foreground">Spam: calls our receptionist flagged as junk, robocalls, or wrong numbers. Nothing here needs a callback. If a real customer ended up here by mistake, open the call and move it back to Today.</p>
     {query.isPending ? <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">Loading spam leads…</p>
       : query.isError ? <p role="alert" className="rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive">Spam leads could not be loaded. Try again.</p>
       : leads.length ? <div className="space-y-2">{leads.map((lead) => <Link key={lead.id} href={`/leads/${lead.id}`} state={{ from: '/spam' }} data-testid={`link-spam-lead-${lead.id}`} className="block rounded-xl border border-border bg-card p-4 hover:border-primary/40">
